@@ -108,8 +108,7 @@ target/kernel {
             --prefix=@(prefix) \
             --arch=x86_64 \
             --toolchain-triplet=x86_64-elf \
-            --sysroot=@(sysroot_dir) \
-            --production
+            --sysroot=@(sysroot_dir)
     }
     build { make all }
     install { DESTDIR=@(install_dir) make install }
