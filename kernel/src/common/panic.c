@@ -9,7 +9,7 @@
     va_list list;
 	va_start(list, format);
     log_list(LOG_LEVEL_ERROR, "PANIC", fmt, list);
-    arch_debug_stack_trace(arch_debug_stack_frame_get());
+    arch_debug_stack_trace();
 	va_end(list);
     arch_cpu_halt();
     __builtin_unreachable();
