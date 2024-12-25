@@ -6,6 +6,7 @@
 #include "arch/debug.h"
 #include "arch/x86_64/sys/port.h"
 #include "arch/x86_64/sys/cpuid.h"
+#include "arch/x86_64/sys/gdt.h"
 
 #include <tartarus.h>
 #include <stddef.h>
@@ -66,6 +67,8 @@ static log_sink_t g_serial_sink = {
     }
 
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_MSR));
+
+    x86_64_gdt_load();
 
     log(LOG_LEVEL_INFO, "INIT", "Reached end of init");
     arch_cpu_halt();
