@@ -1,0 +1,131 @@
+// Support
+source/support {
+    url: support
+    type: local
+}
+
+// Freestanding Toolchain
+source/freestanding_binutils {
+    url: https://ftp.gnu.org/gnu/binutils/binutils-2.41.tar.gz
+    b2sum: 5a4c2bc5e4dfcb9902732d8393c58e8b435dbc91db974672a4d2fd6f6c5ae6d7651ccbcb7faf8915bb2405ff11c0788a5994ea717f929b76ca86dbcb567f7029
+    type: tar.gz
+}
+
+source/freestanding_gcc {
+    url: https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.gz
+    b2sum: 749671e29fb8bcd35e5bb9d1f8a5a4b815d1764c48f996ce406ef198731962d58b86d69db7b04a75a4ebcaf5d9f80d0715fe6b14139a60da5b4d2445388efa58
+    type: tar.gz
+    patch: freestanding-gcc.diff
+}
+
+host/freestanding_binutils {
+    source: freestanding_binutils
+    dependencies [ image/gcc image/binutils ]
+    configure {
+        CFLAGS="-O2 -pipe" CXXFLAGS="-O2 -pipe" \
+        @(source_dir)/configure \
+            --target=x86_64-elf \
+            --prefix=@(prefix) \
+            --with-sysroot \
+            --disable-nls \
+            --disable-werror
+    }
+    build { make -j@(thread_count) all }
+    install { DESTDIR=@(install_dir) make install }
+}
+
+host/freestanding_gcc {
+    source: freestanding_gcc
+    dependencies [ *host/freestanding_binutils image/gcc *image/libisl *image/libmpc ]
+    configure {
+        CFLAGS="-O2 -pipe" CXXFLAGS="-O2 -pipe" \
+        @(source_dir)/configure \
+            --target=x86_64-elf \
+            --prefix=@(prefix) \
+            --disable-nls \
+            --enable-languages=c \
+            --without-headers
+    }
+    build {
+        make -j@(thread_count) all-gcc
+        make -j@(thread_count) all-target-libgcc
+    }
+    install {
+        DESTDIR=@(install_dir) make install-gcc
+        DESTDIR=@(install_dir) make install-target-libgcc
+    }
+}
+
+
+// mkimg
+source/mkimg {
+    url: https://git.thenest.dev/wux/mkimg/-/archive/main/mkimg-main.tar.gz
+    b2sum: 653ee4d9516d24c906646cbfe69ae4f02369143c2ddb3207f9bb357666385f4a28d9ab009efe827b874b7478c2f50fb30231b0ba19b4c60a3d4618734308b99b
+    type: tar.gz
+}
+
+host/mkimg {
+    source: mkimg
+    dependencies [ image/go ]
+    configure { cp @(source_dir)/go.mod @(source_dir)/go.sum @(source_dir)/main.go . }
+    build { go build }
+    install {
+        mkdir -p @(install_dir)@(prefix)/bin
+        cp mkimg @(install_dir)@(prefix)/bin
+    }
+}
+
+// Tartarus (Bootloader)
+source/tartarus {
+    url: https://git.thenest.dev/wux/tartarus-bootloader/-/archive/8d1decae0d0d8072f40fe0ff5de9ab1b8a5f6ec3/tartarus-bootloader-8d1decae0d0d8072f40fe0ff5de9ab1b8a5f6ec3.tar.gz
+    b2sum: 45877dc085ca300e7874a8c67835457bd439d28933b77b47b6c45d59d19df962e35c90129a78574b6a50444a4de3ce45ef8123707b211ff352ccfa6f6ddd732a
+    type: tar.gz
+}
+
+target/tartarus {
+    source: tartarus
+    dependencies [ host/freestanding_gcc image/nasm image/git ]
+    configure {
+        @(source_dir)/conf.sh \
+            --prefix=@(prefix) \
+            --target=x86_64-bios
+    }
+    build { make -j@(thread_count) all }
+    install { DESTDIR=@(install_dir) make install }
+}
+
+// Kernel
+source/kernel {
+    url: kernel
+    type: local
+}
+
+target/kernel {
+    source: kernel
+    dependencies [ host/freestanding_gcc target/tartarus ]
+    configure {
+        @(source_dir)/conf.sh \
+            --prefix=@(prefix) \
+            --arch=x86_64 \
+            --toolchain-triplet=x86_64-elf \
+            --sysroot=@(sysroot_dir) \
+            --production
+    }
+    build { make all }
+    install { DESTDIR=@(install_dir) make install }
+}
+
+// Image
+target/image {
+    dependencies [ host/freestanding_binutils host/mkimg source/support target/tartarus target/kernel ]
+    build {
+        cp @(sysroot_dir)@(prefix)/share/tartarus/* .
+        cp @(sysroot_dir)@(prefix)/share/kernel.elf .
+        cp @(sources_dir)/support/tartarus.cfg .
+
+        x86_64-elf-nm kernel.elf -n > kernelsymbols.txt
+
+        mkimg --config=@(sources_dir)/support/mkimg.toml
+    }
+    install { cp elysium.img @(install_dir) }
+}

@@ -1,0 +1,6 @@
+{
+    "C_Cpp.files.exclude": {
+        "**/.chariot-cache": true
+    },
+    "C_Cpp.default.compilerPath": ""
+}

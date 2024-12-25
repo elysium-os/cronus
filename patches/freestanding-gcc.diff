@@ -1,0 +1,17 @@
+diff -Naru gcc-13.2.0/gcc/config/i386/t-x86_64-elf gcc-13.2.0-modified/gcc/config/i386/t-x86_64-elf
+--- gcc-13.2.0/gcc/config/i386/t-x86_64-elf	1970-01-01 02:00:00.000000000 +0200
++++ gcc-13.2.0-modified/gcc/config/i386/t-x86_64-elf	2023-12-21 05:15:35.525427727 +0200
+@@ -0,0 +1,2 @@
++MULTILIB_OPTIONS += mno-red-zone
++MULTILIB_DIRNAMES += no-red-zone
+diff -Naru gcc-13.2.0/gcc/config.gcc gcc-13.2.0-modified/gcc/config.gcc
+--- gcc-13.2.0/gcc/config.gcc	2023-07-27 11:13:04.000000000 +0300
++++ gcc-13.2.0-modified/gcc/config.gcc	2023-12-21 05:15:35.535427727 +0200
+@@ -1865,6 +1865,7 @@
+ 	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h"
+ 	;;
+ x86_64-*-elf*)
++	tmake_file="${tmake_file} i386/t-x86_64-elf"
+ 	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
+ 	;;
+ x86_64-*-rtems*)

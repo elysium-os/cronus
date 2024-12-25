@@ -1,0 +1,47 @@
+{
+    "configurations": [
+        {
+            "name": "ElysiumOS",
+            "includePath": [
+                "${workspaceFolder}/kernel/src",
+                "${workspaceFolder}/.chariot-cache/target/tartarus/install/usr/include"
+            ],
+            "defines": [
+                "__ARCH_X86_64",
+                "__MLIBC_ABI_ONLY",
+
+                /* Unsupported C23 features work-around */
+                /* https://github.com/microsoft/vscode-cpptools/issues/10696 */
+                "true=1",
+                "false=0",
+                "bool=_Bool",
+                "static_assert=_Static_assert"
+            ],
+            "compilerPath": "/run/current-system/sw/bin/gcc",
+            "cStandard": "gnu23",
+            "intelliSenseMode": "gcc-x64",
+            "compilerArgs": [
+                "-std=gnu2x",
+                "-ffreestanding",
+                "-mcmodel=kernel",
+                "-mno-red-zone",
+                "-mgeneral-regs-only",
+                "-O3",
+
+                "-Wall",
+                "-Wextra",
+                "-Wno-unused-variable",
+                "-Wno-microsoft-anon-tag",
+                "-Wvla",
+                "-Wshadow",
+
+                "-fno-stack-protector",
+                "-fno-stack-check",
+                "-fno-omit-frame-pointer",
+                "-fno-strict-aliasing",
+                "-D__ARCH_X86_64"
+            ]
+        }
+    ],
+    "version": 4
+}

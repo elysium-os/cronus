@@ -1,0 +1,5 @@
+.chariot-cache/
+!.chariot-cache/patches
+
+build/
+log.txt
