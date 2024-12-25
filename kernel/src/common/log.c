@@ -31,7 +31,7 @@ void log_list(log_level_t level, const char *tag, const char *fmt, va_list list)
     spinlock_acquire(&g_lock);
     LIST_FOREACH(&g_sinks, elem) {
         log_sink_t *sink = LIST_CONTAINER_GET(elem, log_sink_t, list_elem);
-        if(sink->filter.level <= level) continue;
+        if(sink->filter.level < level) continue;
         for(size_t i = 0; i < sink->filter.tag_count; i++) if(string_eq(sink->filter.tags[i], tag) != sink->filter.tags_as_include) goto skip;
 	    va_copy(local_list, list);
         sink->log(level, tag, fmt, local_list);
