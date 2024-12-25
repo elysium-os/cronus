@@ -1,9 +1,11 @@
 #include "lib/string.h"
+#include "common/assert.h"
 #include "common/log.h"
 #include "memory/hhdm.h"
 #include "arch/cpu.h"
 #include "arch/debug.h"
 #include "arch/x86_64/sys/port.h"
+#include "arch/x86_64/sys/cpuid.h"
 
 #include <tartarus.h>
 #include <stddef.h>
@@ -53,7 +55,7 @@ static log_sink_t g_serial_sink = {
 
     serial_raw('\n');
     log_sink_add(&g_serial_sink);
-    log(LOG_LEVEL_INFO, "INIT", "Elysium alpha_6 (" __DATE__ " " __TIME__ ")");
+    log(LOG_LEVEL_INFO, "INIT", "Elysium alpha.6 (" __DATE__ " " __TIME__ ")");
 
     for(uint16_t i = 0; i < boot_info->module_count; i++) {
         tartarus_module_t *module = &boot_info->modules[i];
@@ -63,6 +65,9 @@ static log_sink_t g_serial_sink = {
         g_arch_debug_symbols_length = module->size;
     }
 
+    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_MSR));
+
+    log(LOG_LEVEL_INFO, "INIT", "Reached end of init");
     arch_cpu_halt();
     __builtin_unreachable();
 }
