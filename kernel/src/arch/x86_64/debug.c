@@ -1,25 +1,20 @@
 #include "arch/debug.h"
 
 #include "common/log.h"
+#include "arch/x86_64/debug.h"
 
-#include <stdint.h>
 #include <stddef.h>
 
 const char *g_arch_debug_symbols = NULL;
 size_t g_arch_debug_symbols_length = 0;
 
-struct debug_stack_frame {
-    struct debug_stack_frame *rbp;
-    uint64_t rip;
-} __attribute__((packed));
-
 void arch_debug_stack_trace() {
-    debug_stack_frame_t *stack_frame;
+    x86_64_debug_stack_frame_t *stack_frame;
     asm volatile("movq %%rbp, %0" : "=r" (stack_frame));
-    arch_debug_stack_trace_from(stack_frame);
+    x86_64_debug_stack_trace_from(stack_frame);
 }
 
-void arch_debug_stack_trace_from(debug_stack_frame_t *stack_frame) {
+void x86_64_debug_stack_trace_from(x86_64_debug_stack_frame_t *stack_frame) {
     if(g_arch_debug_symbols == NULL) {
         log(LOG_LEVEL_DEBUG, "DEBUG", "Stack Trace: missing debug symbols");
         return;
