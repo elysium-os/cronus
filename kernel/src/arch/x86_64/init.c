@@ -7,9 +7,13 @@
 #include "memory/pmm.h"
 #include "arch/cpu.h"
 #include "arch/debug.h"
+#include "arch/x86_64/interrupt.h"
+#include "arch/x86_64/exception.h"
+#include "arch/x86_64/sys/gdt.h"
 #include "arch/x86_64/sys/port.h"
 #include "arch/x86_64/sys/cpuid.h"
-#include "arch/x86_64/sys/gdt.h"
+#include "arch/x86_64/sys/lapic.h"
+#include "arch/x86_64/dev/pic8259.h"
 
 #include <tartarus.h>
 #include <stddef.h>
@@ -96,7 +100,26 @@ static log_sink_t g_serial_sink = {
         }
     }
 
+    // Initialize interrupt & exception handling
+    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC))
+    x86_64_pic8259_remap();
+    x86_64_pic8259_disable();
+    x86_64_lapic_initialize();
+    g_x86_64_interrupt_irq_eoi = x86_64_lapic_eoi;
+    x86_64_interrupt_init();
+    x86_64_interrupt_load_idt();
+    for(int i = 0; i < 32; i++) {
+        switch(i) {
+            default:
+                x86_64_interrupt_set(i, X86_64_INTERRUPT_PRIORITY_EXCEPTION, x86_64_exception_unhandled);
+                break;
+        }
+    }
+    x86_64_init_flag_set(X86_64_INIT_FLAG_INTERRUPTS);
+
     log(LOG_LEVEL_INFO, "INIT", "Reached end of init");
+
+    asm volatile ("ud2");
     arch_cpu_halt();
     __builtin_unreachable();
 }
