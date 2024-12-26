@@ -37,7 +37,7 @@ $(BUILD)/kernel.elf: $(S_SOURCES:.S=_S.o) $(C_SOURCES:.c=.o)
 endif
 
 %_S.o: %.S
-	$(ASMC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
