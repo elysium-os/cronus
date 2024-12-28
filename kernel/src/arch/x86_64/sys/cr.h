@@ -25,7 +25,7 @@ static inline uint64_t x86_64_cr4_read() {
 }
 
 static inline void x86_64_cr4_write(uint64_t value) {
-    asm volatile("mov %0, %%cr4" : : "r"(value) : "memory"); // TODO memory clobber uncessary?
+    asm volatile("mov %0, %%cr4" : : "r"(value) : "memory");
 }
 
 static inline uint64_t x86_64_cr8_read() {

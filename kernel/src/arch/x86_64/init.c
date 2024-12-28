@@ -1,27 +1,39 @@
 #include "init.h"
 
 #include "lib/string.h"
+#include "lib/math.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "memory/hhdm.h"
 #include "memory/pmm.h"
+#include "memory/heap.h"
+#include "memory/vm.h"
 #include "arch/cpu.h"
+#include "arch/ptm.h"
+#include "arch/page.h"
 #include "arch/debug.h"
 #include "arch/x86_64/interrupt.h"
 #include "arch/x86_64/exception.h"
 #include "arch/x86_64/sys/gdt.h"
+#include "arch/x86_64/sys/msr.h"
 #include "arch/x86_64/sys/port.h"
 #include "arch/x86_64/sys/cpuid.h"
 #include "arch/x86_64/sys/lapic.h"
 #include "arch/x86_64/dev/pic8259.h"
+#include "arch/x86_64/sys/cr.h"
+#include "arch/x86_64/ptm.h"
 
 #include <tartarus.h>
 #include <stddef.h>
+
+#define ADJUST_STACK(OFFSET) asm volatile("mov %%rsp, %%rax\nadd %0, %%rax\nmov %%rax, %%rsp\nmov %%rbp, %%rax\nadd %0, %%rax\nmov %%rax, %%rbp" : : "rm" (OFFSET) : "rax", "memory")
 
 uintptr_t g_hhdm_offset;
 size_t g_hhdm_size;
 
 static size_t init_flags = 0;
+
+static vm_region_t g_hhdm_region, g_kernel_region;
 
 static void serial_raw(char c) {
     x86_64_port_outb(0x3F8, c);
@@ -117,18 +129,51 @@ static log_sink_t g_serial_sink = {
     }
     x86_64_init_flag_set(X86_64_INIT_FLAG_INTERRUPTS);
 
+    // Initialize Virtual Memory
+    uint64_t pat = x86_64_msr_read(X86_64_MSR_PAT);
+    pat &= ~(((uint64_t) 0b111 << 48) | ((uint64_t) 0b111 << 40));
+    pat |= ((uint64_t) 0x1 << 48) | ((uint64_t) 0x5 << 40);
+    x86_64_msr_write(X86_64_MSR_PAT, pat);
+
+    uint64_t cr4 = x86_64_cr4_read();
+    cr4 |= 1 << 7; /* CR4.PGE */
+    x86_64_cr4_write(cr4);
+
+    g_vm_global_address_space = x86_64_ptm_init();
+    x86_64_interrupt_set(0xE, X86_64_INTERRUPT_PRIORITY_EXCEPTION, x86_64_ptm_page_fault_handler);
+
+    g_hhdm_region.address_space = g_vm_global_address_space;
+    g_hhdm_region.base = MATH_FLOOR(g_hhdm_offset, ARCH_PAGE_GRANULARITY);
+    g_hhdm_region.length = MATH_CEIL(g_hhdm_size, ARCH_PAGE_GRANULARITY);
+    g_hhdm_region.protection = (vm_protection_t) { .read = true, .write = true };
+    g_hhdm_region.cache_behavior = VM_CACHE_STANDARD;
+    g_hhdm_region.type = VM_REGION_TYPE_DIRECT;
+    g_hhdm_region.type_data.direct.physical_address = 0;
+    list_append(&g_vm_global_address_space->regions, &g_hhdm_region.list_elem);
+
+    g_kernel_region.address_space = g_vm_global_address_space;
+    g_kernel_region.base = MATH_FLOOR(boot_info->kernel.vaddr, ARCH_PAGE_GRANULARITY);
+    g_kernel_region.length = MATH_CEIL(boot_info->kernel.size, ARCH_PAGE_GRANULARITY);
+    g_kernel_region.protection = (vm_protection_t) { .read = true, .write = true };
+    g_kernel_region.cache_behavior = VM_CACHE_STANDARD;
+    g_kernel_region.type = VM_REGION_TYPE_ANON;
+    list_append(&g_vm_global_address_space->regions, &g_kernel_region.list_elem);
+
+    ADJUST_STACK(g_hhdm_offset);
+    arch_ptm_load_address_space(g_vm_global_address_space);
+    x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_VIRT);
+
     log(LOG_LEVEL_INFO, "INIT", "Reached end of init");
 
-    asm volatile ("ud2");
     arch_cpu_halt();
     __builtin_unreachable();
 }
 
 bool x86_64_init_flag_check(size_t flag) {
     ASSERT(flag < sizeof(init_flags) * 8);
-    return ((1 << flag) & init_flags) != 0;
+    return (flag & init_flags) == flag;
 }
 
 void x86_64_init_flag_set(size_t flag) {
-    init_flags |= (1 << flag);
+    init_flags |= flag;
 }
