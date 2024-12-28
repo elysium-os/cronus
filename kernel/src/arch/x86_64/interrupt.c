@@ -60,13 +60,11 @@ static void set_idt_gate(uint8_t gate, uintptr_t handler, uint16_t segment, uint
 }
 
 static void interrupt_priority_set(x86_64_interrupt_priority_t priority) {
-    asm volatile("mov %0, %%cr8" : : "r" ((uint64_t) priority));
+    x86_64_cr8_write(((uint64_t) priority));
 }
 
 static x86_64_interrupt_priority_t interrupt_priority_get() {
-    uint64_t ipl;
-    asm volatile("mov %%cr8, %0" : "=r" (ipl));
-    return (x86_64_interrupt_priority_t) ipl;
+    return (x86_64_interrupt_priority_t) x86_64_cr8_read();
 }
 
 void arch_interrupt_set_ipl(ipl_t ipl) {

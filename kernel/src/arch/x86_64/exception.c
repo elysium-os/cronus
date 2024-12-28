@@ -46,11 +46,7 @@ static char *g_exception_messages[] = {
     initial_stack_frame.rip = frame->rip;
     x86_64_debug_stack_trace_from(&initial_stack_frame);
 
-    if(frame->int_no == 14) {
-        uint64_t cr2_value;
-        asm volatile("movq %%cr2, %0" : "=r" (cr2_value));
-        log(LOG_LEVEL_DEBUG, "EXCEPTION", "CR2: %#lx", cr2_value);
-    }
+    if(frame->int_no == 14) log(LOG_LEVEL_DEBUG, "EXCEPTION", "CR2: %#lx", x86_64_cr2_read());
 
     log(
         LOG_LEVEL_DEBUG,
