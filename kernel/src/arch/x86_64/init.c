@@ -2,6 +2,7 @@
 
 #include "lib/string.h"
 #include "lib/math.h"
+#include "lib/mem.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "memory/hhdm.h"
@@ -12,6 +13,7 @@
 #include "arch/ptm.h"
 #include "arch/page.h"
 #include "arch/debug.h"
+#include "arch/interrupt.h"
 #include "arch/x86_64/interrupt.h"
 #include "arch/x86_64/exception.h"
 #include "arch/x86_64/sys/gdt.h"
@@ -20,16 +22,24 @@
 #include "arch/x86_64/sys/cpuid.h"
 #include "arch/x86_64/sys/lapic.h"
 #include "arch/x86_64/dev/pic8259.h"
+#include "arch/x86_64/sys/cpu.h"
 #include "arch/x86_64/sys/cr.h"
+#include "arch/x86_64/dev/pit.h"
 #include "arch/x86_64/ptm.h"
 
 #include <tartarus.h>
 #include <stddef.h>
 
+#define PIT_TIMER_FREQ 1000
+#define LAPIC_CALIBRATION_TICKS 0x10000
+
 #define ADJUST_STACK(OFFSET) asm volatile("mov %%rsp, %%rax\nadd %0, %%rax\nmov %%rax, %%rsp\nmov %%rbp, %%rax\nadd %0, %%rax\nmov %%rax, %%rbp" : : "rm" (OFFSET) : "rax", "memory")
 
 uintptr_t g_hhdm_offset;
 size_t g_hhdm_size;
+
+volatile size_t g_x86_64_cpu_count;
+x86_64_cpu_t *g_x86_64_cpus;
 
 static size_t init_flags = 0;
 
@@ -71,7 +81,57 @@ static log_sink_t g_serial_sink = {
     .log = log_serial
 };
 
-[[noreturn]] void init([[maybe_unused]] tartarus_boot_info_t *boot_info) {
+[[noreturn]] __attribute__((naked)) static void init_ap() {
+    log(LOG_LEVEL_INFO, "INIT", "Initializing AP %i", x86_64_lapic_id());
+
+    x86_64_gdt_load();
+
+    // Virtual Memory
+    uint64_t pat = x86_64_msr_read(X86_64_MSR_PAT);
+    pat &= ~(((uint64_t) 0b111 << 48) | ((uint64_t) 0b111 << 40));
+    pat |= ((uint64_t) 0x1 << 48) | ((uint64_t) 0x5 << 40);
+    x86_64_msr_write(X86_64_MSR_PAT, pat);
+
+    uint64_t cr4 = x86_64_cr4_read();
+    cr4 |= 1 << 7; /* CR4.PGE */
+    x86_64_cr4_write(cr4);
+
+    ADJUST_STACK(g_hhdm_offset);
+    arch_ptm_load_address_space(g_vm_global_address_space);
+
+    // Interrupts
+    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
+    x86_64_lapic_initialize();
+    x86_64_interrupt_load_idt();
+
+    // CPU Local
+    x86_64_tss_t *tss = heap_alloc(sizeof(x86_64_tss_t));
+    memset(tss, 0, sizeof(x86_64_tss_t));
+    tss->iomap_base = sizeof(x86_64_tss_t);
+    x86_64_gdt_load_tss(tss);
+
+    x86_64_pit_set_reload(UINT16_MAX);
+    uint16_t start_count = x86_64_pit_count();
+    x86_64_lapic_timer_poll(LAPIC_CALIBRATION_TICKS);
+    uint16_t end_count = x86_64_pit_count();
+
+    x86_64_cpu_t *cpu = &g_x86_64_cpus[g_x86_64_cpu_count];
+    cpu->lapic_id = x86_64_lapic_id();
+    cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * PIT_BASE_FREQ;
+    cpu->tss = tss;
+    cpu->tlb_shootdown_check = SPINLOCK_INIT;
+    cpu->tlb_shootdown_lock = SPINLOCK_INIT;
+
+    log(LOG_LEVEL_DEBUG, "INIT", "AP %i:%i init exit", g_x86_64_cpu_count, x86_64_lapic_id());
+    __atomic_add_fetch(&g_x86_64_cpu_count, 1, __ATOMIC_SEQ_CST);
+
+    arch_interrupt_set_ipl(IPL_PREEMPT);
+    asm volatile("sti");
+    arch_cpu_halt();
+    __builtin_unreachable();
+}
+
+[[noreturn]] void init(tartarus_boot_info_t *boot_info) {
     g_hhdm_offset = boot_info->hhdm.offset;
     g_hhdm_size = boot_info->hhdm.size;
 
@@ -165,6 +225,45 @@ static log_sink_t g_serial_sink = {
 
     // Initialize HEAP
     heap_initialize(g_vm_global_address_space, 0x100'0000'0000);
+
+    // SMP init
+    g_x86_64_cpus = heap_alloc(sizeof(x86_64_cpu_t) * boot_info->cpu_count);
+
+    x86_64_tss_t *tss = heap_alloc(sizeof(x86_64_tss_t));
+    memset(tss, 0, sizeof(x86_64_tss_t));
+    tss->iomap_base = sizeof(x86_64_tss_t);
+    x86_64_gdt_load_tss(tss);
+
+    x86_64_pit_set_reload(UINT16_MAX);
+    uint16_t start_count = x86_64_pit_count();
+    x86_64_lapic_timer_poll(LAPIC_CALIBRATION_TICKS);
+    uint16_t end_count = x86_64_pit_count();
+
+    x86_64_cpu_t *cpu = NULL;
+
+    g_x86_64_cpu_count = 0;
+    for(size_t i = 0; i < boot_info->cpu_count; i++) {
+        if(boot_info->cpus[i].init_failed) continue;
+
+        if(i == boot_info->bsp_index) {
+            cpu = &g_x86_64_cpus[g_x86_64_cpu_count];
+            cpu->lapic_id = x86_64_lapic_id();
+            cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * PIT_BASE_FREQ;
+            cpu->tss = tss;
+            cpu->tlb_shootdown_check = SPINLOCK_INIT;
+            cpu->tlb_shootdown_lock = SPINLOCK_INIT;
+            g_x86_64_cpu_count++;
+            continue;
+        }
+
+        size_t previous_count = g_x86_64_cpu_count;
+        *boot_info->cpus[i].wake_on_write = (uint64_t) init_ap;
+        while(previous_count >= g_x86_64_cpu_count);
+    }
+    ASSERT(cpu != NULL);
+
+    log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%i/%i cpus initialized)", g_x86_64_cpu_count, boot_info->cpu_count);
+    x86_64_init_flag_set(X86_64_INIT_FLAG_SMP);
 
     log(LOG_LEVEL_INFO, "INIT", "Reached end of init");
 
