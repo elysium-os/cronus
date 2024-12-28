@@ -100,6 +100,24 @@ vm_address_space_t *x86_64_ptm_init() {
     return &g_initial_address_space.common;
 }
 
+vm_address_space_t *arch_ptm_address_space_create() {
+    x86_64_address_space_t *address_space = heap_alloc(sizeof(x86_64_address_space_t));
+    address_space->cr3 = pmm_alloc_page(PMM_ZONE_NORMAL, PMM_FLAG_ZERO)->paddr;
+    address_space->cr3_lock = SPINLOCK_INIT;
+    address_space->common.lock = SPINLOCK_INIT;
+    address_space->common.regions = LIST_INIT;
+    address_space->common.start = USERSPACE_START;
+    address_space->common.end = USERSPACE_END;
+
+    memcpy(
+        (void *) HHDM(address_space->cr3 + 256 * sizeof(uint64_t)),
+        (void *) HHDM(X86_64_AS(g_vm_global_address_space)->cr3 + 256 * sizeof(uint64_t)),
+        256 * sizeof(uint64_t)
+    );
+
+    return &address_space->common;
+}
+
 void arch_ptm_load_address_space(vm_address_space_t *address_space) {
     x86_64_cr3_write(X86_64_AS(address_space)->cr3);
 }

@@ -5,6 +5,12 @@
 #include <stdint.h>
 
 /**
+ * @brief Create a new address space.
+ * @warning Depends on heap.
+ */
+vm_address_space_t *arch_ptm_address_space_create();
+
+/**
  * @brief Load a virtual address space.
  */
 void arch_ptm_load_address_space(vm_address_space_t *address_space);
