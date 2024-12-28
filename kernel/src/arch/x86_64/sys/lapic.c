@@ -41,3 +41,16 @@ uint32_t x86_64_lapic_id() {
     return (uint8_t) (lapic_read(REG_ID) >> 24);
 }
 
+void x86_64_lapic_timer_poll(uint32_t ticks) {
+    x86_64_lapic_timer_stop();
+    lapic_write(REG_LVT_TIMER, (1 << 16) | 0xFF);
+    lapic_write(REG_TIMER_DIV, 0);
+    lapic_write(REG_TIMER_INITIAL_COUNT, ticks);
+    while(lapic_read(REG_TIMER_CURRENT_COUNT) != 0);
+    x86_64_lapic_timer_stop();
+}
+
+void x86_64_lapic_timer_stop() {
+    lapic_write(REG_TIMER_INITIAL_COUNT, 0);
+    lapic_write(REG_LVT_TIMER, (1 << 16));
+}

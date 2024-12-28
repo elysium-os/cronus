@@ -25,3 +25,14 @@ void x86_64_lapic_eoi(uint8_t interrupt_vector);
  */
 void x86_64_lapic_ipi(uint32_t lapic_id, uint32_t vec);
 
+/**
+ * @brief Polls the local apic timer.
+ * @warning This function blocks until polling is done.
+ */
+void x86_64_lapic_timer_poll(uint32_t ticks);
+
+
+/**
+ * @brief Stop the local apic timer.
+ */
+void x86_64_lapic_timer_stop();
