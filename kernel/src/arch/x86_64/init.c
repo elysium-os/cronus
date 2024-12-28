@@ -163,6 +163,9 @@ static log_sink_t g_serial_sink = {
     arch_ptm_load_address_space(g_vm_global_address_space);
     x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_VIRT);
 
+    // Initialize HEAP
+    heap_initialize(g_vm_global_address_space, 0x100'0000'0000);
+
     log(LOG_LEVEL_INFO, "INIT", "Reached end of init");
 
     arch_cpu_halt();
