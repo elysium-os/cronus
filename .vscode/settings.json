@@ -2,16 +2,7 @@
     "C_Cpp.files.exclude": {
         "**/.chariot-cache": true
     },
-    "files.associations": {
-        "*.h": "c",
-        "charconv": "c",
-        "optional": "c",
-        "format": "c",
-        "system_error": "c",
-        "array": "c",
-        "functional": "c",
-        "tuple": "c",
-        "type_traits": "c",
-        "utility": "c"
-    }
+    "C_Cpp.autoAddFileAssociations": false,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true
 }
