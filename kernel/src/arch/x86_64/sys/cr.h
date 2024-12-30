@@ -2,38 +2,28 @@
 
 #include <stdint.h>
 
-static inline uint64_t x86_64_cr2_read() {
-    uint64_t value;
-    asm volatile("movq %%cr2, %0" : "=r"(value));
-    return value;
-}
+#define DEFINE_WRITE(REGISTER)                                           \
+    static inline void x86_64_##REGISTER##_write(uint64_t value) {       \
+        asm volatile("movq %0, %%" #REGISTER : : "r"(value) : "memory"); \
+    }
 
-static inline uint64_t x86_64_cr3_read() {
-    uint64_t value;
-    asm volatile("movq %%cr3, %0" : "=r"(value));
-    return value;
-}
+#define DEFINE_READ(REGISTER)                                   \
+    static inline uint64_t x86_64_##REGISTER##_read() {         \
+        uint64_t value;                                         \
+        asm volatile("movq %%" #REGISTER ", %0" : "=r"(value)); \
+        return value;                                           \
+    }
 
-static inline void x86_64_cr3_write(uint64_t value) {
-    asm volatile("mov %0, %%cr3" : : "r"(value) : "memory");
-}
+DEFINE_READ(cr0)
+DEFINE_WRITE(cr0)
 
-static inline uint64_t x86_64_cr4_read() {
-    uint64_t value;
-    asm volatile("movq %%cr4, %0" : "=r"(value));
-    return value;
-}
+DEFINE_READ(cr2)
 
-static inline void x86_64_cr4_write(uint64_t value) {
-    asm volatile("mov %0, %%cr4" : : "r"(value) : "memory");
-}
+DEFINE_READ(cr3)
+DEFINE_WRITE(cr3)
 
-static inline uint64_t x86_64_cr8_read() {
-    uint64_t value;
-    asm volatile("movq %%cr8, %0" : "=r"(value));
-    return value;
-}
+DEFINE_READ(cr4)
+DEFINE_WRITE(cr4)
 
-static inline void x86_64_cr8_write(uint64_t value) {
-    asm volatile("mov %0, %%cr8" : : "r"(value));
-}
+DEFINE_READ(cr8)
+DEFINE_WRITE(cr8)
