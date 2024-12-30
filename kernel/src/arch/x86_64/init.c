@@ -25,6 +25,7 @@
 #include "arch/x86_64/sys/cpu.h"
 #include "arch/x86_64/sys/cr.h"
 #include "arch/x86_64/dev/pit.h"
+#include "arch/x86_64/sys/fpu.h"
 #include "arch/x86_64/ptm.h"
 
 #include <tartarus.h>
@@ -121,6 +122,8 @@ static log_sink_t g_serial_sink = {
     cpu->tss = tss;
     cpu->tlb_shootdown_check = SPINLOCK_INIT;
     cpu->tlb_shootdown_lock = SPINLOCK_INIT;
+
+    x86_64_fpu_init_cpu();
 
     log(LOG_LEVEL_DEBUG, "INIT", "AP %i:%i init exit", g_x86_64_cpu_count, x86_64_lapic_id());
     __atomic_add_fetch(&g_x86_64_cpu_count, 1, __ATOMIC_SEQ_CST);
@@ -225,6 +228,11 @@ static log_sink_t g_serial_sink = {
 
     // Initialize HEAP
     heap_initialize(g_vm_global_address_space, 0x100'0000'0000);
+
+    // Initialize FPU
+    x86_64_fpu_init();
+    x86_64_fpu_init_cpu();
+
 
     // SMP init
     g_x86_64_cpus = heap_alloc(sizeof(x86_64_cpu_t) * boot_info->cpu_count);

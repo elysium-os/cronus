@@ -1,0 +1,73 @@
+#include "fpu.h"
+
+#include "common/assert.h"
+
+#include "arch/x86_64/sys/cpuid.h"
+#include "arch/x86_64/sys/cr.h"
+
+uint32_t g_x86_64_fpu_area_size = 0;
+void (*g_x86_64_fpu_save)(void *area) = 0;
+void (*g_x86_64_fpu_restore)(void *area) = 0;
+
+static inline void xsave(void *area) {
+    asm volatile("xsave (%0)" : : "r"(area), "a"(0xFFFF'FFFF), "d"(0xFFFF'FFFF) : "memory");
+}
+
+static inline void xrstor(void *area) {
+    asm volatile("xrstor (%0)" : : "r"(area), "a"(0xFFFF'FFFF), "d"(0xFFFF'FFFF) : "memory");
+}
+
+static inline void fxsave(void *area) {
+    asm volatile("fxsave (%0)" : : "r"(area) : "memory");
+}
+
+static inline void fxrstor(void *area) {
+    asm volatile("fxrstor (%0)" : : "r"(area) : "memory");
+}
+
+void x86_64_fpu_init() {
+    if(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_XSAVE)) {
+        uint32_t area_size;
+        ASSERT(!x86_64_cpuid_register(0xD, X86_64_CPUID_REGISTER_ECX, &area_size));
+        g_x86_64_fpu_area_size = area_size;
+        g_x86_64_fpu_save = xsave;
+        g_x86_64_fpu_restore = xrstor;
+    } else {
+        g_x86_64_fpu_area_size = 512;
+        g_x86_64_fpu_save = fxsave;
+        g_x86_64_fpu_restore = fxrstor;
+    }
+}
+
+void x86_64_fpu_init_cpu() {
+    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_FXSR));
+
+    /* Enable FPU */
+    uint64_t cr0 = x86_64_cr0_read();
+    cr0 &= ~(1 << 2); /* CR0.EM */
+    cr0 |= 1 << 1; /* CR0.MP */
+    x86_64_cr0_write(cr0);
+
+    /* Enable MMX & friends */
+    uint64_t cr4 = x86_64_cr4_read();
+    cr4 |= 1 << 9; /* CR4.OSFXSR */
+    cr4 |= 1 << 10; /* CR4.OSXMMEXCPT */
+    x86_64_cr4_write(cr4);
+
+    if(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_XSAVE)) {
+        cr4 = x86_64_cr4_read();
+        cr4 |= 1 << 18; /* CR4.OSXSAVE */
+        x86_64_cr4_write(cr4);
+
+        uint64_t xcr0 = 0;
+        xcr0 |= 1 << 0; /* XCR0.X87 */
+        xcr0 |= 1 << 1; /* XCR0.SSE */
+        if(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_AVX)) xcr0 |= 1 << 2; /* XCR0.AVX */
+        if(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_AVX512)) {
+            xcr0 |= 1 << 5; /* XCR0.opmask */
+            xcr0 |= 1 << 6; /* XCR0.ZMM_Hi256 */
+            xcr0 |= 1 << 7; /* XCR0.Hi16_ZMM */
+        }
+        asm volatile("xsetbv" : : "a"(xcr0), "d"(xcr0 >> 32), "c"(0) : "memory");
+    }
+}
