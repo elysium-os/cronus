@@ -2,8 +2,8 @@
 
 #include "arch/interrupt.h"
 
-#include "arch/x86_64/sys/cr.h"
-#include "arch/x86_64/sys/gdt.h"
+#include "arch/x86_64/cpu/cr.h"
+#include "arch/x86_64/cpu/gdt.h"
 
 #define FLAGS_NORMAL 0x8E
 #define FLAGS_TRAP 0x8F

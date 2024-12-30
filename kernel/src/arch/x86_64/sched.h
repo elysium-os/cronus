@@ -1,6 +1,6 @@
 #pragma once
 
-#include "arch/x86_64/sys/cpu.h"
+#include "arch/x86_64/cpu/cpu.h"
 
 /**
  * @brief Initialize the scheduler.

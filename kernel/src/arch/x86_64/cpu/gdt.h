@@ -1,6 +1,6 @@
 #pragma once
 
-#include "arch/x86_64/sys/tss.h"
+#include "arch/x86_64/cpu/tss.h"
 
 #include <stdint.h>
 

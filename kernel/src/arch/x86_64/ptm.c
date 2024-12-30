@@ -14,11 +14,11 @@
 #include "sys/cpu.h"
 #include "sys/ipl.h"
 
+#include "arch/x86_64/cpu/cpu.h"
+#include "arch/x86_64/cpu/cr.h"
+#include "arch/x86_64/cpu/lapic.h"
 #include "arch/x86_64/exception.h"
 #include "arch/x86_64/init.h"
-#include "arch/x86_64/sys/cpu.h"
-#include "arch/x86_64/sys/cr.h"
-#include "arch/x86_64/sys/lapic.h"
 
 #define X86_64_AS(ADDRESS_SPACE) (CONTAINER_OF((ADDRESS_SPACE), x86_64_address_space_t, common))
 

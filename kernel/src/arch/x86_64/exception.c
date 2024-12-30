@@ -3,8 +3,8 @@
 #include "arch/cpu.h"
 #include "common/log.h"
 
+#include "arch/x86_64/cpu/cr.h"
 #include "arch/x86_64/debug.h"
-#include "arch/x86_64/sys/cr.h"
 
 static char *g_exception_messages[] = {
     "Division by Zero",

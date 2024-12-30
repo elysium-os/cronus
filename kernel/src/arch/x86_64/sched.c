@@ -14,11 +14,11 @@
 #include "sched/sched.h"
 #include "sched/thread.h"
 
+#include "arch/x86_64/cpu/fpu.h"
+#include "arch/x86_64/cpu/lapic.h"
+#include "arch/x86_64/cpu/msr.h"
 #include "arch/x86_64/init.h"
 #include "arch/x86_64/interrupt.h"
-#include "arch/x86_64/sys/fpu.h"
-#include "arch/x86_64/sys/lapic.h"
-#include "arch/x86_64/sys/msr.h"
 
 #define INTERVAL 100000
 #define KERNEL_STACK_SIZE_PG 16

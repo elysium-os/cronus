@@ -2,8 +2,8 @@
 
 #include "memory/hhdm.h"
 
-#include "arch/x86_64/sys/cpu.h"
-#include "arch/x86_64/sys/msr.h"
+#include "arch/x86_64/cpu/cpu.h"
+#include "arch/x86_64/cpu/msr.h"
 
 #define BASE_MASK 0xF'FFFF'FFFF'F000
 

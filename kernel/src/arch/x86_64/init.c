@@ -15,20 +15,20 @@
 #include "memory/pmm.h"
 #include "memory/vm.h"
 
+#include "arch/x86_64/cpu/cpu.h"
+#include "arch/x86_64/cpu/cpuid.h"
+#include "arch/x86_64/cpu/cr.h"
+#include "arch/x86_64/cpu/fpu.h"
+#include "arch/x86_64/cpu/gdt.h"
+#include "arch/x86_64/cpu/lapic.h"
+#include "arch/x86_64/cpu/msr.h"
+#include "arch/x86_64/cpu/port.h"
 #include "arch/x86_64/dev/pic8259.h"
 #include "arch/x86_64/dev/pit.h"
 #include "arch/x86_64/exception.h"
 #include "arch/x86_64/interrupt.h"
 #include "arch/x86_64/ptm.h"
 #include "arch/x86_64/sched.h"
-#include "arch/x86_64/sys/cpu.h"
-#include "arch/x86_64/sys/cpuid.h"
-#include "arch/x86_64/sys/cr.h"
-#include "arch/x86_64/sys/fpu.h"
-#include "arch/x86_64/sys/gdt.h"
-#include "arch/x86_64/sys/lapic.h"
-#include "arch/x86_64/sys/msr.h"
-#include "arch/x86_64/sys/port.h"
 
 #include <stddef.h>
 #include <tartarus.h>

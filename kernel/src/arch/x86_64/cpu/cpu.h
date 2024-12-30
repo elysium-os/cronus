@@ -4,7 +4,7 @@
 #include "lib/container.h"
 #include "sys/cpu.h"
 
-#include "arch/x86_64/sys/tss.h"
+#include "arch/x86_64/cpu/tss.h"
 
 #include <stddef.h>
 #include <stdint.h>
