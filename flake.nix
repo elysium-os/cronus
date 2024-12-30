@@ -15,6 +15,8 @@
 
                     gdb
                     qemu_full
+
+                    llvmPackages_19.clang-tools
                 ];
             };
         }
