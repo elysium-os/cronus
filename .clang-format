@@ -59,7 +59,7 @@ IndentPPDirectives: None
 IndentWrappedFunctionNames: true
 
 InsertBraces: false
-InsertNewlineAtEOF: false
+InsertNewlineAtEOF: true
 
 IntegerLiteralSeparator:
   Decimal: -1
