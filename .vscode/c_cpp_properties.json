@@ -8,7 +8,7 @@
             ],
             "defines": [
                 "__ARCH_X86_64",
-                "__MLIBC_ABI_ONLY",
+                "__ENV_DEVELOPMENT",
 
                 /* Unsupported C23 features work-around */
                 /* https://github.com/microsoft/vscode-cpptools/issues/10696 */
