@@ -1,7 +1,6 @@
 #include "gdt.h"
 
-#define STR(S) #S
-#define XSTR(S) STR(S)
+#include "common/log.h"
 
 #define ACCESS_PRESENT (1 << 7)
 #define ACCESS_DPL(DPL) (((DPL) & 0b11) << 5)
@@ -36,6 +35,8 @@ typedef struct {
     uint16_t limit;
     uint64_t base;
 } __attribute__((packed)) gdt_descriptor_t;
+
+void gdt_load(gdt_descriptor_t *gdtr, uint64_t selector_code, uint64_t selector_data);
 
 // clang-format off
 static gdt_entry_t g_gdt[] = {
@@ -80,22 +81,8 @@ void x86_64_gdt_load() {
     gdt_descriptor_t gdtr;
     gdtr.limit = sizeof(g_gdt) - 1;
     gdtr.base = (uint64_t) &g_gdt;
-    // clang-format off
-    asm volatile(
-        "lgdt %0\n"
-        "push $" XSTR(X86_64_GDT_SELECTOR_CODE64_RING0) "\n"
-        "lea 1f(%%rip), %%rax\n"
-        "push %%rax\n"
-        "lretq\n"
-        "1:\n"
-        "mov $" XSTR(X86_64_GDT_SELECTOR_DATA64_RING0) ", %%rax\n"
-        "mov %%rax, %%ss\n"
-        "mov $0, %%rax\n"
-        "mov %%rax, %%ds\n"
-        "mov %%rax, %%es\n"
-        : : "m" (gdtr) : "rax", "memory"
-    );
-    // clang-format on
+    log(LOG_LEVEL_DEBUG, "GDT", "Loading GDT(%#lx, %#lx)", gdtr.base, (uint64_t) gdtr.limit);
+    gdt_load(&gdtr, X86_64_GDT_SELECTOR_CODE64_RING0, X86_64_GDT_SELECTOR_DATA64_RING0);
 }
 
 void x86_64_gdt_load_tss(x86_64_tss_t *tss) {
