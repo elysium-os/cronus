@@ -5,6 +5,8 @@
 #include "common/assert.h"
 #include "common/log.h"
 #include "lib/math.h"
+#include "lib/mem.h"
+#include "memory/hhdm.h"
 #include "memory/pmm.h"
 
 #define ADDRESS_IN_BOUNDS(ADDRESS, START, END) ((ADDRESS) >= (START) && (ADDRESS) < (END))
@@ -115,6 +117,35 @@ static vm_region_t *addr_to_region(vm_address_space_t *address_space, uintptr_t 
         return region;
     }
     return NULL;
+}
+
+static bool address_space_fix_page(vm_address_space_t *address_space, uintptr_t vaddr) {
+    vm_region_t *region = addr_to_region(address_space, vaddr);
+    if(region == NULL) return false;
+    region_map(region, MATH_FLOOR(vaddr, ARCH_PAGE_GRANULARITY), ARCH_PAGE_GRANULARITY);
+    return true;
+}
+
+// OPTIMIZE: this is very slow/inefficient, segments should probably be ordered or in a tree and we could do this fast
+static bool memory_exists(vm_address_space_t *address_space, uintptr_t address, size_t length) {
+    if(!ADDRESS_IN_BOUNDS(address, address_space->start, address_space->end) || !ADDRESS_IN_BOUNDS(address + length, address_space->start, address_space->end)) return false;
+restart:
+    if(length == 0) return true;
+    LIST_FOREACH(&address_space->regions, elem) {
+        vm_region_t *region = LIST_CONTAINER_GET(elem, vm_region_t, list_elem);
+        if(region->base <= address && region->base + region->length > address) {
+            uintptr_t new_addr = region->base + region->length;
+            if(new_addr >= address + length) return true;
+            length = (address + length) - new_addr;
+            address = new_addr;
+            goto restart;
+        }
+        if(region->base > address && region->base < address + length && region->base + region->length >= address + length) {
+            length -= (address + length) - region->base;
+            goto restart;
+        }
+    }
+    return false;
 }
 
 static void *map_common(
@@ -246,9 +277,43 @@ bool vm_fault(uintptr_t address, vm_fault_t fault) {
         // }
     }
 
-    vm_region_t *region = addr_to_region(as, address);
-    if(region == NULL) return false;
+    return address_space_fix_page(as, address);
+}
 
-    region_map(region, MATH_FLOOR(address, ARCH_PAGE_GRANULARITY), ARCH_PAGE_GRANULARITY);
-    return true;
+size_t vm_copy_to(vm_address_space_t *dest_as, uintptr_t dest_addr, void *src, size_t count) {
+    if(!memory_exists(dest_as, dest_addr, count)) return 0;
+    size_t i = 0;
+    while(i < count) {
+        size_t offset = (dest_addr + i) % ARCH_PAGE_GRANULARITY;
+        uintptr_t phys;
+        if(!arch_ptm_physical(dest_as, dest_addr + i, &phys)) {
+            if(!address_space_fix_page(dest_as, dest_addr + i)) return i;
+            ASSERT(arch_ptm_physical(dest_as, dest_addr + i, &phys));
+        }
+
+        size_t len = math_min(count - i, ARCH_PAGE_GRANULARITY - offset);
+        memcpy((void *) HHDM(phys + offset), src, len);
+        i += len;
+        src += len;
+    }
+    return i;
+}
+
+size_t vm_copy_from(void *dest, vm_address_space_t *src_as, uintptr_t src_addr, size_t count) {
+    if(!memory_exists(src_as, src_addr, count)) return 0;
+    size_t i = 0;
+    while(i < count) {
+        size_t offset = (src_addr + i) % ARCH_PAGE_GRANULARITY;
+        uintptr_t phys;
+        if(!arch_ptm_physical(src_as, src_addr + i, &phys)) {
+            if(!address_space_fix_page(src_as, src_addr + i)) return i;
+            ASSERT(arch_ptm_physical(src_as, src_addr + i, &phys));
+        }
+
+        size_t len = math_min(count - i, ARCH_PAGE_GRANULARITY - offset);
+        memcpy(dest, (void *) HHDM(phys + offset), len);
+        i += len;
+        dest += len;
+    }
+    return i;
 }
