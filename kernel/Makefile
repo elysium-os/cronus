@@ -6,7 +6,7 @@ DESTDIR ?= /
 CFLAGS := -std=gnu2x -ffreestanding -mcmodel=kernel -mno-red-zone -mgeneral-regs-only -O3
 CFLAGS += -Wall -Wextra -Wvla -Wshadow
 CFLAGS += -fno-stack-protector -fno-stack-check -fno-omit-frame-pointer -fno-strict-aliasing
-CFLAGS += -D__ARCH_$(shell echo $(ARCH) | tr a-z A-Z) -D__ENV_$(shell echo $(ENV) | tr a-z A-Z)
+CFLAGS += -D__ARCH_$(shell echo $(ARCH) | tr a-z A-Z) -D__ENV_$(shell echo $(ENVIRONMENT) | tr a-z A-Z)
 CFLAGS += -I$(SYSROOT)$(PREFIX)/include -I$(SRC)
 
 ifeq ($(ENVIRONMENT), development)
