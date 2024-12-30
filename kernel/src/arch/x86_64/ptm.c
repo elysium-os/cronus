@@ -1,5 +1,6 @@
 #include "ptm.h"
 
+#include "arch/cpu.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
 #include "common/assert.h"
@@ -7,13 +8,17 @@
 #include "common/spinlock.h"
 #include "lib/container.h"
 #include "lib/mem.h"
+#include "memory/heap.h"
 #include "memory/hhdm.h"
 #include "memory/pmm.h"
+#include "sys/cpu.h"
+#include "sys/ipl.h"
 
 #include "arch/x86_64/exception.h"
 #include "arch/x86_64/init.h"
 #include "arch/x86_64/sys/cpu.h"
 #include "arch/x86_64/sys/cr.h"
+#include "arch/x86_64/sys/lapic.h"
 
 #define X86_64_AS(ADDRESS_SPACE) (CONTAINER_OF((ADDRESS_SPACE), x86_64_address_space_t, common))
 
@@ -59,7 +64,12 @@ typedef struct {
     vm_address_space_t common;
 } x86_64_address_space_t;
 
+static uint8_t g_tlb_shootdown_vector;
 static x86_64_address_space_t g_initial_address_space;
+
+static inline void invlpg(uint64_t value) {
+    asm volatile("invlpg (%0)" : : "r"(value) : "memory");
+}
 
 static uint64_t privilege_to_x86_flags(vm_privilege_t privilege) {
     switch(privilege) {
@@ -77,6 +87,53 @@ static uint64_t cache_to_x86_flags(vm_cache_t cache) {
     __builtin_unreachable();
 }
 
+static void tlb_shootdown(vm_address_space_t *address_space, uintptr_t addr) {
+    if(!x86_64_init_flag_check(X86_64_INIT_FLAG_SMP | X86_64_INIT_FLAG_SCHED)) {
+        if(address_space == g_vm_global_address_space || x86_64_cr3_read() == X86_64_AS(address_space)->cr3) invlpg(addr);
+        return;
+    }
+
+    ipl_t old_ipl = ipl(IPL_CRITICAL);
+    for(size_t i = 0; i < g_x86_64_cpu_count; i++) {
+        x86_64_cpu_t *cpu = &g_x86_64_cpus[i];
+
+        if(cpu == X86_64_CPU(cpu_current())) {
+            if(address_space == g_vm_global_address_space || x86_64_cr3_read() == X86_64_AS(address_space)->cr3) invlpg(addr);
+            continue;
+        }
+
+        spinlock_acquire(&cpu->tlb_shootdown_lock);
+        spinlock_acquire(&cpu->tlb_shootdown_check);
+        cpu->tlb_shootdown_cr3 = X86_64_AS(address_space)->cr3;
+        cpu->tlb_shootdown_addr = addr;
+
+        asm volatile("" : : : "memory");
+        x86_64_lapic_ipi(cpu->lapic_id, g_tlb_shootdown_vector | X86_64_LAPIC_IPI_ASSERT);
+
+        volatile int timeout = 0;
+        do {
+            if(timeout++ % 500 != 0) {
+                asm volatile("pause");
+                continue;
+            }
+            if(timeout >= 3000) break;
+            x86_64_lapic_ipi(cpu->lapic_id, g_tlb_shootdown_vector | X86_64_LAPIC_IPI_ASSERT);
+        } while(!spinlock_try_acquire(&cpu->tlb_shootdown_check));
+
+        spinlock_release(&cpu->tlb_shootdown_check);
+        spinlock_release(&cpu->tlb_shootdown_lock);
+    }
+    ipl(old_ipl);
+}
+
+static void tlb_shootdown_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
+    ASSERT(x86_64_init_flag_check(X86_64_INIT_FLAG_SMP | X86_64_INIT_FLAG_SCHED));
+    x86_64_cpu_t *cpu = X86_64_CPU(cpu_current());
+    if(spinlock_try_acquire(&cpu->tlb_shootdown_check)) return spinlock_release(&cpu->tlb_shootdown_check);
+    if(cpu->tlb_shootdown_cr3 == g_initial_address_space.cr3 || x86_64_cr3_read() == cpu->tlb_shootdown_cr3) invlpg(cpu->tlb_shootdown_addr);
+    spinlock_release(&cpu->tlb_shootdown_check);
+}
+
 vm_address_space_t *x86_64_ptm_init() {
     g_initial_address_space.common.lock = SPINLOCK_INIT;
     g_initial_address_space.common.regions = LIST_INIT;
@@ -84,6 +141,10 @@ vm_address_space_t *x86_64_ptm_init() {
     g_initial_address_space.common.end = KERNELSPACE_END;
     g_initial_address_space.cr3 = pmm_alloc_page(PMM_ZONE_NORMAL, PMM_FLAG_ZERO)->paddr;
     g_initial_address_space.cr3_lock = SPINLOCK_INIT;
+
+    int vector = x86_64_interrupt_request(X86_64_INTERRUPT_PRIORITY_IPC, tlb_shootdown_handler);
+    ASSERT(vector != -1);
+    g_tlb_shootdown_vector = (uint8_t) vector;
 
     uint64_t *old_pml4 = (uint64_t *) HHDM(x86_64_cr3_read());
     uint64_t *pml4 = (uint64_t *) HHDM(g_initial_address_space.cr3);
@@ -145,7 +206,7 @@ void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t 
     if(!prot.exec) current_table[index] |= PTE_FLAG_NX;
     if(global) current_table[index] |= PTE_FLAG_GLOBAL;
 
-    // tlb_shootdown(address_space, vaddr); // TODO
+    tlb_shootdown(address_space, vaddr);
 
     spinlock_release(&X86_64_AS(address_space)->cr3_lock);
 }
@@ -163,7 +224,7 @@ void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr) {
     }
     current_table[VADDR_TO_INDEX(vaddr, 1)] = 0;
 
-    // tlb_shootdown(address_space, vaddr); // TODO
+    tlb_shootdown(address_space, vaddr);
 
     spinlock_release(&X86_64_AS(address_space)->cr3_lock);
 }
