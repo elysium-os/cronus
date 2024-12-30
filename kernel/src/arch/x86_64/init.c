@@ -27,6 +27,7 @@
 #include "arch/x86_64/dev/pit.h"
 #include "arch/x86_64/sys/fpu.h"
 #include "arch/x86_64/ptm.h"
+#include "arch/x86_64/sched.h"
 
 #include <tartarus.h>
 #include <stddef.h>
@@ -130,7 +131,8 @@ static log_sink_t g_serial_sink = {
 
     arch_interrupt_set_ipl(IPL_PREEMPT);
     asm volatile("sti");
-    arch_cpu_halt();
+
+    x86_64_sched_init_cpu(cpu, false);
     __builtin_unreachable();
 }
 
@@ -233,6 +235,8 @@ static log_sink_t g_serial_sink = {
     x86_64_fpu_init();
     x86_64_fpu_init_cpu();
 
+    // Initialize sched
+    x86_64_sched_init();
 
     // SMP init
     g_x86_64_cpus = heap_alloc(sizeof(x86_64_cpu_t) * boot_info->cpu_count);
@@ -273,9 +277,8 @@ static log_sink_t g_serial_sink = {
     log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%i/%i cpus initialized)", g_x86_64_cpu_count, boot_info->cpu_count);
     x86_64_init_flag_set(X86_64_INIT_FLAG_SMP);
 
-    log(LOG_LEVEL_INFO, "INIT", "Reached end of init");
-
-    arch_cpu_halt();
+    log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye for now!");
+    x86_64_sched_init_cpu(cpu, true);
     __builtin_unreachable();
 }
 

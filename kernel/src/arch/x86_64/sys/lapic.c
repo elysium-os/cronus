@@ -1,6 +1,7 @@
 #include "lapic.h"
 
 #include "memory/hhdm.h"
+#include "arch/x86_64/sys/cpu.h"
 #include "arch/x86_64/sys/msr.h"
 
 #define BASE_MASK 0xFFFFFFFFFF000
@@ -48,6 +49,13 @@ void x86_64_lapic_timer_poll(uint32_t ticks) {
     lapic_write(REG_TIMER_INITIAL_COUNT, ticks);
     while(lapic_read(REG_TIMER_CURRENT_COUNT) != 0);
     x86_64_lapic_timer_stop();
+}
+
+void x86_64_lapic_timer_oneshot(uint8_t vector, uint64_t us) {
+    x86_64_lapic_timer_stop();
+    lapic_write(REG_LVT_TIMER, vector);
+    lapic_write(REG_TIMER_DIV, 0);
+    lapic_write(REG_TIMER_INITIAL_COUNT, us * (X86_64_CPU(cpu_current())->lapic_timer_frequency / 1'000'000));
 }
 
 void x86_64_lapic_timer_stop() {
