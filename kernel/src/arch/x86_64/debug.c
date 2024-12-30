@@ -1,6 +1,7 @@
 #include "arch/debug.h"
 
 #include "common/log.h"
+
 #include "arch/x86_64/debug.h"
 
 #include <stddef.h>
@@ -10,7 +11,7 @@ size_t g_arch_debug_symbols_length = 0;
 
 void arch_debug_stack_trace() {
     x86_64_debug_stack_frame_t *stack_frame;
-    asm volatile("movq %%rbp, %0" : "=r" (stack_frame));
+    asm volatile("movq %%rbp, %0" : "=r"(stack_frame));
     x86_64_debug_stack_trace_from(stack_frame);
 }
 

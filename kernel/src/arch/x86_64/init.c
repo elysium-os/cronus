@@ -1,41 +1,43 @@
 #include "init.h"
 
-#include "lib/string.h"
-#include "lib/math.h"
-#include "lib/mem.h"
-#include "common/assert.h"
-#include "common/log.h"
-#include "memory/hhdm.h"
-#include "memory/pmm.h"
-#include "memory/heap.h"
-#include "memory/vm.h"
 #include "arch/cpu.h"
-#include "arch/ptm.h"
-#include "arch/page.h"
 #include "arch/debug.h"
 #include "arch/interrupt.h"
-#include "arch/x86_64/interrupt.h"
-#include "arch/x86_64/exception.h"
-#include "arch/x86_64/sys/gdt.h"
-#include "arch/x86_64/sys/msr.h"
-#include "arch/x86_64/sys/port.h"
-#include "arch/x86_64/sys/cpuid.h"
-#include "arch/x86_64/sys/lapic.h"
+#include "arch/page.h"
+#include "arch/ptm.h"
+#include "common/assert.h"
+#include "common/log.h"
+#include "lib/math.h"
+#include "lib/mem.h"
+#include "lib/string.h"
+#include "memory/heap.h"
+#include "memory/hhdm.h"
+#include "memory/pmm.h"
+#include "memory/vm.h"
+
 #include "arch/x86_64/dev/pic8259.h"
-#include "arch/x86_64/sys/cpu.h"
-#include "arch/x86_64/sys/cr.h"
 #include "arch/x86_64/dev/pit.h"
-#include "arch/x86_64/sys/fpu.h"
+#include "arch/x86_64/exception.h"
+#include "arch/x86_64/interrupt.h"
 #include "arch/x86_64/ptm.h"
 #include "arch/x86_64/sched.h"
+#include "arch/x86_64/sys/cpu.h"
+#include "arch/x86_64/sys/cpuid.h"
+#include "arch/x86_64/sys/cr.h"
+#include "arch/x86_64/sys/fpu.h"
+#include "arch/x86_64/sys/gdt.h"
+#include "arch/x86_64/sys/lapic.h"
+#include "arch/x86_64/sys/msr.h"
+#include "arch/x86_64/sys/port.h"
 
-#include <tartarus.h>
 #include <stddef.h>
+#include <tartarus.h>
 
 #define PIT_TIMER_FREQ 1000
-#define LAPIC_CALIBRATION_TICKS 0x10000
+#define LAPIC_CALIBRATION_TICKS 0x1'0000
 
-#define ADJUST_STACK(OFFSET) asm volatile("mov %%rsp, %%rax\nadd %0, %%rax\nmov %%rax, %%rsp\nmov %%rbp, %%rax\nadd %0, %%rax\nmov %%rax, %%rbp" : : "rm" (OFFSET) : "rax", "memory")
+#define ADJUST_STACK(OFFSET)                                                                                                                                \
+    asm volatile("mov %%rsp, %%rax\nadd %0, %%rax\nmov %%rax, %%rsp\nmov %%rbp, %%rax\nadd %0, %%rax\nmov %%rax, %%rbp" : : "rm"(OFFSET) : "rax", "memory")
 
 uintptr_t g_hhdm_offset;
 size_t g_hhdm_size;
@@ -62,10 +64,10 @@ static void log_serial(log_level_t level, const char *tag, const char *fmt, va_l
     char *color;
     switch(level) {
         case LOG_LEVEL_DEBUG: color = "\e[36m"; break;
-        case LOG_LEVEL_INFO: color = "\e[33m"; break;
-        case LOG_LEVEL_WARN: color = "\e[91m"; break;
+        case LOG_LEVEL_INFO:  color = "\e[33m"; break;
+        case LOG_LEVEL_WARN:  color = "\e[91m"; break;
         case LOG_LEVEL_ERROR: color = "\e[31m"; break;
-        default: color = "\e[0m"; break;
+        default:              color = "\e[0m"; break;
     }
     serial_format("%s[%s:%s]%s ", color, log_level_stringify(level), tag, "\e[0m");
     format(serial_raw, fmt, args);
@@ -74,12 +76,7 @@ static void log_serial(log_level_t level, const char *tag, const char *fmt, va_l
 
 static log_sink_t g_serial_sink = {
     .name = "SERIAL",
-    .filter = {
-        .level = LOG_LEVEL_DEBUG,
-        .tags_as_include = false,
-        .tags = NULL,
-        .tag_count = 0
-    },
+    .filter = {.level = LOG_LEVEL_DEBUG, .tags_as_include = false, .tags = NULL, .tag_count = 0},
     .log = log_serial
 };
 
@@ -187,9 +184,7 @@ static log_sink_t g_serial_sink = {
     x86_64_interrupt_load_idt();
     for(int i = 0; i < 32; i++) {
         switch(i) {
-            default:
-                x86_64_interrupt_set(i, X86_64_INTERRUPT_PRIORITY_EXCEPTION, x86_64_exception_unhandled);
-                break;
+            default: x86_64_interrupt_set(i, X86_64_INTERRUPT_PRIORITY_EXCEPTION, x86_64_exception_unhandled); break;
         }
     }
     x86_64_init_flag_set(X86_64_INIT_FLAG_INTERRUPTS);
@@ -210,7 +205,7 @@ static log_sink_t g_serial_sink = {
     g_hhdm_region.address_space = g_vm_global_address_space;
     g_hhdm_region.base = MATH_FLOOR(g_hhdm_offset, ARCH_PAGE_GRANULARITY);
     g_hhdm_region.length = MATH_CEIL(g_hhdm_size, ARCH_PAGE_GRANULARITY);
-    g_hhdm_region.protection = (vm_protection_t) { .read = true, .write = true };
+    g_hhdm_region.protection = (vm_protection_t) {.read = true, .write = true};
     g_hhdm_region.cache_behavior = VM_CACHE_STANDARD;
     g_hhdm_region.type = VM_REGION_TYPE_DIRECT;
     g_hhdm_region.type_data.direct.physical_address = 0;
@@ -219,7 +214,7 @@ static log_sink_t g_serial_sink = {
     g_kernel_region.address_space = g_vm_global_address_space;
     g_kernel_region.base = MATH_FLOOR(boot_info->kernel.vaddr, ARCH_PAGE_GRANULARITY);
     g_kernel_region.length = MATH_CEIL(boot_info->kernel.size, ARCH_PAGE_GRANULARITY);
-    g_kernel_region.protection = (vm_protection_t) { .read = true, .write = true };
+    g_kernel_region.protection = (vm_protection_t) {.read = true, .write = true};
     g_kernel_region.cache_behavior = VM_CACHE_STANDARD;
     g_kernel_region.type = VM_REGION_TYPE_ANON;
     list_append(&g_vm_global_address_space->regions, &g_kernel_region.list_elem);

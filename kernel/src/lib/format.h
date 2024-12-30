@@ -2,7 +2,7 @@
 
 #include <stdarg.h>
 
-typedef void (* format_writer_t)(char ch);
+typedef void (*format_writer_t)(char ch);
 
 /**
  * @brief Format a string as described by the C specification.

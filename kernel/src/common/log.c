@@ -1,8 +1,8 @@
 #include "log.h"
 
-#include "lib/string.h"
-#include "lib/format.h"
 #include "common/spinlock.h"
+#include "lib/format.h"
+#include "lib/string.h"
 
 static spinlock_t g_lock = SPINLOCK_INIT;
 static list_t g_sinks = LIST_INIT;
@@ -32,11 +32,12 @@ void log_list(log_level_t level, const char *tag, const char *fmt, va_list list)
     LIST_FOREACH(&g_sinks, elem) {
         log_sink_t *sink = LIST_CONTAINER_GET(elem, log_sink_t, list_elem);
         if(sink->filter.level < level) continue;
-        for(size_t i = 0; i < sink->filter.tag_count; i++) if(string_eq(sink->filter.tags[i], tag) != sink->filter.tags_as_include) goto skip;
-	    va_copy(local_list, list);
+        for(size_t i = 0; i < sink->filter.tag_count; i++)
+            if(string_eq(sink->filter.tags[i], tag) != sink->filter.tags_as_include) goto skip;
+        va_copy(local_list, list);
         sink->log(level, tag, fmt, local_list);
         va_end(local_list);
-        skip:
+    skip:
     }
     spinlock_release(&g_lock);
 }
@@ -44,8 +45,8 @@ void log_list(log_level_t level, const char *tag, const char *fmt, va_list list)
 const char *log_level_stringify(log_level_t level) {
     switch(level) {
         case LOG_LEVEL_ERROR: return "ERROR";
-        case LOG_LEVEL_WARN: return "WARN";
-        case LOG_LEVEL_INFO: return "INFO";
+        case LOG_LEVEL_WARN:  return "WARN";
+        case LOG_LEVEL_INFO:  return "INFO";
         case LOG_LEVEL_DEBUG: return "DEBUG";
     }
     return "UNKNOWN";

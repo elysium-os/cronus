@@ -1,7 +1,7 @@
 #include "spinlock.h"
 
-#include "common/assert.h"
 #include "arch/cpu.h"
+#include "common/assert.h"
 
 #include <stdint.h>
 

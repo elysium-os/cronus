@@ -3,10 +3,11 @@
 #include "common/spinlock.h"
 #include "lib/container.h"
 #include "sys/cpu.h"
+
 #include "arch/x86_64/sys/tss.h"
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define X86_64_CPU(CPU) (CONTAINER_OF((CPU), x86_64_cpu_t, common))
 

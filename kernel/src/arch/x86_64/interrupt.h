@@ -19,8 +19,8 @@ typedef enum {
     X86_64_INTERRUPT_PRIORITY_CRITICAL = 0xF
 } x86_64_interrupt_priority_t;
 
-typedef void (* x86_64_interrupt_handler_t)(x86_64_interrupt_frame_t *frame);
-typedef void (* x86_64_interrupt_irq_eoi_t)(uint8_t);
+typedef void (*x86_64_interrupt_handler_t)(x86_64_interrupt_frame_t *frame);
+typedef void (*x86_64_interrupt_irq_eoi_t)(uint8_t);
 
 extern x86_64_interrupt_irq_eoi_t g_x86_64_interrupt_irq_eoi;
 

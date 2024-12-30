@@ -25,11 +25,11 @@ typedef struct {
 } __attribute__((packed)) gdt_entry_t;
 
 typedef struct {
-	gdt_entry_t entry;
-	uint32_t base_ext;
-	uint8_t rsv0;
-	uint8_t zero_rsv1;
-	uint16_t rsv2;
+    gdt_entry_t entry;
+    uint32_t base_ext;
+    uint8_t rsv0;
+    uint8_t zero_rsv1;
+    uint16_t rsv2;
 } __attribute__((packed)) gdt_system_entry_t;
 
 typedef struct {
@@ -37,6 +37,7 @@ typedef struct {
     uint64_t base;
 } __attribute__((packed)) gdt_descriptor_t;
 
+// clang-format off
 static gdt_entry_t g_gdt[] = {
     {},
     {
@@ -73,11 +74,13 @@ static gdt_entry_t g_gdt[] = {
     },
     {}, {} // TSS
 };
+// clang-format on
 
 void x86_64_gdt_load() {
     gdt_descriptor_t gdtr;
     gdtr.limit = sizeof(g_gdt) - 1;
     gdtr.base = (uint64_t) &g_gdt;
+    // clang-format off
     asm volatile(
         "lgdt %0\n"
         "push $" XSTR(X86_64_GDT_SELECTOR_CODE64_RING0) "\n"
@@ -92,6 +95,7 @@ void x86_64_gdt_load() {
         "mov %%rax, %%es\n"
         : : "m" (gdtr) : "rax", "memory"
     );
+    // clang-format on
 }
 
 void x86_64_gdt_load_tss(x86_64_tss_t *tss) {
@@ -106,5 +110,5 @@ void x86_64_gdt_load_tss(x86_64_tss_t *tss) {
     entry->entry.base_high = (uint8_t) ((uint64_t) tss >> 24);
     entry->base_ext = (uint32_t) ((uint64_t) tss >> 32);
 
-    asm volatile("ltr %0" : : "m" (tss_segment));
+    asm volatile("ltr %0" : : "m"(tss_segment));
 }

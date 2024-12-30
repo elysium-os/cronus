@@ -1,10 +1,11 @@
 #include "lapic.h"
 
 #include "memory/hhdm.h"
+
 #include "arch/x86_64/sys/cpu.h"
 #include "arch/x86_64/sys/msr.h"
 
-#define BASE_MASK 0xFFFFFFFFFF000
+#define BASE_MASK 0xF'FFFF'FFFF'F000
 
 #define REG_ID 0x20
 #define REG_SPURIOUS 0xF0
@@ -55,7 +56,7 @@ void x86_64_lapic_timer_oneshot(uint8_t vector, uint64_t us) {
     x86_64_lapic_timer_stop();
     lapic_write(REG_LVT_TIMER, vector);
     lapic_write(REG_TIMER_DIV, 0);
-    lapic_write(REG_TIMER_INITIAL_COUNT, us * (X86_64_CPU(cpu_current())->lapic_timer_frequency / 1'000'000));
+    lapic_write(REG_TIMER_INITIAL_COUNT, us * (X86_64_CPU(cpu_current())->lapic_timer_frequency / 1000000));
 }
 
 void x86_64_lapic_timer_stop() {

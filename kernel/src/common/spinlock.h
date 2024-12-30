@@ -16,7 +16,7 @@ void spinlock_acquire(volatile spinlock_t *lock);
  * @returns true = acquired the lock
  */
 static inline bool spinlock_try_acquire(volatile spinlock_t *lock) {
-    return  !__atomic_test_and_set(lock, __ATOMIC_ACQUIRE);
+    return !__atomic_test_and_set(lock, __ATOMIC_ACQUIRE);
 }
 
 /**

@@ -1,11 +1,11 @@
 #include "pmm.h"
 
-#include "lib/mem.h"
-#include "lib/math.h"
+#include "arch/page.h"
 #include "common/assert.h"
 #include "common/panic.h"
+#include "lib/math.h"
+#include "lib/mem.h"
 #include "memory/hhdm.h"
-#include "arch/page.h"
 
 uint8_t g_pmm_zone_mask = 0;
 pmm_zone_t g_pmm_zones[PMM_ZONE_COUNT] = {};
@@ -61,11 +61,7 @@ void pmm_region_add(uintptr_t base, size_t size) {
         region->zone->free_count += region->free_count;
 
         for(size_t j = 0; j < region->page_count; j++) {
-            region->pages[j] = (pmm_page_t) {
-                .region = region,
-                .free = true,
-                .paddr = region->base + j * ARCH_PAGE_GRANULARITY
-            };
+            region->pages[j] = (pmm_page_t) {.region = region, .free = true, .paddr = region->base + j * ARCH_PAGE_GRANULARITY};
         }
 
         for(size_t j = 0; j < used_pages; j++) {

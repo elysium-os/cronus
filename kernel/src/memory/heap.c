@@ -1,9 +1,10 @@
 #include "heap.h"
-#include "lib/list.h"
-#include "common/spinlock.h"
+
 #include "common/assert.h"
-#include "common/panic.h"
 #include "common/log.h"
+#include "common/panic.h"
+#include "common/spinlock.h"
+#include "lib/list.h"
 #include "memory/pmm.h"
 
 #define INITIAL_SIZE_PAGES 10
@@ -35,7 +36,7 @@ static uint64_t get_prot(heap_entry_t *entry) {
 #endif
 
 void heap_initialize(vm_address_space_t *address_space, size_t size) {
-    void *addr = vm_map_anon(address_space, NULL, size, (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_FLAG_NONE);
+    void *addr = vm_map_anon(address_space, NULL, size, (vm_protection_t) {.read = true, .write = true}, VM_CACHE_STANDARD, VM_FLAG_NONE);
     log(LOG_LEVEL_DEBUG, "HEAP", "Initialized at address %#lx with size %#lx", (uintptr_t) addr, size);
     ASSERT(addr != NULL);
 
@@ -56,14 +57,14 @@ void *heap_alloc_align(size_t size, size_t alignment) {
         heap_entry_t *entry = LIST_CONTAINER_GET(elem, heap_entry_t, list_elem);
         if(!entry->free) continue;
 #if HEAP_PROTECTION
-    ASSERT(get_prot(entry) == 0);
+        ASSERT(get_prot(entry) == 0);
 #endif
 
         uintptr_t mod = ((uintptr_t) entry + sizeof(heap_entry_t)) % alignment;
         uintptr_t offset = alignment - mod;
         if(mod == 0) offset = 0;
 
-        check_fit:
+    check_fit:
         if(entry->size < offset + size) continue;
         if(offset == 0) goto aligned;
         if(offset < sizeof(heap_entry_t) + MIN_ENTRY_SIZE) {
@@ -82,7 +83,7 @@ void *heap_alloc_align(size_t size, size_t alignment) {
 #endif
         entry = new;
 
-        aligned:
+    aligned:
         entry->free = false;
         if(entry->size - size > sizeof(heap_entry_t) + MIN_ENTRY_SIZE) {
             heap_entry_t *overflow = (heap_entry_t *) ((uintptr_t) entry + sizeof(heap_entry_t) + size);

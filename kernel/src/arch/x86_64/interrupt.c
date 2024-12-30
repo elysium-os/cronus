@@ -1,8 +1,9 @@
 #include "interrupt.h"
 
 #include "arch/interrupt.h"
-#include "arch/x86_64/sys/gdt.h"
+
 #include "arch/x86_64/sys/cr.h"
+#include "arch/x86_64/sys/gdt.h"
 
 #define FLAGS_NORMAL 0x8E
 #define FLAGS_TRAP 0x8F
@@ -92,7 +93,7 @@ void x86_64_interrupt_load_idt() {
     idt_descriptor_t idtr;
     idtr.limit = sizeof(g_idt) - 1;
     idtr.base = (uint64_t) &g_idt;
-    asm volatile("lidt %0" : : "m" (idtr));
+    asm volatile("lidt %0" : : "m"(idtr));
 }
 
 void x86_64_interrupt_set(uint8_t vector, x86_64_interrupt_priority_t priority, x86_64_interrupt_handler_t handler) {

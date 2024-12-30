@@ -8,7 +8,8 @@ size_t string_length(const char *str) {
 
 int string_cmp(const char *lhs, const char *rhs) {
     size_t i = 0;
-    while(lhs[i] == rhs[i]) if(lhs[i++] == '\0') return 0;
+    while(lhs[i] == rhs[i])
+        if(lhs[i++] == '\0') return 0;
     return lhs[i] < rhs[i] ? -1 : 1;
 }
 

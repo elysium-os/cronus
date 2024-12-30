@@ -1,10 +1,10 @@
 #pragma once
 
-#include "lib/list.h"
 #include "common/spinlock.h"
+#include "lib/list.h"
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define PMM_MAX_ORDER 7
 
@@ -38,7 +38,7 @@ typedef struct pmm_page {
     struct pmm_region *region;
     uintptr_t paddr;
     uint8_t order : 3;
-    uint8_t free : 1;
+    uint8_t free  : 1;
 } pmm_page_t;
 
 typedef struct pmm_region {

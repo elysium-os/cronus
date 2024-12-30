@@ -1,7 +1,9 @@
 #include "format.h"
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
+
+// clang-format off
 
 #define FLAG_LEFT (1 << 0)
 #define FLAG_SIGN (1 << 1)

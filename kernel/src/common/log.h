@@ -22,7 +22,7 @@ typedef struct {
     } filter;
     list_element_t list_elem;
 
-    void (* log)(log_level_t level, const char *tag, const char *fmt, va_list args);
+    void (*log)(log_level_t level, const char *tag, const char *fmt, va_list args);
 } log_sink_t;
 
 /**
