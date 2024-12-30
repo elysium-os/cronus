@@ -80,7 +80,7 @@ static log_sink_t g_serial_sink = {
     .log = log_serial
 };
 
-[[noreturn]] __attribute__((naked)) static void init_ap() {
+[[noreturn]] [[gnu::naked]] static void init_ap() {
     log(LOG_LEVEL_INFO, "INIT", "Initializing AP %i", x86_64_lapic_id());
 
     x86_64_gdt_load();

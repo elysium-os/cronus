@@ -296,12 +296,12 @@ void __ubsan_handle_pointer_overflow(data_only_location_t *data, void *, void *)
     log(LOG_LEVEL_WARN, "UBSAN", "pointer_overflow @ %s:%u:%u", data->location.filename, data->location.line, data->location.column);
 }
 
-__attribute__((noreturn)) void __ubsan_handle_builtin_unreachable(data_only_location_t *data) {
+[[noreturn]] void __ubsan_handle_builtin_unreachable(data_only_location_t *data) {
     log(LOG_LEVEL_ERROR, "UBSAN", "builtin_unreachable @ %s:%u:%u", data->location.filename, data->location.line, data->location.column);
     panic("UBSAN");
 }
 
-__attribute__((noreturn)) void __ubsan_handle_missing_return(data_only_location_t *data) {
+[[noreturn]] void __ubsan_handle_missing_return(data_only_location_t *data) {
     log(LOG_LEVEL_ERROR, "UBSAN", "missing_return @ %s:%u:%u", data->location.filename, data->location.line, data->location.column);
     panic("UBSAN");
 }

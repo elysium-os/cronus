@@ -9,7 +9,7 @@
 #define FLAGS_TRAP 0x8F
 #define IDT_SIZE 256
 
-typedef struct {
+typedef struct [[gnu::packed]] {
     uint16_t low_offset;
     uint16_t segment_selector;
     uint8_t ist;
@@ -17,12 +17,12 @@ typedef struct {
     uint16_t middle_offset;
     uint32_t high_offset;
     uint32_t rsv0;
-} __attribute__((packed)) idt_entry_t;
+} idt_entry_t;
 
-typedef struct {
+typedef struct [[gnu::packed]] {
     uint16_t limit;
     uint64_t base;
-} __attribute__((packed)) idt_descriptor_t;
+} idt_descriptor_t;
 
 typedef struct {
     bool free;

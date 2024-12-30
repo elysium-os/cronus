@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-typedef struct {
+typedef struct [[gnu::packed]] {
     uint32_t rsv0;
     uint32_t rsp0_lower;
     uint32_t rsp0_upper;
@@ -30,7 +30,7 @@ typedef struct {
     uint32_t rsv4;
     uint16_t rsv5;
     uint16_t iomap_base;
-} __attribute__((packed)) x86_64_tss_t;
+} x86_64_tss_t;
 
 /**
  * @brief Set the CPL0 stack pointer.

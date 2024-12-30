@@ -14,27 +14,27 @@
 #define FLAG_LONG (1 << 5)
 #define FLAG_SYSTEM_AVL (1 << 4)
 
-typedef struct {
+typedef struct [[gnu::packed]] {
     uint16_t limit;
     uint16_t base_low;
     uint8_t base_mid;
     uint8_t access;
     uint8_t flags;
     uint8_t base_high;
-} __attribute__((packed)) gdt_entry_t;
+} gdt_entry_t;
 
-typedef struct {
+typedef struct [[gnu::packed]] {
     gdt_entry_t entry;
     uint32_t base_ext;
     uint8_t rsv0;
     uint8_t zero_rsv1;
     uint16_t rsv2;
-} __attribute__((packed)) gdt_system_entry_t;
+} gdt_system_entry_t;
 
-typedef struct {
+typedef struct [[gnu::packed]] {
     uint16_t limit;
     uint64_t base;
-} __attribute__((packed)) gdt_descriptor_t;
+} gdt_descriptor_t;
 
 void gdt_load(gdt_descriptor_t *gdtr, uint64_t selector_code, uint64_t selector_data);
 

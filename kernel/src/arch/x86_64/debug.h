@@ -4,10 +4,10 @@
 
 typedef struct x86_64_debug_stack_frame x86_64_debug_stack_frame_t;
 
-struct x86_64_debug_stack_frame {
+struct [[gnu::packed]] x86_64_debug_stack_frame {
     x86_64_debug_stack_frame_t *rbp;
     uint64_t rip;
-} __attribute__((packed));
+};
 
 /**
  * @brief Log a stack trace starting at the provided stack frame.

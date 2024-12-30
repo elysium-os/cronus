@@ -45,7 +45,7 @@ typedef struct x86_64_thread {
     thread_t common;
 } x86_64_thread_t;
 
-typedef struct {
+typedef struct [[gnu::packed]] {
     uint64_t r12, r13, r14, r15, rbp, rbx;
     void (*thread_init)(x86_64_thread_t *prev);
     void (*thread_init_kernel)();
@@ -55,15 +55,15 @@ typedef struct {
         uint64_t rbp;
         uint64_t rip;
     } invalid_stack_frame;
-} __attribute__((packed)) init_stack_kernel_t;
+} init_stack_kernel_t;
 
-typedef struct {
+typedef struct [[gnu::packed]] {
     uint64_t r12, r13, r14, r15, rbp, rbx;
     void (*thread_init)(x86_64_thread_t *prev);
     void (*thread_init_user)();
     void (*entry)();
     uint64_t user_stack;
-} __attribute__((packed)) init_stack_user_t;
+} init_stack_user_t;
 
 static_assert(offsetof(x86_64_thread_t, rsp) == 8, "rsp in thread_t changed. Update arch/x86_64/sched.S::THREAD_RSP_OFFSET");
 
