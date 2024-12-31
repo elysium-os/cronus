@@ -1,21 +1,19 @@
 .global memset
 .global memcpy
 .global memmove
+.global memclear
 
 .type memset, "function"
 memset:
-    mov %rdi, %r8
     mov %rdx, %rcx
     mov %rsi, %rax
     rep stosb
-    mov %r8, %rax
     ret
 .size memset, . - memset
 
 .type memcpy, "function"
 memcpy:
     mov %rdx, %rcx
-    mov %rdi, %rax
     rep movsb
     ret
 .size memcpy, . - memcpy
@@ -23,7 +21,6 @@ memcpy:
 .type memmove, "function"
 memmove:
     mov %rdx, %rcx
-    mov %rdi, %rax
     cmp %rsi, %rdi
     jb .move
     lea -1(%rdi, %rcx), %rdi
@@ -34,3 +31,11 @@ memmove:
     cld
     ret
 .size memmove, . - memmove
+
+.type memclear, "function"
+memclear:
+    xor %rax, %rax
+    mov %rsi, %rcx
+    rep stosb
+    ret
+.size memclear, . - memclear

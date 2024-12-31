@@ -107,7 +107,7 @@ pmm_page_t *pmm_alloc(pmm_zone_index_t zone_index, pmm_order_t order, pmm_flags_
     page->free = false;
     page->region->free_count -= order_to_pagecount(order);
     page->region->zone->free_count -= order_to_pagecount(order);
-    if(flags & PMM_FLAG_ZERO) memset((void *) HHDM(page->paddr), 0, order_to_pagecount(order) * ARCH_PAGE_GRANULARITY);
+    if(flags & PMM_FLAG_ZERO) memclear((void *) HHDM(page->paddr), order_to_pagecount(order) * ARCH_PAGE_GRANULARITY);
     return page;
 }
 

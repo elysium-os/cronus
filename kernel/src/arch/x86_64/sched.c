@@ -138,7 +138,7 @@ void arch_sched_thread_destroy(thread_t *thread) {
 
 static x86_64_thread_t *create_thread(process_t *proc, stack_t kernel_stack, uintptr_t rsp) {
     x86_64_thread_t *thread = heap_alloc(sizeof(x86_64_thread_t));
-    memset(thread, 0, sizeof(x86_64_thread_t));
+    memclear(thread, sizeof(x86_64_thread_t));
     thread->this = thread;
     thread->common.id = __atomic_fetch_add(&g_next_tid, 1, __ATOMIC_RELAXED);
     thread->common.state = THREAD_STATE_READY;
@@ -148,7 +148,7 @@ static x86_64_thread_t *create_thread(process_t *proc, stack_t kernel_stack, uin
     thread->state.fs = 0;
     thread->state.gs = 0;
     thread->state.fpu_area = heap_alloc_align(g_x86_64_fpu_area_size, 64);
-    memset(thread->state.fpu_area, 0, g_x86_64_fpu_area_size);
+    memclear(thread->state.fpu_area, g_x86_64_fpu_area_size);
 
     g_x86_64_fpu_restore(thread->state.fpu_area);
     uint16_t x87cw = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (0b11 << 8);
@@ -278,7 +278,7 @@ static void sched_entry([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     cpu->common.idle_thread = &idle_thread->common;
 
     x86_64_thread_t *bootstrap_thread = heap_alloc(sizeof(x86_64_thread_t));
-    memset(bootstrap_thread, 0, sizeof(x86_64_thread_t));
+    memclear(bootstrap_thread, sizeof(x86_64_thread_t));
     bootstrap_thread->this = bootstrap_thread;
     bootstrap_thread->common.state = THREAD_STATE_DESTROY;
     bootstrap_thread->common.cpu = &cpu->common;

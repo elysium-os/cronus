@@ -105,7 +105,7 @@ static log_sink_t g_serial_sink = {
 
     // CPU Local
     x86_64_tss_t *tss = heap_alloc(sizeof(x86_64_tss_t));
-    memset(tss, 0, sizeof(x86_64_tss_t));
+    memclear(tss, sizeof(x86_64_tss_t));
     tss->iomap_base = sizeof(x86_64_tss_t);
     x86_64_gdt_load_tss(tss);
 
@@ -237,7 +237,7 @@ static log_sink_t g_serial_sink = {
     g_x86_64_cpus = heap_alloc(sizeof(x86_64_cpu_t) * boot_info->cpu_count);
 
     x86_64_tss_t *tss = heap_alloc(sizeof(x86_64_tss_t));
-    memset(tss, 0, sizeof(x86_64_tss_t));
+    memclear(tss, sizeof(x86_64_tss_t));
     tss->iomap_base = sizeof(x86_64_tss_t);
     x86_64_gdt_load_tss(tss);
 
