@@ -1,5 +1,12 @@
 #pragma once
 
+#include <sys/cpu.h>
+
+/**
+ * @brief Get the current CPU local.
+ */
+cpu_t *arch_cpu_current();
+
 /**
  * @brief "Relax" the CPU.
  */

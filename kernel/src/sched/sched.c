@@ -1,5 +1,6 @@
 #include "sched.h"
 
+#include "arch/cpu.h"
 #include "arch/sched.h"
 #include "common/spinlock.h"
 #include "lib/list.h"
@@ -25,9 +26,9 @@ process_t *sched_process_create(vm_address_space_t *address_space) {
     proc->threads = LIST_INIT;
     proc->address_space = address_space;
 
-    spinlock_acquire(&g_sched_processes_lock);
+    ipl_t previous_ipl = spinlock_acquire(&g_sched_processes_lock);
     list_append(&g_sched_processes, &proc->list_sched);
-    spinlock_release(&g_sched_processes_lock);
+    spinlock_release(&g_sched_processes_lock, previous_ipl);
     return proc;
 }
 
@@ -36,25 +37,25 @@ void sched_process_destroy(process_t *proc) {
 }
 
 void sched_thread_schedule(thread_t *thread) {
-    spinlock_acquire(&g_sched_threads_lock);
+    ipl_t previous_ipl = spinlock_acquire(&g_sched_threads_lock);
     list_prepend(&g_sched_threads_queued, &thread->list_sched);
-    spinlock_release(&g_sched_threads_lock);
+    spinlock_release(&g_sched_threads_lock, previous_ipl);
 }
 
 thread_t *sched_thread_next() {
-    spinlock_acquire(&g_sched_threads_lock);
+    ipl_t previous_ipl = spinlock_acquire(&g_sched_threads_lock);
     if(list_is_empty(&g_sched_threads_queued)) {
-        spinlock_release(&g_sched_threads_lock);
+        spinlock_release(&g_sched_threads_lock, previous_ipl);
         return 0;
     }
     thread_t *thread = LIST_CONTAINER_GET(g_sched_threads_queued.next, thread_t, list_sched);
     list_delete(&thread->list_sched);
-    spinlock_release(&g_sched_threads_lock);
+    spinlock_release(&g_sched_threads_lock, previous_ipl);
     return thread;
 }
 
 void sched_thread_drop(thread_t *thread) {
-    if(thread == cpu_current()->idle_thread) return;
+    if(thread == arch_cpu_current()->idle_thread) return;
     if(thread->state == THREAD_STATE_DESTROY) {
         arch_sched_thread_destroy(thread);
         return;

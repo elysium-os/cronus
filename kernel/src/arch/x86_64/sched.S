@@ -1,4 +1,4 @@
-#define THREAD_RSP_OFFSET 8
+#define THREAD_RSP_OFFSET 0
 
 .global x86_64_sched_context_switch
 .global x86_64_sched_userspace_init

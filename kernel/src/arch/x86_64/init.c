@@ -50,7 +50,13 @@ static size_t init_flags = 0;
 
 static vm_region_t g_hhdm_region, g_kernel_region;
 
+static x86_64_cpu_t g_early_bsp;
+
 [[noreturn]] [[gnu::naked]] static void init_ap() {
+    x86_64_cpu_t *cpu = &g_x86_64_cpus[g_x86_64_cpu_count];
+    cpu->self = cpu;
+    x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
+
     log(LOG_LEVEL_INFO, "INIT", "Initializing AP %i", x86_64_lapic_id());
 
     x86_64_gdt_load();
@@ -72,6 +78,7 @@ static vm_region_t g_hhdm_region, g_kernel_region;
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
     x86_64_lapic_initialize();
     x86_64_interrupt_load_idt();
+    arch_interrupt_set_ipl(IPL_PREEMPT);
 
     // CPU Local
     x86_64_tss_t *tss = heap_alloc(sizeof(x86_64_tss_t));
@@ -84,7 +91,6 @@ static vm_region_t g_hhdm_region, g_kernel_region;
     x86_64_lapic_timer_poll(LAPIC_CALIBRATION_TICKS);
     uint16_t end_count = x86_64_pit_count();
 
-    x86_64_cpu_t *cpu = &g_x86_64_cpus[g_x86_64_cpu_count];
     cpu->lapic_id = x86_64_lapic_id();
     cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * PIT_BASE_FREQ;
     cpu->tss = tss;
@@ -96,7 +102,6 @@ static vm_region_t g_hhdm_region, g_kernel_region;
     log(LOG_LEVEL_DEBUG, "INIT", "AP %i:%i init exit", g_x86_64_cpu_count, x86_64_lapic_id());
     __atomic_add_fetch(&g_x86_64_cpu_count, 1, __ATOMIC_SEQ_CST);
 
-    arch_interrupt_set_ipl(IPL_PREEMPT);
     asm volatile("sti");
 
     x86_64_sched_init_cpu(cpu, false);
@@ -107,21 +112,44 @@ static vm_region_t g_hhdm_region, g_kernel_region;
     g_hhdm_offset = boot_info->hhdm.offset;
     g_hhdm_size = boot_info->hhdm.size;
 
+    memclear(&g_early_bsp, sizeof(g_early_bsp));
+    g_early_bsp.self = &g_early_bsp;
+    x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
+
     x86_64_qemu_serial_putc('\n');
     log_sink_add(&g_x86_64_qemu_serial_sink);
     log(LOG_LEVEL_INFO, "INIT", "Elysium alpha.6 (" __DATE__ " " __TIME__ ")");
 
+    log(LOG_LEVEL_DEBUG, "INIT", "Enumerating modules");
     for(uint16_t i = 0; i < boot_info->module_count; i++) {
         tartarus_module_t *module = &boot_info->modules[i];
         log(LOG_LEVEL_DEBUG, "INIT", "Module found: %s", module->name);
         if(!string_eq("kernelsymbols.txt", module->name)) continue;
         g_arch_debug_symbols = (char *) HHDM(module->paddr);
         g_arch_debug_symbols_length = module->size;
+        log(LOG_LEVEL_DEBUG, "INIT", "Kernel symbols loaded");
+        break;
     }
 
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_MSR));
 
     x86_64_gdt_load();
+
+    // Initialize interrupt & exception handling
+    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC))
+    x86_64_pic8259_remap();
+    x86_64_pic8259_disable();
+    x86_64_lapic_initialize();
+    g_x86_64_interrupt_irq_eoi = x86_64_lapic_eoi;
+    x86_64_interrupt_init();
+    x86_64_interrupt_load_idt();
+    for(int i = 0; i < 32; i++) {
+        switch(i) {
+            default: x86_64_interrupt_set(i, x86_64_exception_unhandled); break;
+        }
+    }
+    arch_interrupt_set_ipl(IPL_PREEMPT);
+    x86_64_init_flag_set(X86_64_INIT_FLAG_INTERRUPTS);
 
     // Initialize physical memory
     pmm_zone_register(PMM_ZONE_LOW, "LOW", 0, 0x100'0000);
@@ -144,21 +172,6 @@ static vm_region_t g_hhdm_region, g_kernel_region;
         }
     }
 
-    // Initialize interrupt & exception handling
-    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC))
-    x86_64_pic8259_remap();
-    x86_64_pic8259_disable();
-    x86_64_lapic_initialize();
-    g_x86_64_interrupt_irq_eoi = x86_64_lapic_eoi;
-    x86_64_interrupt_init();
-    x86_64_interrupt_load_idt();
-    for(int i = 0; i < 32; i++) {
-        switch(i) {
-            default: x86_64_interrupt_set(i, X86_64_INTERRUPT_PRIORITY_EXCEPTION, x86_64_exception_unhandled); break;
-        }
-    }
-    x86_64_init_flag_set(X86_64_INIT_FLAG_INTERRUPTS);
-
     // Initialize Virtual Memory
     uint64_t pat = x86_64_msr_read(X86_64_MSR_PAT);
     pat &= ~(((uint64_t) 0b111 << 48) | ((uint64_t) 0b111 << 40));
@@ -170,7 +183,7 @@ static vm_region_t g_hhdm_region, g_kernel_region;
     x86_64_cr4_write(cr4);
 
     g_vm_global_address_space = x86_64_ptm_init();
-    x86_64_interrupt_set(0xE, X86_64_INTERRUPT_PRIORITY_EXCEPTION, x86_64_ptm_page_fault_handler);
+    x86_64_interrupt_set(0xE, x86_64_ptm_page_fault_handler);
 
     g_hhdm_region.address_space = g_vm_global_address_space;
     g_hhdm_region.base = MATH_FLOOR(g_hhdm_offset, ARCH_PAGE_GRANULARITY);
@@ -205,6 +218,7 @@ static vm_region_t g_hhdm_region, g_kernel_region;
 
     // SMP init
     g_x86_64_cpus = heap_alloc(sizeof(x86_64_cpu_t) * boot_info->cpu_count);
+    memclear(g_x86_64_cpus, sizeof(x86_64_cpu_t) * boot_info->cpu_count);
 
     x86_64_tss_t *tss = heap_alloc(sizeof(x86_64_tss_t));
     memclear(tss, sizeof(x86_64_tss_t));
@@ -217,18 +231,20 @@ static vm_region_t g_hhdm_region, g_kernel_region;
     uint16_t end_count = x86_64_pit_count();
 
     x86_64_cpu_t *cpu = NULL;
-
     g_x86_64_cpu_count = 0;
     for(size_t i = 0; i < boot_info->cpu_count; i++) {
         if(boot_info->cpus[i].init_failed) continue;
 
         if(i == boot_info->bsp_index) {
             cpu = &g_x86_64_cpus[g_x86_64_cpu_count];
+            *cpu = g_early_bsp;
+            cpu->self = cpu;
             cpu->lapic_id = x86_64_lapic_id();
             cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * PIT_BASE_FREQ;
             cpu->tss = tss;
             cpu->tlb_shootdown_check = SPINLOCK_INIT;
             cpu->tlb_shootdown_lock = SPINLOCK_INIT;
+            x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
             g_x86_64_cpu_count++;
             continue;
         }
@@ -241,6 +257,8 @@ static vm_region_t g_hhdm_region, g_kernel_region;
 
     log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%i/%i cpus initialized)", g_x86_64_cpu_count, boot_info->cpu_count);
     x86_64_init_flag_set(X86_64_INIT_FLAG_SMP);
+
+    asm volatile("sti");
 
     log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye for now!");
     x86_64_sched_init_cpu(cpu, true);

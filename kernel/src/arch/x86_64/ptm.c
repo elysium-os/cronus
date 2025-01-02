@@ -93,17 +93,17 @@ static void tlb_shootdown(vm_address_space_t *address_space, uintptr_t addr) {
         return;
     }
 
-    ipl_t old_ipl = ipl(IPL_CRITICAL);
+    ipl_t old_ipl = ipl_raise(IPL_CRITICAL);
     for(size_t i = 0; i < g_x86_64_cpu_count; i++) {
         x86_64_cpu_t *cpu = &g_x86_64_cpus[i];
 
-        if(cpu == X86_64_CPU(cpu_current())) {
+        if(cpu == X86_64_CPU(arch_cpu_current())) {
             if(address_space == g_vm_global_address_space || x86_64_cr3_read() == X86_64_AS(address_space)->cr3) invlpg(addr);
             continue;
         }
 
-        spinlock_acquire(&cpu->tlb_shootdown_lock);
-        spinlock_acquire(&cpu->tlb_shootdown_check);
+        ipl_t previous_ipl = spinlock_acquire(&cpu->tlb_shootdown_lock);
+        spinlock_primitive_acquire(&cpu->tlb_shootdown_check);
         cpu->tlb_shootdown_cr3 = X86_64_AS(address_space)->cr3;
         cpu->tlb_shootdown_addr = addr;
 
@@ -118,20 +118,27 @@ static void tlb_shootdown(vm_address_space_t *address_space, uintptr_t addr) {
             }
             if(timeout >= 3000) break;
             x86_64_lapic_ipi(cpu->lapic_id, g_tlb_shootdown_vector | X86_64_LAPIC_IPI_ASSERT);
-        } while(!spinlock_try_acquire(&cpu->tlb_shootdown_check));
+        } while(!spinlock_primitive_try_acquire(&cpu->tlb_shootdown_check));
 
-        spinlock_release(&cpu->tlb_shootdown_check);
-        spinlock_release(&cpu->tlb_shootdown_lock);
+        spinlock_primitive_release(&cpu->tlb_shootdown_check);
+        spinlock_release(&cpu->tlb_shootdown_lock, previous_ipl);
     }
-    ipl(old_ipl);
+    ipl_lower(old_ipl);
 }
 
 static void tlb_shootdown_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     ASSERT(x86_64_init_flag_check(X86_64_INIT_FLAG_SMP | X86_64_INIT_FLAG_SCHED));
-    x86_64_cpu_t *cpu = X86_64_CPU(cpu_current());
-    if(spinlock_try_acquire(&cpu->tlb_shootdown_check)) return spinlock_release(&cpu->tlb_shootdown_check);
+    ipl_t previous_ipl = ipl_raise(IPL_NORMAL);
+    x86_64_cpu_t *cpu = X86_64_CPU_LOCAL_MEMBER(self);
+    if(spinlock_primitive_try_acquire(&cpu->tlb_shootdown_check)) {
+        log(LOG_LEVEL_WARN, "PTM", "Spurious TLB shootdown");
+        spinlock_primitive_release(&cpu->tlb_shootdown_check);
+        ipl_lower(previous_ipl);
+        return;
+    }
     if(cpu->tlb_shootdown_cr3 == g_initial_address_space.cr3 || x86_64_cr3_read() == cpu->tlb_shootdown_cr3) invlpg(cpu->tlb_shootdown_addr);
-    spinlock_release(&cpu->tlb_shootdown_check);
+    spinlock_primitive_release(&cpu->tlb_shootdown_check);
+    ipl_lower(previous_ipl);
 }
 
 vm_address_space_t *x86_64_ptm_init() {
@@ -142,7 +149,7 @@ vm_address_space_t *x86_64_ptm_init() {
     g_initial_address_space.cr3 = pmm_alloc_page(PMM_ZONE_NORMAL, PMM_FLAG_ZERO)->paddr;
     g_initial_address_space.cr3_lock = SPINLOCK_INIT;
 
-    int vector = x86_64_interrupt_request(X86_64_INTERRUPT_PRIORITY_IPC, tlb_shootdown_handler);
+    int vector = x86_64_interrupt_request(X86_64_INTERRUPT_PRIORITY_NORMAL, tlb_shootdown_handler);
     ASSERT(vector != -1);
     g_tlb_shootdown_vector = (uint8_t) vector;
 
@@ -185,7 +192,7 @@ void arch_ptm_load_address_space(vm_address_space_t *address_space) {
 
 void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t paddr, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global) {
     if(!prot.read) log(LOG_LEVEL_ERROR, "PTM", "No-read mapping is not supported on x86_64");
-    spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
+    ipl_t previous_ipl = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
     uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
     for(int i = 4; i > 1; i--) {
         int index = VADDR_TO_INDEX(vaddr, i);
@@ -208,16 +215,16 @@ void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t 
 
     tlb_shootdown(address_space, vaddr);
 
-    spinlock_release(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_ipl);
 }
 
 void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr) {
-    spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
+    ipl_t previous_ipl = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
     uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
     for(int i = 4; i > 1; i--) {
         int index = VADDR_TO_INDEX(vaddr, i);
         if((current_table[index] & PTE_FLAG_PRESENT) != 0) {
-            spinlock_release(&X86_64_AS(address_space)->cr3_lock);
+            spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_ipl);
             return;
         }
         current_table = (uint64_t *) HHDM(current_table[index] & ADDRESS_MASK);
@@ -226,22 +233,22 @@ void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr) {
 
     tlb_shootdown(address_space, vaddr);
 
-    spinlock_release(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_ipl);
 }
 
 bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t *out) {
-    spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
+    ipl_t previous_ipl = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
     uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
     for(int i = 4; i > 1; i--) {
         int index = VADDR_TO_INDEX(vaddr, i);
         if((current_table[index] & PTE_FLAG_PRESENT) != 0) {
-            spinlock_release(&X86_64_AS(address_space)->cr3_lock);
+            spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_ipl);
             return false;
         }
         current_table = (uint64_t *) HHDM(current_table[index] & ADDRESS_MASK);
     }
     uint64_t entry = current_table[VADDR_TO_INDEX(vaddr, 1)];
-    spinlock_release(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_ipl);
     if((entry & PTE_FLAG_PRESENT) != 0) return false;
     *out = (entry & ADDRESS_MASK);
     return true;

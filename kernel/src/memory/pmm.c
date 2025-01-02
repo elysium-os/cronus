@@ -92,7 +92,7 @@ pmm_page_t *pmm_alloc(pmm_zone_index_t zone_index, pmm_order_t order, pmm_flags_
 
     pmm_order_t avl_order = order;
     pmm_zone_t *zone = &g_pmm_zones[zone_index];
-    spinlock_acquire(&zone->lock);
+    ipl_t previous_ipl = spinlock_acquire(&zone->lock);
     while(list_is_empty(&zone->lists[avl_order])) ASSERT_COMMENT(++avl_order <= PMM_MAX_ORDER, "Out of memory");
 
     pmm_page_t *page = LIST_CONTAINER_GET(LIST_NEXT(&zone->lists[avl_order]), pmm_page_t, list_elem);
@@ -102,7 +102,7 @@ pmm_page_t *pmm_alloc(pmm_zone_index_t zone_index, pmm_order_t order, pmm_flags_
         buddy->order = avl_order - 1;
         list_append(&zone->lists[avl_order - 1], &buddy->list_elem);
     }
-    spinlock_release(&zone->lock);
+    spinlock_release(&zone->lock, previous_ipl);
     page->order = order;
     page->free = false;
     page->region->free_count -= order_to_pagecount(order);
@@ -125,7 +125,7 @@ void pmm_free(pmm_page_t *page) {
     page->region->free_count += order_to_pagecount(page->order);
     page->region->zone->free_count += order_to_pagecount(page->order);
     pmm_zone_t *zone = page->region->zone;
-    spinlock_acquire(&zone->lock);
+    ipl_t previous_ipl = spinlock_acquire(&zone->lock);
     for(;;) {
         if(page->order >= PMM_MAX_ORDER) break;
         size_t buddy_addr = data_base + ((page->paddr - data_base) ^ (order_to_pagecount(page->order) * ARCH_PAGE_GRANULARITY));
@@ -139,7 +139,7 @@ void pmm_free(pmm_page_t *page) {
         if(buddy->paddr < page->paddr) page = buddy;
     }
     list_append(&zone->lists[page->order], &page->list_elem);
-    spinlock_release(&zone->lock);
+    spinlock_release(&zone->lock, previous_ipl);
 }
 
 void pmm_free_address(uintptr_t physical_address) {

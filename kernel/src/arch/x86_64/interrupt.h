@@ -10,12 +10,8 @@ typedef struct {
 } x86_64_interrupt_frame_t;
 
 typedef enum {
-    X86_64_INTERRUPT_PRIORITY_EXCEPTION = 0x0,
-    X86_64_INTERRUPT_PRIORITY_PREEMPT = 0x1,
+    X86_64_INTERRUPT_PRIORITY_PREEMPT = 0x2,
     X86_64_INTERRUPT_PRIORITY_NORMAL = 0x5,
-    X86_64_INTERRUPT_PRIORITY_HID = 0xC,
-    X86_64_INTERRUPT_PRIORITY_TIMER = 0xD,
-    X86_64_INTERRUPT_PRIORITY_IPC = 0xE,
     X86_64_INTERRUPT_PRIORITY_CRITICAL = 0xF
 } x86_64_interrupt_priority_t;
 
@@ -38,7 +34,7 @@ void x86_64_interrupt_load_idt();
  * @brief Set a handler onto an interrupt vector.
  * @warning Will carelessly override existing handlers.
  */
-void x86_64_interrupt_set(uint8_t vector, x86_64_interrupt_priority_t priority, x86_64_interrupt_handler_t handler);
+void x86_64_interrupt_set(uint8_t vector, x86_64_interrupt_handler_t handler);
 
 /**
  * @brief Request a free interrupt vector.

@@ -3,6 +3,7 @@
 #include "arch/cpu.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
+#include "arch/sched.h"
 #include "common/assert.h"
 #include "common/auxv.h"
 #include "lib/mem.h"
@@ -19,31 +20,11 @@
 #include "arch/x86_64/cpu/msr.h"
 #include "arch/x86_64/init.h"
 #include "arch/x86_64/interrupt.h"
+#include "arch/x86_64/thread.h"
 
 #define INTERVAL 100000
 #define KERNEL_STACK_SIZE_PG 16
 #define USER_STACK_SIZE (8 * ARCH_PAGE_GRANULARITY)
-
-#define X86_64_THREAD(THREAD) (CONTAINER_OF((THREAD), x86_64_thread_t, common))
-
-typedef struct {
-    uintptr_t base;
-    uintptr_t size;
-} stack_t;
-
-typedef struct x86_64_thread {
-    struct x86_64_thread *this;
-    uintptr_t rsp;
-    uintptr_t syscall_rsp;
-    stack_t kernel_stack;
-
-    struct {
-        void *fpu_area;
-        uint64_t fs, gs;
-    } state;
-
-    thread_t common;
-} x86_64_thread_t;
 
 typedef struct [[gnu::packed]] {
     uint64_t r12, r13, r14, r15, rbp, rbx;
@@ -65,7 +46,7 @@ typedef struct [[gnu::packed]] {
     uint64_t user_stack;
 } init_stack_user_t;
 
-static_assert(offsetof(x86_64_thread_t, rsp) == 8, "rsp in thread_t changed. Update arch/x86_64/sched.S::THREAD_RSP_OFFSET");
+static_assert(offsetof(x86_64_thread_t, rsp) == 0, "rsp in thread_t changed. Update arch/x86_64/sched.S::THREAD_RSP_OFFSET");
 
 extern x86_64_thread_t *x86_64_sched_context_switch(x86_64_thread_t *this, x86_64_thread_t *next);
 extern void x86_64_sched_userspace_init();
@@ -104,7 +85,8 @@ static void sched_switch(x86_64_thread_t *this, x86_64_thread_t *next) {
 
     next->common.cpu = this->common.cpu;
     ASSERT(next != NULL);
-    x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) next);
+    X86_64_CPU_LOCAL_MEMBER_SET(current_thread, next);
+    x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) next);
     this->common.cpu = 0;
 
     x86_64_tss_set_rsp0(X86_64_CPU(next->common.cpu)->tss, next->kernel_stack.base);
@@ -122,24 +104,23 @@ static void sched_switch(x86_64_thread_t *this, x86_64_thread_t *next) {
     sched_thread_drop(&prev->common);
 }
 
-/** @warning Thread should not be on the scheduler queue when this is called */
 void arch_sched_thread_destroy(thread_t *thread) {
     if(thread->proc) {
-        spinlock_acquire(&thread->proc->lock);
+        ipl_t previous_ipl = spinlock_acquire(&thread->proc->lock);
         list_delete(&thread->list_proc);
         if(list_is_empty(&thread->proc->threads)) {
             sched_process_destroy(thread->proc);
+            ipl_lower(previous_ipl);
         } else {
-            spinlock_release(&thread->proc->lock);
+            spinlock_release(&thread->proc->lock, previous_ipl);
         }
     }
     heap_free(X86_64_THREAD(thread));
 }
 
-static x86_64_thread_t *create_thread(process_t *proc, stack_t kernel_stack, uintptr_t rsp) {
+static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t kernel_stack, uintptr_t rsp) {
     x86_64_thread_t *thread = heap_alloc(sizeof(x86_64_thread_t));
     memclear(thread, sizeof(x86_64_thread_t));
-    thread->this = thread;
     thread->common.id = __atomic_fetch_add(&g_next_tid, 1, __ATOMIC_RELAXED);
     thread->common.state = THREAD_STATE_READY;
     thread->common.proc = proc;
@@ -160,9 +141,16 @@ static x86_64_thread_t *create_thread(process_t *proc, stack_t kernel_stack, uin
     return thread;
 }
 
+static void sched_entry([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
+    x86_64_sched_next();
+}
+
 thread_t *arch_sched_thread_create_kernel(void (*func)()) {
     pmm_page_t *kernel_stack_page = pmm_alloc_pages(PMM_ZONE_NORMAL, KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO);
-    stack_t kernel_stack = {.base = HHDM(kernel_stack_page->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY};
+    x86_64_thread_stack_t kernel_stack = {
+        .base = HHDM(kernel_stack_page->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY),
+        .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY
+    };
 
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));
     init_stack->entry = func;
@@ -173,7 +161,10 @@ thread_t *arch_sched_thread_create_kernel(void (*func)()) {
 
 thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t sp) {
     pmm_page_t *kernel_stack_page = pmm_alloc_pages(PMM_ZONE_NORMAL, KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO);
-    stack_t kernel_stack = {.base = HHDM(kernel_stack_page->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY};
+    x86_64_thread_stack_t kernel_stack = {
+        .base = HHDM(kernel_stack_page->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY),
+        .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY
+    };
 
     init_stack_user_t *init_stack = (init_stack_user_t *) (kernel_stack.base - sizeof(init_stack_user_t));
     init_stack->entry = (void (*)()) ip;
@@ -182,9 +173,9 @@ thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t
     init_stack->user_stack = sp;
 
     x86_64_thread_t *thread = create_thread(proc, kernel_stack, (uintptr_t) init_stack);
-    spinlock_acquire(&proc->lock);
+    ipl_t previous_ipl = spinlock_acquire(&proc->lock);
     list_append(&proc->threads, &thread->common.list_proc);
-    spinlock_release(&proc->lock);
+    spinlock_release(&proc->lock, previous_ipl);
     return &thread->common;
 }
 
@@ -246,8 +237,7 @@ uintptr_t arch_sched_stack_setup(process_t *proc, char **argv, char **envp, auxv
 }
 
 thread_t *arch_sched_thread_current() {
-    x86_64_thread_t *thread = NULL;
-    asm volatile("mov %%gs:0, %0" : "=r"(thread));
+    x86_64_thread_t *thread = X86_64_CPU_LOCAL_MEMBER(current_thread);
     ASSERT(thread != NULL);
     return &thread->common;
 }
@@ -268,10 +258,6 @@ oneshot:
     x86_64_lapic_timer_oneshot(g_sched_vector, INTERVAL);
 }
 
-static void sched_entry([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
-    x86_64_sched_next();
-}
-
 [[noreturn]] void x86_64_sched_init_cpu(x86_64_cpu_t *cpu, bool release) {
     x86_64_thread_t *idle_thread = X86_64_THREAD(arch_sched_thread_create_kernel(sched_idle));
     idle_thread->common.id = 0;
@@ -279,7 +265,6 @@ static void sched_entry([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
 
     x86_64_thread_t *bootstrap_thread = heap_alloc(sizeof(x86_64_thread_t));
     memclear(bootstrap_thread, sizeof(x86_64_thread_t));
-    bootstrap_thread->this = bootstrap_thread;
     bootstrap_thread->common.state = THREAD_STATE_DESTROY;
     bootstrap_thread->common.cpu = &cpu->common;
 
