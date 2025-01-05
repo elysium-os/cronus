@@ -265,11 +265,10 @@ static x86_64_cpu_t g_early_bsp;
     __builtin_unreachable();
 }
 
-bool x86_64_init_flag_check(size_t flag) {
-    ASSERT(flag < sizeof(init_flags) * 8);
-    return (flag & init_flags) == flag;
+bool x86_64_init_flag_check(size_t flags) {
+    return (flags & init_flags) == flags;
 }
 
-void x86_64_init_flag_set(size_t flag) {
-    init_flags |= flag;
+void x86_64_init_flag_set(size_t flags) {
+    init_flags |= flags;
 }
