@@ -6,11 +6,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1734805349,
-        "narHash": "sha256-K92a8lBmQWyQC9q4oWCMz0c4a9ou82Kes+TNbGG5z7I=",
+        "lastModified": 1735606007,
+        "narHash": "sha256-x2ui0LIM7htJQJtI/4UcQaVIbxHHiai+Pgk/KxpkOlw=",
         "ref": "refs/heads/v2",
-        "rev": "5580cdc6319f60beebfefb76546701c6d55e86f9",
-        "revCount": 29,
+        "rev": "7e532c47edc0b3b7691f061bbc559fdb8035353d",
+        "revCount": 30,
         "type": "git",
         "url": "https://git.thenest.dev/wux/chariot"
       },
@@ -73,11 +73,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1734991663,
-        "narHash": "sha256-8T660guvdaOD+2/Cj970bWlQwAyZLKrrbkhYOFcY1YE=",
+        "lastModified": 1735531152,
+        "narHash": "sha256-As8I+ebItDKtboWgDXYZSIjGlKeqiLBvjxsQHUmAf1Q=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "6c90912761c43e22b6fb000025ab96dd31c971ff",
+        "rev": "3ffbbdbac0566a0977da3d2657b89cbcfe9a173b",
         "type": "github"
       },
       "original": {
