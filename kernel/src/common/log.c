@@ -44,10 +44,11 @@ void log_list(log_level_t level, const char *tag, const char *fmt, va_list list)
 
 const char *log_level_stringify(log_level_t level) {
     switch(level) {
-        case LOG_LEVEL_ERROR: return "ERROR";
-        case LOG_LEVEL_WARN:  return "WARN";
-        case LOG_LEVEL_INFO:  return "INFO";
-        case LOG_LEVEL_DEBUG: return "DEBUG";
+        case LOG_LEVEL_ERROR:       return "ERROR";
+        case LOG_LEVEL_WARN:        return "WARN";
+        case LOG_LEVEL_INFO:        return "INFO";
+        case LOG_LEVEL_DEBUG:       return "DEBUG";
+        case LOG_LEVEL_DEBUG_NOISY: return "DEBUG";
     }
     return "UNKNOWN";
 }
