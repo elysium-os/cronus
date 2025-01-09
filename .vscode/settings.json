@@ -3,6 +3,35 @@
         "**/.chariot-cache": true
     },
     "C_Cpp.autoAddFileAssociations": false,
-    "editor.formatOnSave": true,
-    "editor.formatOnType": true
+    "[c]": {
+        "editor.formatOnSave": true,
+        "editor.formatOnType": true
+    },
+    "todo-tree.general.tags": [
+        "TODO",
+        "OPTIMIZE",
+        "UNIMPLEMENTED",
+        "CRITICAL",
+        "FIX",
+        "TEMPORARY"
+    ],
+    "todo-tree.highlights.backgroundColourScheme": [
+        "yellow",
+        "purple",
+        "orange",
+        "red",
+        "coral",
+        "cyan"
+    ],
+    "todo-tree.highlights.foregroundColourScheme": [
+        "black",
+        "white",
+        "black",
+        "white",
+        "black",
+        "black"
+    ],
+    "todo-tree.highlights.customHighlight": {
+        "TODO": { "icon": "check" }
+    }
 }
