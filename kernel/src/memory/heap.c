@@ -9,6 +9,7 @@
 
 #define INITIAL_SIZE_PAGES 10
 #define MIN_ENTRY_SIZE 8
+
 #if __ENV_DEVELOPMENT
 #define HEAP_PROTECTION true
 #endif
@@ -36,7 +37,7 @@ static uint64_t get_prot(heap_entry_t *entry) {
 #endif
 
 void heap_initialize(vm_address_space_t *address_space, size_t size) {
-    void *addr = vm_map_anon(address_space, NULL, size, (vm_protection_t) {.read = true, .write = true}, VM_CACHE_STANDARD, VM_FLAG_NONE);
+    void *addr = vm_map_anon(address_space, NULL, size, (vm_protection_t) {.read = true, .write = true}, VM_CACHE_STANDARD, VM_FLAG_NO_DEMAND);
     log(LOG_LEVEL_DEBUG, "HEAP", "Initialized at address %#lx with size %#lx", (uintptr_t) addr, size);
     ASSERT(addr != NULL);
 
@@ -51,7 +52,7 @@ void heap_initialize(vm_address_space_t *address_space, size_t size) {
 
 void *heap_alloc_align(size_t size, size_t alignment) {
     ASSERT(size > 0);
-    log(LOG_LEVEL_DEBUG, "HEAP", "alloc(size: %#lx, alignment: %#lx)", size, alignment);
+    log(LOG_LEVEL_DEBUG_NOISY, "HEAP", "alloc(size: %#lx, alignment: %#lx)", size, alignment);
     ipl_t previous_ipl = spinlock_acquire(&g_lock);
     LIST_FOREACH(&g_entries, elem) {
         heap_entry_t *entry = LIST_CONTAINER_GET(elem, heap_entry_t, list_elem);
@@ -100,7 +101,7 @@ void *heap_alloc_align(size_t size, size_t alignment) {
         spinlock_release(&g_lock, previous_ipl);
 
         size_t address = (uintptr_t) entry + sizeof(heap_entry_t);
-        log(LOG_LEVEL_DEBUG, "HEAP", "alloc success (address: %#lx)", address);
+        log(LOG_LEVEL_DEBUG_NOISY, "HEAP", "alloc success (address: %#lx)", address);
         return (void *) address;
     }
     panic("HEAP: Out of memory");
