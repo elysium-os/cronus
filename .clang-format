@@ -62,9 +62,9 @@ InsertBraces: false
 InsertNewlineAtEOF: true
 
 IntegerLiteralSeparator:
-  Decimal: -1
+  Decimal: 0
   Binary: 0
-  Hex: 4
+  Hex: 0
 
 KeepEmptyLines:
   AtEndOfFile: false
