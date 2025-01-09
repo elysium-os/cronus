@@ -5,8 +5,10 @@
 #include "arch/interrupt.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
+#include "arch/sched.h"
 #include "common/assert.h"
 #include "common/log.h"
+#include "dev/acpi/acpi.h"
 #include "lib/math.h"
 #include "lib/mem.h"
 #include "lib/string.h"
@@ -14,6 +16,8 @@
 #include "memory/hhdm.h"
 #include "memory/pmm.h"
 #include "memory/vm.h"
+#include "sched/sched.h"
+#include "sys/time.h"
 
 #include "arch/x86_64/cpu/cpu.h"
 #include "arch/x86_64/cpu/cpuid.h"
@@ -23,6 +27,7 @@
 #include "arch/x86_64/cpu/lapic.h"
 #include "arch/x86_64/cpu/msr.h"
 #include "arch/x86_64/cpu/port.h"
+#include "arch/x86_64/dev/ioapic.h"
 #include "arch/x86_64/dev/pic8259.h"
 #include "arch/x86_64/dev/pit.h"
 #include "arch/x86_64/dev/qemu_serial.h"
@@ -52,11 +57,11 @@ static vm_region_t g_hhdm_region, g_kernel_region;
 
 static x86_64_cpu_t g_early_bsp;
 
-[[noreturn]] [[gnu::naked]] static void init_ap() {
-    x86_64_cpu_t *cpu = &g_x86_64_cpus[g_x86_64_cpu_count];
-    cpu->self = cpu;
-    x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
+static void pit_time_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
+    time_advance((time_t) {.nanoseconds = TIME_NANOSECONDS_IN_SECOND / PIT_TIMER_FREQ});
+}
 
+[[noreturn]] [[gnu::naked]] static void init_ap() {
     log(LOG_LEVEL_INFO, "INIT", "Initializing AP %i", x86_64_lapic_id());
 
     x86_64_gdt_load();
@@ -73,6 +78,11 @@ static x86_64_cpu_t g_early_bsp;
 
     ADJUST_STACK(g_hhdm_offset);
     arch_ptm_load_address_space(g_vm_global_address_space);
+
+    // Init CPU local immediately after address space load
+    x86_64_cpu_t *cpu = &g_x86_64_cpus[g_x86_64_cpu_count];
+    cpu->self = cpu;
+    x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
 
     // Interrupts
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
@@ -207,11 +217,19 @@ static x86_64_cpu_t g_early_bsp;
     x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_VIRT);
 
     // Initialize HEAP
-    heap_initialize(g_vm_global_address_space, 0x100'0000'0000);
+    heap_initialize(g_vm_global_address_space, 0x100'000);
 
     // Initialize FPU
     x86_64_fpu_init();
     x86_64_fpu_init_cpu();
+
+    // Initialize ACPI
+    log(LOG_LEVEL_DEBUG, "INIT", "RSDP at %#lx", boot_info->acpi_rsdp_address);
+    acpi_init(boot_info->acpi_rsdp_address);
+
+    // Initialize IOAPIC
+    acpi_sdt_header_t *madt = acpi_find_table((uint8_t *) "APIC");
+    if(madt != NULL) x86_64_ioapic_init(madt);
 
     // Initialize sched
     x86_64_sched_init();
@@ -257,6 +275,13 @@ static x86_64_cpu_t g_early_bsp;
 
     log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%i/%i cpus initialized)", g_x86_64_cpu_count, boot_info->cpu_count);
     x86_64_init_flag_set(X86_64_INIT_FLAG_SMP);
+
+    // Initialize timer
+    x86_64_pit_match_frequency(PIT_TIMER_FREQ);
+    int pit_time_vector = x86_64_interrupt_request(X86_64_INTERRUPT_PRIORITY_CRITICAL, pit_time_handler);
+    ASSERT(pit_time_vector != -1);
+    x86_64_ioapic_map_legacy_irq(0, x86_64_lapic_id(), false, true, pit_time_vector);
+    x86_64_init_flag_set(X86_64_INIT_FLAG_TIME);
 
     asm volatile("sti");
 
