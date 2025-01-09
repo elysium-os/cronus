@@ -60,7 +60,7 @@ host/freestanding_gcc {
 // mkimg
 source/mkimg {
     url: https://git.thenest.dev/wux/mkimg/-/archive/main/mkimg-main.tar.gz
-    b2sum: 653ee4d9516d24c906646cbfe69ae4f02369143c2ddb3207f9bb357666385f4a28d9ab009efe827b874b7478c2f50fb30231b0ba19b4c60a3d4618734308b99b
+    b2sum: f6b2eafa35b329323179fecce635cf37b190a5990974bca545c70a9624d6ed181e9df6209f264bcb059002a7d252cf2e54eaaea3144bbcaad1a6b254a50f621b
     type: tar.gz
 }
 
@@ -77,8 +77,8 @@ host/mkimg {
 
 // Tartarus (Bootloader)
 source/tartarus {
-    url: https://git.thenest.dev/wux/tartarus-bootloader/-/archive/8d1decae0d0d8072f40fe0ff5de9ab1b8a5f6ec3/tartarus-bootloader-8d1decae0d0d8072f40fe0ff5de9ab1b8a5f6ec3.tar.gz
-    b2sum: 45877dc085ca300e7874a8c67835457bd439d28933b77b47b6c45d59d19df962e35c90129a78574b6a50444a4de3ce45ef8123707b211ff352ccfa6f6ddd732a
+    url: https://git.thenest.dev/wux/tartarus-bootloader/-/archive/4dc7980ad60ce71f2920b07170f180f4e6354d5d/tartarus-bootloader-4dc7980ad60ce71f2920b07170f180f4e6354d5d.tar.gz
+    b2sum: 1e27ad25a660476003bee31bc4026835c236bddab079c3fedfabfca699ae36e81fba819cda2b42574ca7b7d2afccab0a0b16bb4478a8c33fa7236f8426f402b0
     type: tar.gz
 }
 
