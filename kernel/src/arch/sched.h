@@ -4,6 +4,11 @@
 #include "sched/thread.h"
 
 /**
+ * @brief Pick the next thread and perform a context switch to it.
+ */
+void arch_sched_yield();
+
+/**
  * @brief Destroy a thread.
  * @warning Thread should not be on the scheduler queue when this is called,
  * set thread state to `THREAD_STATE_DESTROY` if you want to destroy a thread.

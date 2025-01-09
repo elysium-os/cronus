@@ -1,6 +1,7 @@
 #include "sched.h"
 
 #include "arch/cpu.h"
+#include "arch/interrupt.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
 #include "arch/sched.h"
@@ -31,6 +32,7 @@ typedef struct [[gnu::packed]] {
     void (*thread_init)(x86_64_thread_t *prev);
     void (*thread_init_kernel)();
     void (*entry)();
+    void (*thread_exit_kernel)();
 
     struct {
         uint64_t rbp;
@@ -64,10 +66,17 @@ static void common_thread_init(x86_64_thread_t *prev) {
     sched_thread_drop(&prev->common);
 
     x86_64_lapic_timer_oneshot(g_sched_vector, INTERVAL);
+
+    arch_interrupt_set_ipl(IPL_PREEMPT);
 }
 
 static void kernel_thread_init() {
     asm volatile("sti");
+}
+
+static void kernel_thread_exit() {
+    arch_sched_thread_current()->state = THREAD_STATE_DESTROY;
+    arch_sched_yield();
 }
 
 [[noreturn]] static void sched_idle() {
@@ -77,19 +86,17 @@ static void kernel_thread_init() {
 }
 
 static void sched_switch(x86_64_thread_t *this, x86_64_thread_t *next) {
-    if(next->common.proc) {
+    ASSERT(arch_interrupt_get_ipl() != IPL_PREEMPT);
+    ASSERT(next != NULL);
+
+    if(next->common.proc != NULL) {
         arch_ptm_load_address_space(next->common.proc->address_space);
     } else {
         arch_ptm_load_address_space(g_vm_global_address_space);
     }
 
-    next->common.cpu = this->common.cpu;
-    ASSERT(next != NULL);
     X86_64_CPU_LOCAL_MEMBER_SET(current_thread, next);
-    x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) next);
-    this->common.cpu = 0;
-
-    x86_64_tss_set_rsp0(X86_64_CPU(next->common.cpu)->tss, next->kernel_stack.base);
+    x86_64_tss_set_rsp0(X86_64_CPU_LOCAL_MEMBER(tss), next->kernel_stack.base);
 
     this->state.gs = x86_64_msr_read(X86_64_MSR_KERNEL_GS_BASE);
     this->state.fs = x86_64_msr_read(X86_64_MSR_FS_BASE);
@@ -102,6 +109,25 @@ static void sched_switch(x86_64_thread_t *this, x86_64_thread_t *next) {
 
     x86_64_thread_t *prev = x86_64_sched_context_switch(this, next);
     sched_thread_drop(&prev->common);
+}
+
+void arch_sched_yield() {
+    ipl_t previous_ipl = ipl_raise(IPL_NORMAL);
+    thread_t *current = arch_sched_thread_current();
+
+    thread_t *next = sched_thread_next();
+    if(next == NULL) {
+        if(current == X86_64_CPU_LOCAL_MEMBER(self)->common.idle_thread) goto oneshot;
+        next = X86_64_CPU_LOCAL_MEMBER(self)->common.idle_thread;
+    }
+    ASSERT(current != next);
+
+    sched_switch(X86_64_THREAD(current), X86_64_THREAD(next));
+
+oneshot:
+    x86_64_lapic_timer_oneshot(g_sched_vector, INTERVAL);
+
+    ipl_lower(previous_ipl);
 }
 
 void arch_sched_thread_destroy(thread_t *thread) {
@@ -142,7 +168,7 @@ static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t ker
 }
 
 static void sched_entry([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
-    x86_64_sched_next();
+    arch_sched_yield();
 }
 
 thread_t *arch_sched_thread_create_kernel(void (*func)()) {
@@ -156,6 +182,7 @@ thread_t *arch_sched_thread_create_kernel(void (*func)()) {
     init_stack->entry = func;
     init_stack->thread_init = common_thread_init;
     init_stack->thread_init_kernel = kernel_thread_init;
+    init_stack->thread_exit_kernel = kernel_thread_exit;
     return &create_thread(NULL, kernel_stack, (uintptr_t) init_stack)->common;
 }
 
@@ -242,22 +269,6 @@ thread_t *arch_sched_thread_current() {
     return &thread->common;
 }
 
-void x86_64_sched_next() {
-    thread_t *current = arch_sched_thread_current();
-
-    thread_t *next = sched_thread_next();
-    if(!next) {
-        if(current == current->cpu->idle_thread) goto oneshot;
-        next = current->cpu->idle_thread;
-    }
-    ASSERT(current != next);
-
-    sched_switch(X86_64_THREAD(current), X86_64_THREAD(next));
-
-oneshot:
-    x86_64_lapic_timer_oneshot(g_sched_vector, INTERVAL);
-}
-
 [[noreturn]] void x86_64_sched_init_cpu(x86_64_cpu_t *cpu, bool release) {
     x86_64_thread_t *idle_thread = X86_64_THREAD(arch_sched_thread_create_kernel(sched_idle));
     idle_thread->common.id = 0;
@@ -266,7 +277,6 @@ oneshot:
     x86_64_thread_t *bootstrap_thread = heap_alloc(sizeof(x86_64_thread_t));
     memclear(bootstrap_thread, sizeof(x86_64_thread_t));
     bootstrap_thread->common.state = THREAD_STATE_DESTROY;
-    bootstrap_thread->common.cpu = &cpu->common;
 
     if(release) {
         x86_64_init_flag_set(X86_64_INIT_FLAG_SCHED);
@@ -274,6 +284,7 @@ oneshot:
         while(!x86_64_init_flag_check(X86_64_INIT_FLAG_SCHED)) arch_cpu_relax();
     }
 
+    arch_interrupt_set_ipl(IPL_NORMAL);
     sched_switch(bootstrap_thread, idle_thread);
     __builtin_unreachable();
 }
