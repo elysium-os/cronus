@@ -1,4 +1,4 @@
-.chariot-cache/
+.chariot-cache/*
 !.chariot-cache/patches
 
 build/
