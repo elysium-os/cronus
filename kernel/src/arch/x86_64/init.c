@@ -39,7 +39,7 @@
 #include <stddef.h>
 #include <tartarus.h>
 
-#define PIT_TIMER_FREQ 1000
+#define PIT_TIMER_FREQ 1'000
 #define LAPIC_CALIBRATION_TICKS 0x1'0000
 
 #define ADJUST_STACK(OFFSET)                                                                                                                                \
@@ -102,7 +102,7 @@ static void pit_time_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     uint16_t end_count = x86_64_pit_count();
 
     cpu->lapic_id = x86_64_lapic_id();
-    cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * PIT_BASE_FREQ;
+    cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * X86_64_PIT_BASE_FREQ;
     cpu->tss = tss;
     cpu->tlb_shootdown_check = SPINLOCK_INIT;
     cpu->tlb_shootdown_lock = SPINLOCK_INIT;
@@ -258,7 +258,7 @@ static void pit_time_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
             *cpu = g_early_bsp;
             cpu->self = cpu;
             cpu->lapic_id = x86_64_lapic_id();
-            cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * PIT_BASE_FREQ;
+            cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * X86_64_PIT_BASE_FREQ;
             cpu->tss = tss;
             cpu->tlb_shootdown_check = SPINLOCK_INIT;
             cpu->tlb_shootdown_lock = SPINLOCK_INIT;

@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#define PIT_BASE_FREQ 1193182
+#define X86_64_PIT_BASE_FREQ 1193182
 
 /**
  * @brief Set the reload value.

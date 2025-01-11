@@ -9,5 +9,12 @@
 #define X86_64_INIT_FLAG_TIME (1 << 4)
 #define X86_64_INIT_FLAG_SCHED (1 << 7)
 
+/**
+ * @brief Check if given initialization flags are set.
+ */
 bool x86_64_init_flag_check(size_t flags);
+
+/**
+ * @brief Set an initialization flag.
+ */
 void x86_64_init_flag_set(size_t flags);

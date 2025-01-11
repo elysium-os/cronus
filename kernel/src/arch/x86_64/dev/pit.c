@@ -14,8 +14,8 @@ void x86_64_pit_set_reload(uint16_t reload_value) {
 }
 
 void x86_64_pit_match_frequency(uint64_t frequency) {
-    uint64_t divider = PIT_BASE_FREQ / frequency;
-    if(PIT_BASE_FREQ % frequency > frequency / 2) divider++;
+    uint64_t divider = X86_64_PIT_BASE_FREQ / frequency;
+    if(X86_64_PIT_BASE_FREQ % frequency > frequency / 2) divider++;
     x86_64_pit_set_reload((uint16_t) divider);
 }
 
