@@ -1,15 +1,20 @@
 #include "time.h"
 
+#include "common/log.h"
 #include "common/spinlock.h"
 
-time_t g_time_monotonic = {};
+#include <stddef.h>
 
-static spinlock_t g_lock = SPINLOCK_INIT;
+static time_source_t *g_main_source = NULL;
 
-void time_advance(time_t length) {
-    ipl_t ipl_previous = spinlock_acquire(&g_lock);
+void time_source_register(time_source_t *source) {
+    g_main_source = source;
+}
 
-    g_time_monotonic = time_add(g_time_monotonic, length);
-
-    spinlock_release(&g_lock, ipl_previous);
+time_t time_monotonic() {
+    if(g_main_source == NULL) {
+        log(LOG_LEVEL_WARN, "TIME", "time requested while no available source");
+        return 0;
+    }
+    return g_main_source->current();
 }
