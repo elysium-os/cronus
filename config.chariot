@@ -123,6 +123,36 @@ target/tartarus_efi {
     install { DESTDIR=@(install_dir) make install }
 }
 
+// uACPI
+source/uacpi {
+    url: https://github.com/UltraOS/uACPI/archive/1bd2930030ef819519de32dd1f7a8f999440308f.tar.gz
+    b2sum: 0c972ce71ba510dfa2f443492cf8fcada9bb0c1bddf97d113536939243184b94543dab86b47dafac5cb7bac73a2a9d18ead3a6c9bf4f09876eea36670e90216c
+    type: tar.gz
+}
+
+target/uacpi {
+    source: uacpi
+    dependencies [ host/freestanding_gcc ]
+    build {
+        x86_64-elf-gcc \
+            -ffreestanding \
+            -mcmodel=kernel \
+            -mno-red-zone \
+            -mgeneral-regs-only \
+            -O3 \
+            -DUACPI_NATIVE_ALLOC_ZEROED -DUACPI_FORMATTED_LOGGING \
+            -I@(source_dir)/include \
+            -c $(find @(source_dir)/source -type f -name "*.c")
+        x86_64-elf-ar cr uacpi.a $(find . -type f -name "*.o")
+    }
+    install {
+        mkdir -p @(install_dir)@(prefix)/share
+        mkdir -p @(install_dir)@(prefix)/include
+        cp uacpi.a @(install_dir)@(prefix)/share
+        cp -r @(source_dir)/include/* @(install_dir)@(prefix)/include
+    }
+}
+
 // Kernel
 source/kernel {
     url: kernel
@@ -131,7 +161,7 @@ source/kernel {
 
 target/kernel {
     source: kernel
-    dependencies [ host/freestanding_gcc target/tartarus ]
+    dependencies [ host/freestanding_gcc target/tartarus target/uacpi ]
     configure {
         @(source_dir)/conf.sh \
             --prefix=@(prefix) \

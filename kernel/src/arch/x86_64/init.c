@@ -44,6 +44,7 @@
 
 #include <stddef.h>
 #include <tartarus.h>
+#include <uacpi/uacpi.h>
 
 #define PIT_TIMER_FREQ 1'000
 #define LAPIC_CALIBRATION_TICKS 0x1'0000
@@ -65,8 +66,15 @@ static vm_region_t g_hhdm_region, g_kernel_region;
 
 static x86_64_cpu_t g_early_bsp;
 
-static void pit_time_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
-    time_advance((time_t) {.nanoseconds = TIME_NANOSECONDS_IN_SECOND / PIT_TIMER_FREQ});
+static void thread_uacpi_setup() {
+    uacpi_status ret = uacpi_initialize(0);
+    if(uacpi_unlikely_error(ret)) {
+        log(LOG_LEVEL_WARN, "UACPI", "initialization failed (%s)", uacpi_status_to_string(ret));
+    } else {
+        ret = uacpi_namespace_load();
+        if(uacpi_unlikely_error(ret)) log(LOG_LEVEL_WARN, "UACPI", "namespace load failed (%s)", uacpi_status_to_string(ret));
+    }
+    log(LOG_LEVEL_INFO, "UACPI", "done");
 }
 
 [[noreturn]] [[gnu::naked]] static void init_ap() {
@@ -325,6 +333,8 @@ static void pit_time_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     x86_64_init_flag_set(X86_64_INIT_FLAG_TIME);
 
     asm volatile("sti");
+
+    sched_thread_schedule(arch_sched_thread_create_kernel(thread_uacpi_setup));
 
     log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye for now!");
     x86_64_sched_init_cpu(cpu, true);

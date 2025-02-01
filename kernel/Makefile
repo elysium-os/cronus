@@ -10,7 +10,7 @@ CFLAGS += -fno-stack-protector -fno-stack-check -fno-omit-frame-pointer -fno-str
 CFLAGS += -I$(SYSROOT)$(PREFIX)/include -I$(SRC_DIRECTORY)
 
 CFLAGS += -D__ARCH_$(shell echo $(ARCH) | tr a-z A-Z) -D__ENV_$(shell echo $(ENVIRONMENT) | tr a-z A-Z)
-CFLAGS += -I$(SYSROOT)$(PREFIX)/include -I$(SRC)
+CFLAGS += -DUACPI_NATIVE_ALLOC_ZEROED -DUACPI_FORMATTED_LOGGING
 
 ifeq ($(ENVIRONMENT), development)
 CFLAGS += -g -fsanitize=undefined
@@ -39,7 +39,7 @@ OBJS += $(patsubst %.S,$(BUILD_DIRECTORY)/%_S.o,$(S_SOURCES))
 all: $(BUILD_DIRECTORY)/kernel.elf $(BUILD_DIRECTORY)/kernel_symbols.txt clean
 
 ifeq ($(ARCH), x86_64)
-$(BUILD_DIRECTORY)/kernel.elf: $(OBJS)  /usr/local/lib/gcc/x86_64-elf/13.2.0/no-red-zone/libgcc.a
+$(BUILD_DIRECTORY)/kernel.elf: $(OBJS) $(SYSROOT)$(PREFIX)/share/uacpi.a /usr/local/lib/gcc/x86_64-elf/13.2.0/no-red-zone/libgcc.a
 	mkdir -p $(@D)
 	$(LD) -o $@ -T"$(SUPPORT_DIRECTORY)/link.x86_64.ld" $^
 
