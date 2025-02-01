@@ -220,7 +220,7 @@ void *vm_map_direct(vm_address_space_t *address_space, void *hint, size_t length
 }
 
 void vm_unmap(vm_address_space_t *address_space, void *address, size_t length) {
-    log(LOG_LEVEL_DEBUG, "VMM", "unmap(address: %#lx, length: %#lx)", (uintptr_t) address, length);
+    log(LOG_LEVEL_DEBUG, "VM", "unmap(address: %#lx, length: %#lx)", (uintptr_t) address, length);
     if(length == 0) return;
 
     ASSERT((uintptr_t) address % ARCH_PAGE_GRANULARITY == 0 && length % ARCH_PAGE_GRANULARITY == 0);
