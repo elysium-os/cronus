@@ -14,9 +14,15 @@
                     wget # Required by Chariot
 
                     gdb
-                    qemu_full
-
                     llvmPackages_19.clang-tools
+
+                    bochs
+                    qemu_full
+                    (pkgs.writeShellScriptBin "qemu-ovmf-x86-64" ''
+                        ${pkgs.qemu_full}/bin/qemu-system-x86_64 \
+                            -drive if=pflash,unit=0,format=raw,file=${pkgs.OVMF.fd}/FV/OVMF.fd,readonly=on \
+                            "$@"
+                    '')
                 ];
             };
         }

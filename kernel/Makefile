@@ -2,10 +2,13 @@ include conf.mk
 
 DESTDIR ?= /
 
-# Flags
-CFLAGS := -std=gnu2x -ffreestanding -mcmodel=kernel -mno-red-zone -mgeneral-regs-only -O3
+# Kernel Flags
+CFLAGS := -std=gnu2x -ffreestanding -mcmodel=kernel -mno-red-zone -mgeneral-regs-only -mabi=sysv
 CFLAGS += -Wall -Wextra -Wvla -Wshadow
-CFLAGS += -fno-stack-protector -fno-stack-check -fno-omit-frame-pointer -fno-strict-aliasing
+CFLAGS += -fno-stack-protector -fno-stack-check -fno-omit-frame-pointer -fno-strict-aliasing -fno-lto
+
+CFLAGS += -I$(SYSROOT)$(PREFIX)/include -I$(SRC_DIRECTORY)
+
 CFLAGS += -D__ARCH_$(shell echo $(ARCH) | tr a-z A-Z) -D__ENV_$(shell echo $(ENVIRONMENT) | tr a-z A-Z)
 CFLAGS += -I$(SYSROOT)$(PREFIX)/include -I$(SRC)
 
@@ -15,36 +18,47 @@ ifeq ($(ARCH), x86_64)
 CFLAGS += -fno-sanitize=alignment
 endif
 else ifeq ($(ENVIRONMENT), production)
+CFLAGS += -O3
 else
 $(error invalid environment=`$(ENVIRONMENT)`)
 endif
 
-# Sources
-S_SOURCES := $(shell find $(SRC) -type f -name "*.S" -not -path "$(SRC)/arch/*")
-S_SOURCES += $(shell find $(SRC)/arch/$(ARCH) -type f -name "*.S")
-C_SOURCES := $(shell find $(SRC) -type f -name "*.c" -not -path "$(SRC)/arch/*")
-C_SOURCES += $(shell find $(SRC)/arch/$(ARCH) -type f -name "*.c")
+# Kernel Sources
+C_SOURCES := $(shell find $(SRC_DIRECTORY) -type f -name "*.c" -not -path "$(SRC_DIRECTORY)/arch/*")
+C_SOURCES += $(shell find $(SRC_DIRECTORY)/arch/$(ARCH) -type f -name "*.c")
+S_SOURCES := $(shell find $(SRC_DIRECTORY) -type f -name "*.S" -not -path "$(SRC_DIRECTORY)/arch/*")
+S_SOURCES += $(shell find $(SRC_DIRECTORY)/arch/$(ARCH) -type f -name "*.S")
+
+# Objects
+OBJS := $(patsubst %.c,$(BUILD_DIRECTORY)/%_c.o,$(C_SOURCES))
+OBJS += $(patsubst %.S,$(BUILD_DIRECTORY)/%_S.o,$(S_SOURCES))
 
 # Targets
 .PHONY: all install clean
 
-all: $(BUILD)/kernel.elf clean
+all: $(BUILD_DIRECTORY)/kernel.elf $(BUILD_DIRECTORY)/kernel_symbols.txt clean
 
 ifeq ($(ARCH), x86_64)
-$(BUILD)/kernel.elf: $(S_SOURCES:.S=_S.o) $(C_SOURCES:.c=.o)
-	mkdir -p $(BUILD)
-	$(LD) -o $@ -T"$(SUPPORT)/link.x86_64.ld" $^
+$(BUILD_DIRECTORY)/kernel.elf: $(OBJS)  /usr/local/lib/gcc/x86_64-elf/13.2.0/no-red-zone/libgcc.a
+	mkdir -p $(@D)
+	$(LD) -o $@ -T"$(SUPPORT_DIRECTORY)/link.x86_64.ld" $^
+
+$(BUILD_DIRECTORY)/kernel_symbols.txt: $(BUILD_DIRECTORY)/kernel.elf
+	x86_64-elf-nm $< -n > $@
 endif
 
-%_S.o: %.S
+$(BUILD_DIRECTORY)/%_S.o: %.S
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.c
+$(BUILD_DIRECTORY)/%_c.o: %.c
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 install:
 	install -d $(DESTDIR)$(PREFIX)/share
-	install $(BUILD)/kernel.elf $(DESTDIR)$(PREFIX)/share
+	install $(BUILD_DIRECTORY)/kernel.elf $(DESTDIR)$(PREFIX)/share
+	install $(BUILD_DIRECTORY)/kernel_symbols.txt $(DESTDIR)$(PREFIX)/share
 
 clean:
-	rm -f $(shell find $(SRC) -type f -name "*.o")
+	rm -f $(shell find $(BUILD_DIRECTORY) -type f -name "*.o")

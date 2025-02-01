@@ -1,6 +1,6 @@
-name = "elysium.img"
+name = "elysium_bios.img"
 protective-mbr = true
-bootsector = "mbr.bin"
+bootsector = "x86_64-bios.bin"
 
 [[partitions]]
 type = "file"
@@ -13,8 +13,4 @@ type = "fs"
 gpt-type = "454C5953-4955-4D52-4F4F-545041525458"
 fs-type = "fat32"
 size = 64
-files = [
-    "kernel.elf",
-    "tartarus.cfg",
-    "kernelsymbols.txt"
-]
+files = ["image_root"]

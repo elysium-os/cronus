@@ -13,19 +13,27 @@ while [[ $# -gt 0 ]]; do
             ;;
         --arch=*)
             ARCH=${1#*=}
-            ;;
-        --toolchain-triplet=*)
-            TC_TRIPLET=${1#*=}
+            case $ARCH in
+                x86_64)
+                    ;;
+                *)
+                    echo "Unknown architecture \"$ARCH\""
+                    exit 1
+                    ;;
+            esac
             ;;
         --production)
             ENVIRONMENT="production"
+            ;;
+        --toolchain-triplet=*)
+            TC_TRIPLET=${1#*=}
             ;;
         -*|--*)
             echo "Unknown option \"$1\""
             exit 1
             ;;
         *)
-            POSITIONAL_ARGS+=("$1") # save positional arg
+            POSITIONAL_ARGS+=("$1")
             ;;
     esac
     shift
@@ -42,19 +50,21 @@ if [ -z "$TC_TRIPLET" ]; then
     exit 1
 fi
 
-SRCDIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
-DSTDIR=$(pwd)
+SRC_DIRECTORY=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+DEST_DIRECTORY=$(pwd)
 
-cp $SRCDIR/Makefile $DSTDIR
+cp $SRC_DIRECTORY/Makefile $DEST_DIRECTORY
 
-CONFMK="$DSTDIR/conf.mk"
-echo "SRC := $SRCDIR/src" > $CONFMK
-echo "SUPPORT := $SRCDIR/support" >> $CONFMK
-echo "BUILD := $DSTDIR/build" >> $CONFMK
-echo "ASMC := $TC_TRIPLET-as" >> $CONFMK
-echo "CC := $TC_TRIPLET-gcc" >> $CONFMK
-echo "LD := $TC_TRIPLET-ld" >> $CONFMK
-echo "PREFIX := $PREFIX" >> $CONFMK
-echo "ARCH := $ARCH" >> $CONFMK
-echo "ENVIRONMENT := $ENVIRONMENT" >> $CONFMK
-echo "SYSROOT := $SYSROOT" >> $CONFMK
+CONFIG_FILE="$DEST_DIRECTORY/conf.mk"
+echo "SRC_DIRECTORY := $SRC_DIRECTORY/src" > $CONFIG_FILE
+echo "SUPPORT_DIRECTORY := $SRC_DIRECTORY/support" >> $CONFIG_FILE
+echo "BUILD_DIRECTORY := $DEST_DIRECTORY/build" >> $CONFIG_FILE
+echo "PREFIX := $PREFIX" >> $CONFIG_FILE
+echo "SYSROOT := $SYSROOT" >> $CONFIG_FILE
+echo "ARCH := $ARCH" >> $CONFIG_FILE
+echo "ENVIRONMENT := $ENVIRONMENT" >> $CONFIG_FILE
+
+echo "ASMC := $TC_TRIPLET-as" >> $CONFIG_FILE
+echo "CC := $TC_TRIPLET-gcc" >> $CONFIG_FILE
+echo "LD := $TC_TRIPLET-ld" >> $CONFIG_FILE
+echo "AR := $TC_TRIPLET-ar" >> $CONFIG_FILE

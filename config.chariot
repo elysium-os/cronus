@@ -77,18 +77,47 @@ host/mkimg {
 
 // Tartarus (Bootloader)
 source/tartarus {
-    url: https://git.thenest.dev/wux/tartarus-bootloader/-/archive/4dc7980ad60ce71f2920b07170f180f4e6354d5d/tartarus-bootloader-4dc7980ad60ce71f2920b07170f180f4e6354d5d.tar.gz
-    b2sum: 1e27ad25a660476003bee31bc4026835c236bddab079c3fedfabfca699ae36e81fba819cda2b42574ca7b7d2afccab0a0b16bb4478a8c33fa7236f8426f402b0
+    url: https://git.thenest.dev/wux/tartarus-bootloader/-/archive/928c02398c2437495bcca5cebcacbba091a40414/tartarus-bootloader-928c02398c2437495bcca5cebcacbba091a40414.tar.gz
+    b2sum: cbff71b461cc066dd0e7a06bc1e1860ff262eea9308d9e092da84bf7d76580db5dc22d01ae172dc50b82f9c2141fceb24449b14e27b64fe5f292f9b1513e12f9
+    type: tar.gz
+}
+
+source/vendor_libgcc {
+    url: https://github.com/osdev0/libgcc-binaries/archive/refs/heads/trunk.tar.gz
+    b2sum: badf839396a04781c1d5d3d92daf43664675cc4a00aa68775706856e6e731759c8bdfb749bffe41ccc0c75c9a8c2cd69be922ef7bb88aff1fbd0d55cb6bf1455
+    type: tar.gz
+}
+
+source/vendor_nyu-efi {
+    url: https://github.com/osdev0/nyu-efi/archive/eede601b8a9134cb4b6de96d2c430e2424c1390c.tar.gz
+    b2sum: 26b841f4af5c0404a7a9976f7f42870ac3ef695e1c77da8f555feee93fe9f5be3cebd3d1f6cf2d5bef9ba198e41cfbc7883f2e23b4ec09b7165adf8c15b6b821
     type: tar.gz
 }
 
 target/tartarus {
     source: tartarus
-    dependencies [ host/freestanding_gcc image/nasm image/git ]
+    dependencies [ source/vendor_libgcc host/freestanding_gcc image/nasm image/git ]
     configure {
         @(source_dir)/conf.sh \
             --prefix=@(prefix) \
-            --target=x86_64-bios
+            --platform=x86_64-bios \
+            --toolchain-triplet=x86_64-elf \
+            --vendor-libgcc=@(sources_dir)/vendor_libgcc
+    }
+    build { make -j@(thread_count) all }
+    install { DESTDIR=@(install_dir) make install }
+}
+
+target/tartarus_efi {
+    source: tartarus
+    dependencies [ source/vendor_libgcc source/vendor_nyu-efi host/freestanding_gcc image/nasm image/git ]
+    configure {
+        @(source_dir)/conf.sh \
+            --prefix=@(prefix) \
+            --platform=x86_64-uefi \
+            --toolchain-triplet=x86_64-elf \
+            --vendor-libgcc=@(sources_dir)/vendor_libgcc \
+            --vendor-efi=@(sources_dir)/vendor_nyu-efi
     }
     build { make -j@(thread_count) all }
     install { DESTDIR=@(install_dir) make install }
@@ -116,15 +145,29 @@ target/kernel {
 
 // Image
 target/image {
-    dependencies [ host/freestanding_binutils host/mkimg source/support target/tartarus target/kernel ]
+    dependencies [ host/mkimg source/support target/tartarus target/tartarus_efi target/kernel image/qemu-img ]
     build {
-        cp @(sysroot_dir)@(prefix)/share/tartarus/* .
-        cp @(sysroot_dir)@(prefix)/share/kernel.elf .
-        cp @(sources_dir)/support/tartarus.cfg .
+        cp @(sysroot_dir)@(prefix)/share/tartarus/tartarus.sys .
+        cp @(sysroot_dir)@(prefix)/share/tartarus/x86_64-bios.bin .
 
-        x86_64-elf-nm kernel.elf -n > kernelsymbols.txt
+        mkdir -p ./image_root
+        cp @(sources_dir)/support/tartarus.cfg ./image_root
+        cp @(sysroot_dir)@(prefix)/share/kernel.elf ./image_root
+        cp @(sysroot_dir)@(prefix)/share/kernel_symbols.txt ./image_root
 
-        mkimg --config=@(sources_dir)/support/mkimg.toml
+        mkimg --config=@(sources_dir)/support/mkimg_bios.toml
+
+        mkdir -p ./image_root/EFI/BOOT
+        cp @(sysroot_dir)@(prefix)/share/tartarus/tartarus.efi ./image_root/EFI/BOOT/BOOTX64.EFI
+        mkimg --config=@(sources_dir)/support/mkimg_efi.toml
+
+        qemu-img convert -O vmdk elysium_efi.img elysium_efi.vmdk
+        qemu-img convert -O vmdk elysium_bios.img elysium_bios.vmdk
     }
-    install { cp elysium.img @(install_dir) }
+    install {
+        cp elysium_bios.img @(install_dir)
+        cp elysium_efi.img @(install_dir)
+        cp elysium_bios.vmdk @(install_dir)
+        cp elysium_efi.vmdk @(install_dir)
+    }
 }

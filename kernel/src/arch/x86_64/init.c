@@ -156,7 +156,7 @@ static void pit_time_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     for(uint16_t i = 0; i < boot_info->module_count; i++) {
         tartarus_module_t *module = &boot_info->modules[i];
         log(LOG_LEVEL_DEBUG, "INIT", "Module found: %s", module->name);
-        if(!string_eq("kernelsymbols.txt", module->name)) continue;
+        if(!string_eq("kernel_symbols.txt", module->name)) continue;
         g_arch_debug_symbols = (char *) HHDM(module->paddr);
         g_arch_debug_symbols_length = module->size;
         log(LOG_LEVEL_DEBUG, "INIT", "Kernel symbols loaded");
