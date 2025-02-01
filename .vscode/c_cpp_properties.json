@@ -4,11 +4,15 @@
             "name": "ElysiumOS",
             "includePath": [
                 "${workspaceFolder}/kernel/src",
-                "${workspaceFolder}/.chariot-cache/target/tartarus/install/usr/include"
+                "${workspaceFolder}/.chariot-cache/target/tartarus/install/usr/include",
+                "${workspaceFolder}/.chariot-cache/source/uacpi/src/include"
             ],
             "defines": [
                 "__ARCH_X86_64",
                 "__ENV_DEVELOPMENT",
+
+                "UACPI_NATIVE_ALLOC_ZEROED",
+                "UACPI_FORMATTED_LOGGING",
 
                 /* Unsupported C23 features work-around */
                 /* https://github.com/microsoft/vscode-cpptools/issues/10696 */
@@ -26,12 +30,10 @@
                 "-mcmodel=kernel",
                 "-mno-red-zone",
                 "-mgeneral-regs-only",
-                "-O3",
+                "-mabi=sysv",
 
                 "-Wall",
                 "-Wextra",
-                "-Wno-unused-variable",
-                "-Wno-microsoft-anon-tag",
                 "-Wvla",
                 "-Wshadow",
 
@@ -39,7 +41,7 @@
                 "-fno-stack-check",
                 "-fno-omit-frame-pointer",
                 "-fno-strict-aliasing",
-                "-D__ARCH_X86_64"
+                "-fno-lto"
             ]
         }
     ],

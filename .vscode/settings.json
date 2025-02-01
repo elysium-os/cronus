@@ -4,8 +4,7 @@
     },
     "C_Cpp.autoAddFileAssociations": false,
     "[c]": {
-        "editor.formatOnSave": true,
-        "editor.formatOnType": true
+        "editor.formatOnSave": true
     },
     "todo-tree.general.tags": [
         "TODO",
@@ -13,7 +12,8 @@
         "UNIMPLEMENTED",
         "CRITICAL",
         "FIX",
-        "TEMPORARY"
+        "TEMPORARY",
+        "NOTE"
     ],
     "todo-tree.highlights.backgroundColourScheme": [
         "yellow",
@@ -21,13 +21,15 @@
         "orange",
         "red",
         "coral",
-        "cyan"
+        "cyan",
+        "grey"
     ],
     "todo-tree.highlights.foregroundColourScheme": [
         "black",
         "white",
         "black",
         "white",
+        "black",
         "black",
         "black"
     ],
