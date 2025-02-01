@@ -9,6 +9,7 @@
 #include "common/assert.h"
 #include "common/log.h"
 #include "dev/acpi/acpi.h"
+#include "dev/pci.h"
 #include "graphics/draw.h"
 #include "graphics/font.h"
 #include "graphics/framebuffer.h"
@@ -251,6 +252,10 @@ static void pit_time_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     // Initialize IOAPIC
     acpi_sdt_header_t *madt = acpi_find_table((uint8_t *) "APIC");
     if(madt != NULL) x86_64_ioapic_init(madt);
+
+    // Initialize PCI
+    acpi_sdt_header_t *mcfg = acpi_find_table((uint8_t *) "MCFG");
+    pci_enumerate(mcfg);
 
     // Initialize sched
     x86_64_sched_init();
