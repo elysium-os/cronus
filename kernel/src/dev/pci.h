@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/spinlock.h"
+#include "common/lock/spinlock.h"
 #include "dev/acpi/acpi.h"
 #include "lib/list.h"
 

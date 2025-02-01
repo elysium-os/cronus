@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/spinlock.h"
+#include "common/lock/spinlock.h"
 #include "lib/list.h"
 
 #define WAITABLE_INIT ((waitable_t) {.lock = SPINLOCK_INIT, .threads_waiting = LIST_INIT})

@@ -1,9 +1,9 @@
 #include "heap.h"
 
 #include "common/assert.h"
+#include "common/lock/spinlock.h"
 #include "common/log.h"
 #include "common/panic.h"
-#include "common/spinlock.h"
 #include "lib/list.h"
 #include "memory/pmm.h"
 

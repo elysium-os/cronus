@@ -2,7 +2,7 @@
 
 #include "arch/cpu.h"
 #include "arch/sched.h"
-#include "common/spinlock.h"
+#include "common/lock/spinlock.h"
 #include "lib/list.h"
 #include "lib/mem.h"
 #include "memory/heap.h"

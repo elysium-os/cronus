@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/spinlock.h"
+#include "common/lock/spinlock.h"
 #include "lib/container.h"
 #include "sys/cpu.h"
 

@@ -1,6 +1,6 @@
 #include "log.h"
 
-#include "common/spinlock.h"
+#include "common/lock/spinlock.h"
 #include "lib/format.h"
 #include "lib/string.h"
 

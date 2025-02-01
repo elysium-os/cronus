@@ -1,7 +1,7 @@
 #include "time.h"
 
+#include "common/lock/spinlock.h"
 #include "common/log.h"
-#include "common/spinlock.h"
 
 #include <stddef.h>
 
