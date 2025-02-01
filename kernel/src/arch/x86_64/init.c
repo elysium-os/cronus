@@ -9,6 +9,9 @@
 #include "common/assert.h"
 #include "common/log.h"
 #include "dev/acpi/acpi.h"
+#include "graphics/draw.h"
+#include "graphics/font.h"
+#include "graphics/framebuffer.h"
 #include "lib/math.h"
 #include "lib/mem.h"
 #include "lib/string.h"
@@ -18,6 +21,7 @@
 #include "memory/vm.h"
 #include "sched/sched.h"
 #include "sys/time.h"
+#include "terminal.h"
 
 #include "arch/x86_64/cpu/cpu.h"
 #include "arch/x86_64/cpu/cpuid.h"
@@ -50,6 +54,8 @@ size_t g_hhdm_size;
 
 volatile size_t g_x86_64_cpu_count;
 x86_64_cpu_t *g_x86_64_cpus;
+
+framebuffer_t g_framebuffer;
 
 static size_t init_flags = 0;
 
@@ -122,6 +128,15 @@ static void pit_time_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     g_hhdm_offset = boot_info->hhdm.offset;
     g_hhdm_size = boot_info->hhdm.size;
 
+    if(boot_info->framebuffer_count == 0) panic("no framebuffer provided");
+    tartarus_framebuffer_t *framebuffer = &boot_info->framebuffers[0];
+    g_framebuffer.physical_address = HHDM_TO_PHYS(framebuffer->address);
+    g_framebuffer.size = framebuffer->size;
+    g_framebuffer.width = framebuffer->width;
+    g_framebuffer.height = framebuffer->height;
+    g_framebuffer.pitch = framebuffer->pitch;
+    // TODO handle pixel format
+
     memclear(&g_early_bsp, sizeof(g_early_bsp));
     g_early_bsp.self = &g_early_bsp;
     x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
@@ -131,6 +146,8 @@ static void pit_time_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     log_sink_add(&g_x86_64_qemu_debug_sink);
 #endif
 
+    log_sink_add(&g_terminal_sink);
+    draw_rect(&g_framebuffer, 0, 0, g_framebuffer.width, g_framebuffer.height, draw_color(14, 14, 15));
     log(LOG_LEVEL_INFO, "INIT", "Elysium alpha.6 (" __DATE__ " " __TIME__ ")");
 
     log(LOG_LEVEL_DEBUG, "INIT", "Enumerating modules");
@@ -254,7 +271,7 @@ static void pit_time_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     x86_64_cpu_t *cpu = NULL;
     g_x86_64_cpu_count = 0;
     for(size_t i = 0; i < boot_info->cpu_count; i++) {
-        if(boot_info->cpus[i].init_failed) continue;
+        if(boot_info->cpus[i].initialization_failed) continue;
 
         if(i == boot_info->bsp_index) {
             cpu = &g_x86_64_cpus[g_x86_64_cpu_count];
