@@ -59,3 +59,4 @@ void x86_64_hpet_init(acpi_sdt_header_t *header) {
     g_hpet[GCR] &= ~(GCR_LEGACY_ROUTING);
     g_hpet[GCR] |= GCR_ENABLED;
 }
+
