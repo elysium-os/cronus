@@ -86,7 +86,7 @@ void pmm_region_add(uintptr_t base, size_t size) {
     }
 }
 
-pmm_page_t *pmm_alloc(pmm_zone_index_t zone_index, pmm_order_t order, pmm_flags_t flags) {
+pmm_page_t *pmm_alloc(pmm_zone_index_t zone_index, pmm_order_t order, bool zero) {
     ASSERT(order <= PMM_MAX_ORDER);
     ASSERT(PMM_ZONE_PRESENT(zone_index));
 
@@ -107,16 +107,16 @@ pmm_page_t *pmm_alloc(pmm_zone_index_t zone_index, pmm_order_t order, pmm_flags_
     page->free = false;
     page->region->free_count -= order_to_pagecount(order);
     page->region->zone->free_count -= order_to_pagecount(order);
-    if(flags & PMM_FLAG_ZERO) memclear((void *) HHDM(page->paddr), order_to_pagecount(order) * ARCH_PAGE_GRANULARITY);
+    if(zero) memclear((void *) HHDM(page->paddr), order_to_pagecount(order) * ARCH_PAGE_GRANULARITY);
     return page;
 }
 
-pmm_page_t *pmm_alloc_pages(pmm_zone_index_t zone_index, size_t page_count, pmm_flags_t flags) {
-    return pmm_alloc(zone_index, pagecount_to_order(page_count), flags);
+pmm_page_t *pmm_alloc_pages(pmm_zone_index_t zone_index, size_t page_count, bool zero) {
+    return pmm_alloc(zone_index, pagecount_to_order(page_count), zero);
 }
 
-pmm_page_t *pmm_alloc_page(pmm_zone_index_t zone_index, pmm_flags_t flags) {
-    return pmm_alloc(zone_index, 0, flags);
+pmm_page_t *pmm_alloc_page(pmm_zone_index_t zone_index, bool zero) {
+    return pmm_alloc(zone_index, 0, zero);
 }
 
 void pmm_free(pmm_page_t *page) {

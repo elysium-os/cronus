@@ -247,7 +247,7 @@ static void thread_uacpi_setup() {
     x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_VIRT);
 
     // Initialize HEAP
-    heap_initialize(g_vm_global_address_space, 0x100'000);
+    heap_initialize(g_vm_global_address_space, 0x1'000'000);
 
     // Initialize FPU
     x86_64_fpu_init();

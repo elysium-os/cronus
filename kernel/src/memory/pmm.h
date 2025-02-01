@@ -14,9 +14,6 @@
 #define PMM_ZONE_NORMAL 0
 #define PMM_ZONE_LOW 1
 
-#define PMM_FLAG_NONE (0)
-#define PMM_FLAG_ZERO (1 << 0)
-
 typedef uint16_t pmm_flags_t;
 typedef uint8_t pmm_zone_index_t;
 typedef uint8_t pmm_order_t;
@@ -68,17 +65,17 @@ void pmm_region_add(uintptr_t base, size_t size);
 /**
  * @brief Allocates a block of size order^2 pages.
  */
-pmm_page_t *pmm_alloc(pmm_zone_index_t zone_index, pmm_order_t order, pmm_flags_t flags);
+pmm_page_t *pmm_alloc(pmm_zone_index_t zone_index, pmm_order_t order, bool zero);
 
 /**
  * @brief Allocates the smallest block of size N^2 pages to fit size.
  */
-pmm_page_t *pmm_alloc_pages(pmm_zone_index_t zone_index, size_t page_count, pmm_flags_t flags);
+pmm_page_t *pmm_alloc_pages(pmm_zone_index_t zone_index, size_t page_count, bool zero);
 
 /**
  * @brief Allocates a page of memory.
  */
-pmm_page_t *pmm_alloc_page(pmm_zone_index_t zone_index, pmm_flags_t flags);
+pmm_page_t *pmm_alloc_page(pmm_zone_index_t zone_index, bool zero);
 
 /**
  * @brief Frees a previously allocated page.

@@ -172,7 +172,7 @@ static void sched_entry([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
 }
 
 thread_t *arch_sched_thread_create_kernel(void (*func)()) {
-    pmm_page_t *kernel_stack_page = pmm_alloc_pages(PMM_ZONE_NORMAL, KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO);
+    pmm_page_t *kernel_stack_page = pmm_alloc_pages(PMM_ZONE_NORMAL, KERNEL_STACK_SIZE_PG, true);
     x86_64_thread_stack_t kernel_stack = {
         .base = HHDM(kernel_stack_page->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY),
         .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY
@@ -187,7 +187,7 @@ thread_t *arch_sched_thread_create_kernel(void (*func)()) {
 }
 
 thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t sp) {
-    pmm_page_t *kernel_stack_page = pmm_alloc_pages(PMM_ZONE_NORMAL, KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO);
+    pmm_page_t *kernel_stack_page = pmm_alloc_pages(PMM_ZONE_NORMAL, KERNEL_STACK_SIZE_PG, true);
     x86_64_thread_stack_t kernel_stack = {
         .base = HHDM(kernel_stack_page->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY),
         .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY
