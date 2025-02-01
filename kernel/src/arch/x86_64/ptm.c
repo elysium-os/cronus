@@ -88,6 +88,7 @@ static uint64_t cache_to_x86_flags(vm_cache_t cache) {
 }
 
 static void tlb_shootdown(vm_address_space_t *address_space, uintptr_t addr) {
+    log(LOG_LEVEL_DEBUG_NOISY, "PTM", "shootdown from CPU(%u) to %#lx", x86_64_lapic_id(), addr);
     if(!x86_64_init_flag_check(X86_64_INIT_FLAG_SMP | X86_64_INIT_FLAG_SCHED)) {
         if(address_space == g_vm_global_address_space || x86_64_cr3_read() == X86_64_AS(address_space)->cr3) invlpg(addr);
         return;
@@ -98,9 +99,11 @@ static void tlb_shootdown(vm_address_space_t *address_space, uintptr_t addr) {
         x86_64_cpu_t *cpu = &g_x86_64_cpus[i];
 
         if(cpu == X86_64_CPU(arch_cpu_current())) {
+            log(LOG_LEVEL_DEBUG_NOISY, "PTM", "local shootdown on CPU(%u) for %#lx", cpu->lapic_id, addr);
             if(address_space == g_vm_global_address_space || x86_64_cr3_read() == X86_64_AS(address_space)->cr3) invlpg(addr);
             continue;
         }
+        log(LOG_LEVEL_DEBUG_NOISY, "PTM", "issue shootdown from CPU(%u) to CPU(%u) for %#lx", x86_64_lapic_id(), cpu->lapic_id, addr);
 
         ipl_t previous_ipl = spinlock_acquire(&cpu->tlb_shootdown_lock);
         spinlock_primitive_acquire(&cpu->tlb_shootdown_check);
@@ -196,22 +199,26 @@ void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t 
     uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
     for(int i = 4; i > 1; i--) {
         int index = VADDR_TO_INDEX(vaddr, i);
-        if((current_table[index] & PTE_FLAG_PRESENT) == 0) {
+        uint64_t entry = current_table[index];
+        if((entry & PTE_FLAG_PRESENT) == 0) {
             pmm_page_t *page = pmm_alloc_page(PMM_ZONE_NORMAL, PMM_FLAG_ZERO);
-            current_table[index] = PTE_FLAG_PRESENT | (page->paddr & ADDRESS_MASK);
-            if(!prot.exec) current_table[index] |= PTE_FLAG_NX;
+            entry = PTE_FLAG_PRESENT | (page->paddr & ADDRESS_MASK);
+            if(!prot.exec) entry |= PTE_FLAG_NX;
         } else {
-            if(prot.exec) current_table[index] &= ~PTE_FLAG_NX;
+            if(prot.exec) entry &= ~PTE_FLAG_NX;
         }
-        if(prot.write) current_table[index] |= PTE_FLAG_RW;
-        current_table[index] |= privilege_to_x86_flags(privilege);
+        if(prot.write) entry |= PTE_FLAG_RW;
+        entry |= privilege_to_x86_flags(privilege);
+        __atomic_store(&current_table[index], &entry, __ATOMIC_SEQ_CST);
+
         current_table = (uint64_t *) HHDM(current_table[index] & ADDRESS_MASK);
     }
     int index = VADDR_TO_INDEX(vaddr, 1);
-    current_table[index] = PTE_FLAG_PRESENT | (paddr & ADDRESS_MASK) | privilege_to_x86_flags(privilege) | cache_to_x86_flags(cache);
-    if(prot.write) current_table[index] |= PTE_FLAG_RW;
-    if(!prot.exec) current_table[index] |= PTE_FLAG_NX;
-    if(global) current_table[index] |= PTE_FLAG_GLOBAL;
+    uint64_t entry = PTE_FLAG_PRESENT | (paddr & ADDRESS_MASK) | privilege_to_x86_flags(privilege) | cache_to_x86_flags(cache);
+    if(prot.write) entry |= PTE_FLAG_RW;
+    if(!prot.exec) entry |= PTE_FLAG_NX;
+    if(global) entry |= PTE_FLAG_GLOBAL;
+    __atomic_store(&current_table[index], &entry, __ATOMIC_SEQ_CST);
 
     tlb_shootdown(address_space, vaddr);
 
@@ -229,7 +236,7 @@ void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr) {
         }
         current_table = (uint64_t *) HHDM(current_table[index] & ADDRESS_MASK);
     }
-    current_table[VADDR_TO_INDEX(vaddr, 1)] = 0;
+    __atomic_store_n(&current_table[VADDR_TO_INDEX(vaddr, 1)], 0, __ATOMIC_SEQ_CST);
 
     tlb_shootdown(address_space, vaddr);
 
