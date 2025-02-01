@@ -1,4 +1,4 @@
-#include "qemu_serial.h"
+#include "qemu_debug.h"
 
 #include "lib/format.h"
 
@@ -6,14 +6,14 @@
 
 #include <stdarg.h>
 
-static void serial_format(char *fmt, ...) {
+static void debug_format(char *fmt, ...) {
     va_list list;
     va_start(list, fmt);
-    format(x86_64_qemu_serial_putc, fmt, list);
+    format(x86_64_qemu_debug_putc, fmt, list);
     va_end(list);
 }
 
-static void log_serial(log_level_t level, const char *tag, const char *fmt, va_list args) {
+static void log_debug(log_level_t level, const char *tag, const char *fmt, va_list args) {
     char *color;
     switch(level) {
         case LOG_LEVEL_DEBUG: color = "\e[36m"; break;
@@ -22,17 +22,17 @@ static void log_serial(log_level_t level, const char *tag, const char *fmt, va_l
         case LOG_LEVEL_ERROR: color = "\e[31m"; break;
         default:              color = "\e[0m"; break;
     }
-    serial_format("%s[%s:%s]%s ", color, log_level_stringify(level), tag, "\e[0m");
-    format(x86_64_qemu_serial_putc, fmt, args);
-    x86_64_qemu_serial_putc('\n');
+    debug_format("%s[%s:%s]%s ", color, log_level_stringify(level), tag, "\e[0m");
+    format(x86_64_qemu_debug_putc, fmt, args);
+    x86_64_qemu_debug_putc('\n');
 }
 
-log_sink_t g_x86_64_qemu_serial_sink = {
-    .name = "SERIAL",
+log_sink_t g_x86_64_qemu_debug_sink = {
+    .name = "QEMU",
     .filter = {.level = LOG_LEVEL_DEBUG, .tags_as_include = false, .tags = NULL, .tag_count = 0},
-    .log = log_serial
+    .log = log_debug
 };
 
-void x86_64_qemu_serial_putc(char ch) {
-    x86_64_port_outb(0x3F8, ch);
+void x86_64_qemu_debug_putc(char ch) {
+    x86_64_port_outb(0xE9, ch);
 }
