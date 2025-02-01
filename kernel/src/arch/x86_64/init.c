@@ -31,6 +31,7 @@
 #include "arch/x86_64/cpu/lapic.h"
 #include "arch/x86_64/cpu/msr.h"
 #include "arch/x86_64/cpu/port.h"
+#include "arch/x86_64/dev/hpet.h"
 #include "arch/x86_64/dev/ioapic.h"
 #include "arch/x86_64/dev/pic8259.h"
 #include "arch/x86_64/dev/pit.h"
@@ -297,10 +298,25 @@ static void pit_time_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     x86_64_init_flag_set(X86_64_INIT_FLAG_SMP);
 
     // Initialize timer
-    x86_64_pit_match_frequency(PIT_TIMER_FREQ);
-    int pit_time_vector = x86_64_interrupt_request(X86_64_INTERRUPT_PRIORITY_CRITICAL, pit_time_handler);
-    ASSERT(pit_time_vector != -1);
-    x86_64_ioapic_map_legacy_irq(0, x86_64_lapic_id(), false, true, pit_time_vector);
+    acpi_sdt_header_t *hpet_header = acpi_find_table((uint8_t *) "HPET");
+    if(hpet_header != NULL) {
+        x86_64_hpet_init(hpet_header);
+        time_source_register(&g_hpet_time_source);
+        //     int timer = x86_64_hpet_find_timer(true);
+        //     if(timer == -1) goto use_pit;
+        //     int gsi_vector = x86_64_hpet_configure_timer(timer, HPET_TIMER_FREQ, false);
+
+        //     int hpet_time_vector = x86_64_interrupt_request(X86_64_INTERRUPT_PRIORITY_CRITICAL, hpet_time_handler);
+        //     ASSERT(hpet_time_vector != -1);
+        //     x86_64_ioapic_map_gsi(gsi_vector, x86_64_lapic_id(), false, true, hpet_time_vector);
+    } else {
+        // use_pit:
+        // x86_64_pit_match_frequency(PIT_TIMER_FREQ);
+        // int pit_time_vector = x86_64_interrupt_request(X86_64_INTERRUPT_PRIORITY_CRITICAL, pit_time_handler);
+        // ASSERT(pit_time_vector != -1);
+        // x86_64_ioapic_map_legacy_irq(0, x86_64_lapic_id(), false, true, pit_time_vector);
+    }
+
     x86_64_init_flag_set(X86_64_INIT_FLAG_TIME);
 
     asm volatile("sti");
