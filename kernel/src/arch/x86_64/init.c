@@ -30,7 +30,7 @@
 #include "arch/x86_64/dev/ioapic.h"
 #include "arch/x86_64/dev/pic8259.h"
 #include "arch/x86_64/dev/pit.h"
-#include "arch/x86_64/dev/qemu_serial.h"
+#include "arch/x86_64/dev/qemu_debug.h"
 #include "arch/x86_64/exception.h"
 #include "arch/x86_64/interrupt.h"
 #include "arch/x86_64/ptm.h"
@@ -126,8 +126,11 @@ static void pit_time_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     g_early_bsp.self = &g_early_bsp;
     x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
 
-    x86_64_qemu_serial_putc('\n');
-    log_sink_add(&g_x86_64_qemu_serial_sink);
+#ifdef __ENV_DEVELOPMENT
+    x86_64_qemu_debug_putc('\n');
+    log_sink_add(&g_x86_64_qemu_debug_sink);
+#endif
+
     log(LOG_LEVEL_INFO, "INIT", "Elysium alpha.6 (" __DATE__ " " __TIME__ ")");
 
     log(LOG_LEVEL_DEBUG, "INIT", "Enumerating modules");
