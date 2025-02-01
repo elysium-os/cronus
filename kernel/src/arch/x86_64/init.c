@@ -77,7 +77,7 @@ static void thread_uacpi_setup() {
     log(LOG_LEVEL_INFO, "UACPI", "done");
 }
 
-[[noreturn]] [[gnu::naked]] static void init_ap() {
+[[noreturn]] static void init_ap() {
     log(LOG_LEVEL_INFO, "INIT", "Initializing AP %i", x86_64_lapic_id());
 
     x86_64_gdt_load();
