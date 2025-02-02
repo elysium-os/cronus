@@ -8,6 +8,10 @@ cpu_t *arch_cpu_current() {
     return &X86_64_CPU_LOCAL_MEMBER(self)->common;
 }
 
+size_t arch_cpu_id() {
+    return X86_64_CPU_LOCAL_MEMBER(sequential_id);
+}
+
 void arch_cpu_relax() {
     __builtin_ia32_pause();
 }

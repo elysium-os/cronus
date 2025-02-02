@@ -98,6 +98,7 @@ static void thread_uacpi_setup() {
     // Init CPU local immediately after address space load
     x86_64_cpu_t *cpu = &g_x86_64_cpus[g_x86_64_cpu_count];
     cpu->self = cpu;
+    cpu->sequential_id = g_x86_64_cpu_count;
     x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
 
     // Interrupts
@@ -149,6 +150,7 @@ static void thread_uacpi_setup() {
 
     memclear(&g_early_bsp, sizeof(g_early_bsp));
     g_early_bsp.self = &g_early_bsp;
+    g_early_bsp.sequential_id = boot_info->bsp_index;
     x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
 
 #ifdef __ENV_DEVELOPMENT
@@ -291,6 +293,7 @@ static void thread_uacpi_setup() {
             cpu = &g_x86_64_cpus[g_x86_64_cpu_count];
             *cpu = g_early_bsp;
             cpu->self = cpu;
+            cpu->sequential_id = g_x86_64_cpu_count;
             cpu->lapic_id = x86_64_lapic_id();
             cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * X86_64_PIT_BASE_FREQ;
             cpu->tss = tss;

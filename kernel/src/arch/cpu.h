@@ -8,6 +8,11 @@
 cpu_t *arch_cpu_current();
 
 /**
+ * @brief Get cpu id. Guaranteed to be sequential.
+ */
+size_t arch_cpu_id();
+
+/**
  * @brief "Relax" the CPU.
  */
 void arch_cpu_relax();

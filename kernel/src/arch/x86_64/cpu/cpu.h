@@ -24,6 +24,8 @@
 typedef struct x86_64_cpu {
     struct x86_64_cpu *self;
 
+    size_t sequential_id;
+
     uint32_t lapic_id;
     uint64_t lapic_timer_frequency;
 
