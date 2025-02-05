@@ -201,7 +201,7 @@ static void check_function(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t 
 
     uint16_t vendor_id = readw(device, offsetof(pci_device_header_t, vendor_id));
     if(vendor_id == VENDOR_INVALID) {
-        heap_free(device);
+        heap_free(device, sizeof(pci_device_t));
         return;
     }
     ipl_t previous_ipl = spinlock_acquire(&g_pci_devices_lock);
@@ -294,7 +294,7 @@ pci_bar_t *pci_config_read_bar(pci_device_t *device, uint8_t index) {
         switch(type) {
             case 0:  break;
             case 2:  new_bar->address |= (uint64_t) pci_config_read_double(device, offset + sizeof(uint32_t)) << 32; break;
-            default: heap_free(new_bar); return 0;
+            default: heap_free(new_bar, sizeof(pci_bar_t)); return 0;
         }
     }
     return new_bar;
@@ -305,13 +305,13 @@ void pci_enumerate(acpi_sdt_header_t *mcfg) {
         g_segments = (pcie_segment_entry_t *) ((uintptr_t) mcfg + sizeof(acpi_sdt_header_t) + 8);
         g_read = &pcie_read;
         g_write = &pcie_write;
-        // unsigned int entry_count = (mcfg->length - (sizeof(acpi_sdt_header_t) + 8)) / sizeof(pcie_segment_entry_t);
-        // for(unsigned int i = 0; i < entry_count; i++) check_segment(i); // FIX: fix on real hw
+        unsigned int entry_count = (mcfg->length - (sizeof(acpi_sdt_header_t) + 8)) / sizeof(pcie_segment_entry_t);
+        for(unsigned int i = 0; i < entry_count; i++) check_segment(i); // FIX: fix on real hw
     } else {
 #ifdef __ARCH_X86_64
         g_read = &pci_read;
         g_write = &pci_write;
-        // check_segment(0); // FIX: fix on real hw
+        check_segment(0); // FIX: fix on real hw
 #else
         panic("Both legacy PCI and PCIe unavailable");
 #endif

@@ -43,5 +43,5 @@ typedef struct x86_64_cpu {
     cpu_t common;
 } x86_64_cpu_t;
 
-extern volatile size_t g_x86_64_cpu_count;
+extern size_t g_x86_64_cpu_count;
 extern x86_64_cpu_t *g_x86_64_cpus;

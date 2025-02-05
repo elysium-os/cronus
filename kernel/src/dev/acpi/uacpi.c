@@ -119,7 +119,7 @@ uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len, uacpi_handl
 }
 
 void uacpi_kernel_io_unmap(uacpi_handle handle) {
-    heap_free(handle);
+    heap_free(handle, sizeof(io_range_t));
 }
 
 uacpi_status uacpi_kernel_io_read8(uacpi_handle handle, uacpi_size offset, uacpi_u8 *out_value) {
@@ -185,11 +185,11 @@ void *uacpi_kernel_alloc_zeroed(uacpi_size size) {
 #endif
 
 #ifndef UACPI_SIZED_FREES
-void uacpi_kernel_free(void *mem) {
-    heap_free(mem);
-}
+#error UACPI_SIZED_FREES expected
 #else
-#error UACPI_SIZED_FREES not expected
+void uacpi_kernel_free(void *mem, uacpi_size size_hint) {
+    heap_free(mem, size_hint);
+}
 #endif
 
 /* Logging */
@@ -219,7 +219,7 @@ void uacpi_kernel_vlog(uacpi_log_level level, const uacpi_char *fmt, uacpi_va_li
     string_copy(new_fmt, fmt);
     new_fmt[len - 2] = ' ';
     log_list(elysium_level, "UACPI", new_fmt, list);
-    heap_free(new_fmt);
+    heap_free(new_fmt, len);
 }
 #endif
 
@@ -236,7 +236,7 @@ uacpi_handle uacpi_kernel_create_mutex() {
 }
 
 void uacpi_kernel_free_mutex(uacpi_handle handle) {
-    heap_free(handle);
+    heap_free(handle, sizeof(mutex_t));
 }
 
 /*
@@ -291,7 +291,7 @@ uacpi_handle uacpi_kernel_create_spinlock() {
 }
 
 void uacpi_kernel_free_spinlock(uacpi_handle lock) {
-    heap_free(lock);
+    heap_free(lock, sizeof(spinlock_t));
 }
 
 uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle lock) {
@@ -310,7 +310,7 @@ uacpi_handle uacpi_kernel_create_event() {
 }
 
 void uacpi_kernel_free_event(uacpi_handle handle) {
-    heap_free(handle);
+    heap_free(handle, sizeof(size_t));
 }
 
 // TODO: not 100% this is correct
@@ -359,10 +359,10 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
     return UACPI_STATUS_OK;
 }
 
-uacpi_status uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler fn, uacpi_handle irq_handle) {
+uacpi_status uacpi_kernel_uninstall_interrupt_handler([[maybe_unused]] uacpi_interrupt_handler fn, uacpi_handle irq_handle) {
     interrupt_handler_t *handler = (interrupt_handler_t *) irq_handle;
     x86_64_interrupt_set(handler->vector, NULL);
-    heap_free(handler);
+    heap_free(handler, sizeof(interrupt_handler_t));
     return UACPI_STATUS_OK;
 }
 

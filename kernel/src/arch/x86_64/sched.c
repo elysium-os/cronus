@@ -7,6 +7,7 @@
 #include "arch/sched.h"
 #include "common/assert.h"
 #include "common/auxv.h"
+#include "lib/math.h"
 #include "lib/mem.h"
 #include "lib/string.h"
 #include "memory/heap.h"
@@ -30,7 +31,6 @@
 typedef struct [[gnu::packed]] {
     uint64_t r12, r13, r14, r15, rbp, rbx;
     void (*thread_init)(x86_64_thread_t *prev);
-    void (*thread_init_kernel)();
     void (*entry)();
     void (*thread_exit_kernel)();
 
@@ -70,18 +70,16 @@ static void common_thread_init(x86_64_thread_t *prev) {
     arch_interrupt_set_ipl(IPL_PREEMPT);
 }
 
-static void kernel_thread_init() {
-    asm volatile("sti");
-}
-
 static void kernel_thread_exit() {
     arch_sched_thread_current()->state = THREAD_STATE_DESTROY;
     arch_sched_yield();
 }
 
 [[noreturn]] static void sched_idle() {
-    while(true) asm volatile("hlt");
-    ASSERT_COMMENT(false, "Unreachable!");
+    while(true) {
+        __builtin_ia32_pause();
+        asm volatile("hlt");
+    }
     __builtin_unreachable();
 }
 
@@ -141,7 +139,7 @@ void arch_sched_thread_destroy(thread_t *thread) {
             spinlock_release(&thread->proc->lock, previous_ipl);
         }
     }
-    heap_free(X86_64_THREAD(thread));
+    heap_free(X86_64_THREAD(thread), sizeof(x86_64_thread_t));
 }
 
 static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t kernel_stack, uintptr_t rsp) {
@@ -154,8 +152,7 @@ static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t ker
     thread->kernel_stack = kernel_stack;
     thread->state.fs = 0;
     thread->state.gs = 0;
-    thread->state.fpu_area = heap_alloc_align(g_x86_64_fpu_area_size, 64);
-    memclear(thread->state.fpu_area, g_x86_64_fpu_area_size);
+    thread->state.fpu_area = (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(g_x86_64_fpu_area_size, ARCH_PAGE_GRANULARITY), PMM_FLAG_ZERO)->paddr);
 
     g_x86_64_fpu_restore(thread->state.fpu_area);
     uint16_t x87cw = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (0b11 << 8);
@@ -172,7 +169,7 @@ static void sched_entry([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
 }
 
 thread_t *arch_sched_thread_create_kernel(void (*func)()) {
-    pmm_page_t *kernel_stack_page = pmm_alloc_pages(PMM_ZONE_NORMAL, KERNEL_STACK_SIZE_PG, true);
+    pmm_block_t *kernel_stack_page = pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO);
     x86_64_thread_stack_t kernel_stack = {
         .base = HHDM(kernel_stack_page->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY),
         .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY
@@ -181,13 +178,12 @@ thread_t *arch_sched_thread_create_kernel(void (*func)()) {
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));
     init_stack->entry = func;
     init_stack->thread_init = common_thread_init;
-    init_stack->thread_init_kernel = kernel_thread_init;
     init_stack->thread_exit_kernel = kernel_thread_exit;
     return &create_thread(NULL, kernel_stack, (uintptr_t) init_stack)->common;
 }
 
 thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t sp) {
-    pmm_page_t *kernel_stack_page = pmm_alloc_pages(PMM_ZONE_NORMAL, KERNEL_STACK_SIZE_PG, true);
+    pmm_block_t *kernel_stack_page = pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO);
     x86_64_thread_stack_t kernel_stack = {
         .base = HHDM(kernel_stack_page->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY),
         .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY
@@ -285,6 +281,8 @@ thread_t *arch_sched_thread_current() {
     }
 
     arch_interrupt_set_ipl(IPL_NORMAL);
+    asm volatile("sti");
+
     sched_switch(bootstrap_thread, idle_thread);
     __builtin_unreachable();
 }

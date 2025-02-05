@@ -16,5 +16,9 @@
 #error Unimplemented
 #endif
 
+#if !defined(ARCH_PAGE_SIZES) || !defined(ARCH_PAGE_SIZES_COUNT) || !defined(ARCH_PAGE_GRANULARITY)
+#error Missing implementation
+#endif
+
 static_assert(ARCH_PAGE_GRANULARITY > 0);
 static_assert(ARCH_PAGE_SIZES_COUNT > 0);

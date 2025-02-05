@@ -10,7 +10,7 @@ fi
 
 qemu_args=()
 qemu_args+=(-drive format=raw,file=$IMAGE_PATH)
-qemu_args+=(-m 256M)
+qemu_args+=(-m 512M)
 qemu_args+=(-machine q35)
 qemu_args+=(-cpu qemu64,pdpe1gb)
 qemu_args+=(-smp cores=4)

@@ -33,7 +33,7 @@ process_t *sched_process_create(vm_address_space_t *address_space) {
 }
 
 void sched_process_destroy(process_t *proc) {
-    heap_free(proc);
+    heap_free(proc, sizeof(process_t));
 }
 
 void sched_thread_schedule(thread_t *thread) {

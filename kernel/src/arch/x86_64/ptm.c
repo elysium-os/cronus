@@ -10,7 +10,6 @@
 #include "lib/mem.h"
 #include "memory/heap.h"
 #include "memory/hhdm.h"
-#include "memory/pmm.h"
 #include "sys/cpu.h"
 #include "sys/ipl.h"
 
@@ -66,6 +65,8 @@ typedef struct {
 
 static uint8_t g_tlb_shootdown_vector;
 static x86_64_address_space_t g_initial_address_space;
+
+uintptr_t (*g_x86_64_ptm_phys_allocator)();
 
 static inline void invlpg(uint64_t value) {
     asm volatile("invlpg (%0)" : : "r"(value) : "memory");
@@ -149,7 +150,7 @@ vm_address_space_t *x86_64_ptm_init() {
     g_initial_address_space.common.regions = LIST_INIT;
     g_initial_address_space.common.start = KERNELSPACE_START;
     g_initial_address_space.common.end = KERNELSPACE_END;
-    g_initial_address_space.cr3 = pmm_alloc_page(PMM_ZONE_NORMAL, true)->paddr;
+    g_initial_address_space.cr3 = g_x86_64_ptm_phys_allocator();
     g_initial_address_space.cr3_lock = SPINLOCK_INIT;
 
     int vector = x86_64_interrupt_request(X86_64_INTERRUPT_PRIORITY_NORMAL, tlb_shootdown_handler);
@@ -165,7 +166,7 @@ vm_address_space_t *x86_64_ptm_init() {
         }
 
         // Needs to be completely unrestricted as these are not synchronized across address spaces
-        pml4[i] = PTE_FLAG_PRESENT | PTE_FLAG_RW | (pmm_alloc_page(PMM_ZONE_NORMAL, true)->paddr & ADDRESS_MASK);
+        pml4[i] = PTE_FLAG_PRESENT | PTE_FLAG_RW | (g_x86_64_ptm_phys_allocator() & ADDRESS_MASK);
     }
 
     return &g_initial_address_space.common;
@@ -173,7 +174,7 @@ vm_address_space_t *x86_64_ptm_init() {
 
 vm_address_space_t *arch_ptm_address_space_create() {
     x86_64_address_space_t *address_space = heap_alloc(sizeof(x86_64_address_space_t));
-    address_space->cr3 = pmm_alloc_page(PMM_ZONE_NORMAL, true)->paddr;
+    address_space->cr3 = g_x86_64_ptm_phys_allocator();
     address_space->cr3_lock = SPINLOCK_INIT;
     address_space->common.lock = SPINLOCK_INIT;
     address_space->common.regions = LIST_INIT;
@@ -201,8 +202,7 @@ void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t 
         int index = VADDR_TO_INDEX(vaddr, i);
         uint64_t entry = current_table[index];
         if((entry & PTE_FLAG_PRESENT) == 0) {
-            pmm_page_t *page = pmm_alloc_page(PMM_ZONE_NORMAL, true);
-            entry = PTE_FLAG_PRESENT | (page->paddr & ADDRESS_MASK);
+            entry = PTE_FLAG_PRESENT | (g_x86_64_ptm_phys_allocator() & ADDRESS_MASK);
             if(!prot.exec) entry |= PTE_FLAG_NX;
         } else {
             if(prot.exec) entry &= ~PTE_FLAG_NX;

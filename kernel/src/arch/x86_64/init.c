@@ -18,7 +18,9 @@
 #include "lib/string.h"
 #include "memory/heap.h"
 #include "memory/hhdm.h"
+#include "memory/page.h"
 #include "memory/pmm.h"
+#include "memory/slab.h"
 #include "memory/vm.h"
 #include "sched/sched.h"
 #include "sys/time.h"
@@ -55,16 +57,37 @@
 uintptr_t g_hhdm_offset;
 size_t g_hhdm_size;
 
-volatile size_t g_x86_64_cpu_count;
+size_t g_x86_64_cpu_count;
 x86_64_cpu_t *g_x86_64_cpus;
 
 framebuffer_t g_framebuffer;
 
-static size_t init_flags = 0;
+page_t *g_page_cache;
+size_t g_page_cache_size;
+
+static volatile size_t g_init_cpu_id_counter = 0;
+
+static size_t g_init_flags = 0;
 
 static vm_region_t g_hhdm_region, g_kernel_region;
 
 static x86_64_cpu_t g_early_bsp;
+
+static uintptr_t g_bootmem_base;
+static size_t g_bootmem_size;
+
+static uintptr_t bootmem_alloc() {
+    if(g_bootmem_size == 0) panic("bootmem: out of memory");
+    uintptr_t address = g_bootmem_base;
+    g_bootmem_base += ARCH_PAGE_GRANULARITY;
+    g_bootmem_size -= ARCH_PAGE_GRANULARITY;
+    memclear((void *) HHDM(address), ARCH_PAGE_GRANULARITY);
+    return address;
+}
+
+static uintptr_t proper_alloc() {
+    return pmm_alloc_page(PMM_FLAG_ZERO)->paddr;
+}
 
 static void thread_uacpi_setup() {
     uacpi_status ret = uacpi_initialize(0);
@@ -74,7 +97,7 @@ static void thread_uacpi_setup() {
         ret = uacpi_namespace_load();
         if(uacpi_unlikely_error(ret)) log(LOG_LEVEL_WARN, "UACPI", "namespace load failed (%s)", uacpi_status_to_string(ret));
     }
-    log(LOG_LEVEL_INFO, "UACPI", "done");
+    log(LOG_LEVEL_INFO, "UACPI", "Setup Done");
 }
 
 [[noreturn]] static void init_ap() {
@@ -96,9 +119,9 @@ static void thread_uacpi_setup() {
     arch_ptm_load_address_space(g_vm_global_address_space);
 
     // Init CPU local immediately after address space load
-    x86_64_cpu_t *cpu = &g_x86_64_cpus[g_x86_64_cpu_count];
+    x86_64_cpu_t *cpu = &g_x86_64_cpus[g_init_cpu_id_counter];
     cpu->self = cpu;
-    cpu->sequential_id = g_x86_64_cpu_count;
+    cpu->sequential_id = g_init_cpu_id_counter;
     x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
 
     // Interrupts
@@ -126,8 +149,8 @@ static void thread_uacpi_setup() {
 
     x86_64_fpu_init_cpu();
 
-    log(LOG_LEVEL_DEBUG, "INIT", "AP %i:%i init exit", g_x86_64_cpu_count, x86_64_lapic_id());
-    __atomic_add_fetch(&g_x86_64_cpu_count, 1, __ATOMIC_SEQ_CST);
+    log(LOG_LEVEL_DEBUG, "INIT", "AP %i:%i init exit", g_init_cpu_id_counter, x86_64_lapic_id());
+    __atomic_add_fetch(&g_init_cpu_id_counter, 1, __ATOMIC_SEQ_CST);
 
     asm volatile("sti");
 
@@ -152,6 +175,11 @@ static void thread_uacpi_setup() {
     g_early_bsp.self = &g_early_bsp;
     g_early_bsp.sequential_id = boot_info->bsp_index;
     x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
+
+    for(size_t i = 0; i < boot_info->cpu_count; i++) {
+        if(boot_info->cpus[i].initialization_failed) continue;
+        g_x86_64_cpu_count++;
+    }
 
 #ifdef __ENV_DEVELOPMENT
     x86_64_qemu_debug_putc('\n');
@@ -178,7 +206,7 @@ static void thread_uacpi_setup() {
     x86_64_gdt_load();
 
     // Initialize interrupt & exception handling
-    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC))
+    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
     x86_64_pic8259_remap();
     x86_64_pic8259_disable();
     x86_64_lapic_initialize();
@@ -193,26 +221,23 @@ static void thread_uacpi_setup() {
     arch_interrupt_set_ipl(IPL_PREEMPT);
     x86_64_init_flag_set(X86_64_INIT_FLAG_INTERRUPTS);
 
-    // Initialize physical memory
-    pmm_zone_register(PMM_ZONE_LOW, "LOW", 0, 0x100'0000);
-    pmm_zone_register(PMM_ZONE_NORMAL, "Normal", 0x100'0000, UINTPTR_MAX);
-    for(int i = 0; i < boot_info->memory_map.size; i++) {
-        tartarus_memory_map_entry_t entry = boot_info->memory_map.entries[i];
-        if(entry.type != TARTARUS_MEMORY_MAP_TYPE_USABLE) continue;
-        pmm_region_add(entry.base, entry.length);
-    }
-    x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_PHYS);
-
-    log(LOG_LEVEL_DEBUG, "INIT", "Physical Memory Map");
-    for(size_t i = 0; i <= PMM_ZONE_COUNT; i++) {
-        if(!PMM_ZONE_PRESENT(i)) continue;
-        pmm_zone_t *zone = &g_pmm_zones[i];
-        log(LOG_LEVEL_DEBUG, "INIT", "- %s", zone->name);
-        LIST_FOREACH(&zone->regions, elem) {
-            pmm_region_t *region = LIST_CONTAINER_GET(elem, pmm_region_t, list_elem);
-            log(LOG_LEVEL_DEBUG, "INIT", "  - %#-12lx %lu/%lu pages", region->base, region->free_count, region->page_count);
+    // Initialize early physical memory
+    size_t early_mem_index = ({
+        size_t largest_index = 0;
+        size_t largest_size = 0;
+        for(int i = 0; i < boot_info->memory_map.size; i++) {
+            tartarus_memory_map_entry_t entry = boot_info->memory_map.entries[i];
+            if(entry.type != TARTARUS_MEMORY_MAP_TYPE_USABLE) continue;
+            if(entry.length < largest_size) continue;
+            largest_index = i;
         }
-    }
+        largest_index;
+    });
+    g_bootmem_base = boot_info->memory_map.entries[early_mem_index].base;
+    g_bootmem_size = boot_info->memory_map.entries[early_mem_index].length;
+
+    g_x86_64_ptm_phys_allocator = bootmem_alloc;
+    x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_PHYS_EARLY);
 
     // Initialize Virtual Memory
     uint64_t pat = x86_64_msr_read(X86_64_MSR_PAT);
@@ -248,8 +273,53 @@ static void thread_uacpi_setup() {
     arch_ptm_load_address_space(g_vm_global_address_space);
     x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_VIRT);
 
+    // Initialize physical memory
+    uintptr_t early_mem_base = g_bootmem_base;
+    size_t early_mem_size = g_bootmem_size;
+
+    uintptr_t pagecache_start = boot_info->hhdm.offset + boot_info->hhdm.size;
+    size_t pagecache_end = pagecache_start;
+    g_page_cache = (page_t *) pagecache_start;
+
+    for(size_t i = 0; i < boot_info->memory_map.size; i++) {
+        tartarus_memory_map_entry_t entry = boot_info->memory_map.entries[i];
+        if(entry.type != TARTARUS_MEMORY_MAP_TYPE_USABLE) continue;
+
+        g_bootmem_base = early_mem_index == i ? early_mem_base : entry.base;
+        g_bootmem_size = early_mem_index == i ? early_mem_size : entry.length;
+
+        uintptr_t start = pagecache_start + MATH_FLOOR((entry.base / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
+        uintptr_t end = pagecache_start + MATH_CEIL(((entry.base + entry.length) / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
+        if(start > pagecache_end) pagecache_end = start;
+        for(; pagecache_end < end; pagecache_end += ARCH_PAGE_GRANULARITY) {
+            arch_ptm_map(
+                g_vm_global_address_space,
+                pagecache_end,
+                bootmem_alloc(),
+                (vm_protection_t) {.read = true, .write = true},
+                VM_CACHE_STANDARD,
+                VM_PRIVILEGE_KERNEL,
+                true
+            );
+        }
+
+        pmm_region_add(entry.base, entry.length, (g_bootmem_base / ARCH_PAGE_GRANULARITY) - (entry.base / ARCH_PAGE_GRANULARITY));
+    }
+    g_page_cache_size = pagecache_start - pagecache_end;
+
+    g_x86_64_ptm_phys_allocator = proper_alloc;
+    x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_PHYS);
+
+    log(LOG_LEVEL_DEBUG, "INIT", "Physical Memory Map");
+    pmm_zone_t *zones[] = {&g_pmm_zone_low, &g_pmm_zone_normal};
+    for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
+        pmm_zone_t *zone = zones[i];
+        log(LOG_LEVEL_DEBUG, "INIT", "» %-6s %#-18lx -> %#-18lx %lu/%lu pages", zone->name, zone->start, zone->end, zone->free_page_count, zone->total_page_count);
+    }
+
     // Initialize HEAP
-    heap_initialize(g_vm_global_address_space, 0x1'000'000);
+    slab_init();
+    heap_initialize();
 
     // Initialize FPU
     x86_64_fpu_init();
@@ -285,32 +355,32 @@ static void thread_uacpi_setup() {
     uint16_t end_count = x86_64_pit_count();
 
     x86_64_cpu_t *cpu = NULL;
-    g_x86_64_cpu_count = 0;
     for(size_t i = 0; i < boot_info->cpu_count; i++) {
         if(boot_info->cpus[i].initialization_failed) continue;
 
         if(i == boot_info->bsp_index) {
-            cpu = &g_x86_64_cpus[g_x86_64_cpu_count];
+            cpu = &g_x86_64_cpus[g_init_cpu_id_counter];
             *cpu = g_early_bsp;
             cpu->self = cpu;
-            cpu->sequential_id = g_x86_64_cpu_count;
+            cpu->sequential_id = g_init_cpu_id_counter;
             cpu->lapic_id = x86_64_lapic_id();
             cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * X86_64_PIT_BASE_FREQ;
             cpu->tss = tss;
             cpu->tlb_shootdown_check = SPINLOCK_INIT;
             cpu->tlb_shootdown_lock = SPINLOCK_INIT;
             x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
-            g_x86_64_cpu_count++;
+            g_init_cpu_id_counter++;
             continue;
         }
 
-        size_t previous_count = g_x86_64_cpu_count;
+        size_t previous_count = g_init_cpu_id_counter;
         *boot_info->cpus[i].wake_on_write = (uint64_t) init_ap;
-        while(previous_count >= g_x86_64_cpu_count);
+        while(previous_count >= g_init_cpu_id_counter);
     }
     ASSERT(cpu != NULL);
+    ASSERT(g_init_cpu_id_counter == g_x86_64_cpu_count);
 
-    log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%i/%i cpus initialized)", g_x86_64_cpu_count, boot_info->cpu_count);
+    log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%i/%i cpus initialized)", g_init_cpu_id_counter, boot_info->cpu_count);
     x86_64_init_flag_set(X86_64_INIT_FLAG_SMP);
 
     // Initialize timer
@@ -335,8 +405,6 @@ static void thread_uacpi_setup() {
 
     x86_64_init_flag_set(X86_64_INIT_FLAG_TIME);
 
-    asm volatile("sti");
-
     sched_thread_schedule(arch_sched_thread_create_kernel(thread_uacpi_setup));
 
     log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye for now!");
@@ -345,9 +413,9 @@ static void thread_uacpi_setup() {
 }
 
 bool x86_64_init_flag_check(size_t flags) {
-    return (flags & init_flags) == flags;
+    return (flags & g_init_flags) == flags;
 }
 
 void x86_64_init_flag_set(size_t flags) {
-    init_flags |= flags;
+    g_init_flags |= flags;
 }

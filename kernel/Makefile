@@ -5,15 +5,15 @@ DESTDIR ?= /
 # Kernel Flags
 CFLAGS := -std=gnu2x -ffreestanding -mcmodel=kernel -mno-red-zone -mgeneral-regs-only -mabi=sysv
 CFLAGS += -Wall -Wextra -Wvla -Wshadow
-CFLAGS += -fno-stack-protector -fno-stack-check -fno-omit-frame-pointer -fno-strict-aliasing -fno-lto
+CFLAGS += -fno-stack-protector -fno-stack-check -fno-strict-aliasing
 
 CFLAGS += -I$(SYSROOT)$(PREFIX)/include -I$(SRC_DIRECTORY)
 
 CFLAGS += -D__ARCH_$(shell echo $(ARCH) | tr a-z A-Z) -D__ENV_$(shell echo $(ENVIRONMENT) | tr a-z A-Z)
-CFLAGS += -DUACPI_NATIVE_ALLOC_ZEROED -DUACPI_FORMATTED_LOGGING
+CFLAGS += -DUACPI_NATIVE_ALLOC_ZEROED -DUACPI_FORMATTED_LOGGING -DUACPI_SIZED_FREES
 
 ifeq ($(ENVIRONMENT), development)
-CFLAGS += -g -fsanitize=undefined
+CFLAGS += -g -fsanitize=undefined -fno-lto -fno-omit-frame-pointer
 ifeq ($(ARCH), x86_64)
 CFLAGS += -fno-sanitize=alignment
 endif

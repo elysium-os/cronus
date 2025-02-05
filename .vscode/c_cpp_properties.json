@@ -13,6 +13,7 @@
 
                 "UACPI_NATIVE_ALLOC_ZEROED",
                 "UACPI_FORMATTED_LOGGING",
+                "UACPI_SIZED_FREES",
 
                 /* Unsupported C23 features work-around */
                 /* https://github.com/microsoft/vscode-cpptools/issues/10696 */

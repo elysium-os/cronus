@@ -4,6 +4,8 @@
 
 #include "arch/x86_64/interrupt.h"
 
+extern uintptr_t (*g_x86_64_ptm_phys_allocator)();
+
 /**
  * @brief Initialize page table manager.
  */

@@ -8,82 +8,61 @@
 
 #define PMM_MAX_ORDER 7
 
-#define PMM_ZONE_COUNT (sizeof(typeof(g_pmm_zone_mask)) * 8)
-#define PMM_ZONE_PRESENT(ZONE_INDEX) ((g_pmm_zone_mask & (1 << ZONE_INDEX)) != 0)
+#define PMM_ORDER_TO_PAGECOUNT(ORDER) (1llu << (ORDER))
 
-#define PMM_ZONE_NORMAL 0
-#define PMM_ZONE_LOW 1
+#define PMM_FLAG_NONE (0)
+#define PMM_FLAG_ZERO (1 << 0)
+#define PMM_FLAG_ZONE_LOW (1 << 1)
 
-typedef uint16_t pmm_flags_t;
-typedef uint8_t pmm_zone_index_t;
+typedef uint8_t pmm_flags_t;
 typedef uint8_t pmm_order_t;
 
 typedef struct {
-    spinlock_t lock;
-    list_t regions;
-    list_t lists[PMM_MAX_ORDER + 1];
-    size_t page_count;
-    size_t free_count;
-    uintptr_t start;
-    uintptr_t end;
     const char *name;
+    uintptr_t start, end;
+
+    spinlock_t lock;
+    list_t lists[PMM_MAX_ORDER + 1];
+
+    size_t total_page_count;
+    size_t free_page_count;
 } pmm_zone_t;
 
-typedef struct pmm_page {
-    /* unallocated = used by pmm, allocated = reserved for vmm */
-    list_element_t list_elem;
-    struct pmm_region *region;
-    uintptr_t paddr;
-    uint8_t order : 3;
-    uint8_t free  : 1;
-} pmm_page_t;
+typedef struct {
+    list_element_t list_elem; /* unallocated = used by pmm, allocated = reserved for vmm */
+    uintptr_t paddr; // TODO remove
+    uint8_t order     : 3;
+    uint8_t max_order : 3;
+    uint8_t free      : 1;
+} pmm_block_t;
 
-typedef struct pmm_region {
-    list_element_t list_elem;
-    pmm_zone_t *zone;
-    uintptr_t base;
-    size_t page_count;
-    size_t free_count;
-    pmm_page_t pages[];
-} pmm_region_t;
-
-extern uint8_t g_pmm_zone_mask;
-extern pmm_zone_t g_pmm_zones[];
-
-/**
- * @brief Register a memory zone.
- */
-void pmm_zone_register(pmm_zone_index_t zone_index, const char *name, uintptr_t start, uintptr_t end);
+extern pmm_zone_t g_pmm_zone_normal;
+extern pmm_zone_t g_pmm_zone_low;
 
 /**
  * @brief Adds a block of memory to be managed by the PMM.
  * @param base region base address
  * @param size region size in bytes
+ * @param used count of pages already used
  */
-void pmm_region_add(uintptr_t base, size_t size);
+void pmm_region_add(uintptr_t base, size_t size, size_t used);
 
 /**
  * @brief Allocates a block of size order^2 pages.
  */
-pmm_page_t *pmm_alloc(pmm_zone_index_t zone_index, pmm_order_t order, bool zero);
+pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags);
 
 /**
  * @brief Allocates the smallest block of size N^2 pages to fit size.
  */
-pmm_page_t *pmm_alloc_pages(pmm_zone_index_t zone_index, size_t page_count, bool zero);
+pmm_block_t *pmm_alloc_pages(size_t page_count, pmm_flags_t flags);
 
 /**
- * @brief Allocates a page of memory.
+ * @brief Allocates a block of memory the size of a page.
  */
-pmm_page_t *pmm_alloc_page(pmm_zone_index_t zone_index, bool zero);
+pmm_block_t *pmm_alloc_page(pmm_flags_t flags);
 
 /**
- * @brief Frees a previously allocated page.
+ * @brief Frees a previously allocated block.
  */
-void pmm_free(pmm_page_t *page);
-
-/**
- * @brief Frees a previously allocated page by address.
- * @warning relatively expensive, has to find the region with said address
- */
-void pmm_free_address(uintptr_t physical_address);
+void pmm_free(pmm_block_t *block);

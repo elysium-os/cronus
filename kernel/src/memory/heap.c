@@ -1,143 +1,60 @@
 #include "heap.h"
 
+#include "arch/page.h"
 #include "common/assert.h"
-#include "common/lock/spinlock.h"
-#include "common/log.h"
-#include "common/panic.h"
-#include "lib/list.h"
+#include "lib/math.h"
+#include "memory/hhdm.h"
+#include "memory/page.h"
 #include "memory/pmm.h"
+#include "memory/slab.h"
 
-#define INITIAL_SIZE_PAGES 10
-#define MIN_ENTRY_SIZE 8
+#define SLAB_8X_COUNT (sizeof(g_slab_8x_sizes) / sizeof(*g_slab_8x_sizes))
+#define SLAB_128X_COUNT (sizeof(g_slab_128x_sizes) / sizeof(*g_slab_128x_sizes))
+#define SLAB_OTHER_COUNT (sizeof(g_slab_other_sizes) / sizeof(*g_slab_other_sizes))
 
-#if __ENV_DEVELOPMENT
-#define HEAP_PROTECTION true
-#endif
+static const char *g_slab_8x_names[] = {"heap-8", "heap-16", "heap-24", "heap-32", "heap-40", "heap-48", "heap-56", "heap-64", "heap-72"};
+static size_t g_slab_8x_sizes[] = {8, 16, 24, 32, 40, 48, 56, 64, 72};
+static slab_cache_t *g_8x_slabs[SLAB_8X_COUNT];
 
-typedef struct {
-#if HEAP_PROTECTION
-    uint64_t prot;
-#endif
-    size_t size;
-    bool free;
-    list_element_t list_elem;
-} heap_entry_t;
+static const char *g_slab_128x_names[] = {"heap-128", "heap-256", "heap-384", "heap-512"};
+static size_t g_slab_128x_sizes[] = {128, 256, 384, 512};
+static slab_cache_t *g_128x_slabs[SLAB_128X_COUNT];
 
-static spinlock_t g_lock = SPINLOCK_INIT;
-static list_t g_entries = LIST_INIT_CIRCULAR(g_entries);
+static const char *g_slab_other_names[] = {"heap-1024"};
+static size_t g_slab_other_sizes[] = {1024};
+static slab_cache_t *g_other_slabs[SLAB_OTHER_COUNT];
 
-#if HEAP_PROTECTION
-static void update_prot(heap_entry_t *entry) {
-    entry->prot = ~((uintptr_t) entry + entry->size);
-}
-
-static uint64_t get_prot(heap_entry_t *entry) {
-    return (uint64_t) (uintptr_t) entry + entry->size + entry->prot + 1;
-}
-#endif
-
-void heap_initialize(vm_address_space_t *address_space, size_t size) {
-    void *addr = vm_map_anon(address_space, NULL, size, (vm_protection_t) {.read = true, .write = true}, VM_CACHE_STANDARD, VM_FLAG_NO_DEMAND);
-    log(LOG_LEVEL_DEBUG, "HEAP", "Initialized at address %#lx with size %#lx", (uintptr_t) addr, size);
-    ASSERT(addr != NULL);
-
-    heap_entry_t *entry = (heap_entry_t *) addr;
-    entry->size = size - sizeof(heap_entry_t);
-    entry->free = true;
-#if HEAP_PROTECTION
-    update_prot(entry);
-#endif
-    list_prepend(&g_entries, &entry->list_elem);
-}
-
-void *heap_alloc_align(size_t size, size_t alignment) {
-    ASSERT(size > 0);
-    log(LOG_LEVEL_DEBUG_NOISY, "HEAP", "alloc(size: %#lx, alignment: %#lx)", size, alignment);
-    ipl_t previous_ipl = spinlock_acquire(&g_lock);
-    LIST_FOREACH(&g_entries, elem) {
-        heap_entry_t *entry = LIST_CONTAINER_GET(elem, heap_entry_t, list_elem);
-        if(!entry->free) continue;
-#if HEAP_PROTECTION
-        ASSERT(get_prot(entry) == 0);
-#endif
-
-        uintptr_t mod = ((uintptr_t) entry + sizeof(heap_entry_t)) % alignment;
-        uintptr_t offset = alignment - mod;
-        if(mod == 0) offset = 0;
-
-    check_fit:
-        if(entry->size < offset + size) continue;
-        if(offset == 0) goto aligned;
-        if(offset < sizeof(heap_entry_t) + MIN_ENTRY_SIZE) {
-            offset += alignment;
-            goto check_fit;
+static slab_cache_t *find_cache(size_t size) {
+    slab_cache_t *cache = NULL;
+    if(size <= g_slab_8x_sizes[SLAB_8X_COUNT - 1]) {
+        cache = g_8x_slabs[MATH_DIV_CEIL(size, 8) - 1];
+    } else if(size <= g_slab_128x_sizes[SLAB_128X_COUNT - 1]) {
+        cache = g_128x_slabs[MATH_DIV_CEIL(size, 128) - 1];
+    } else {
+        for(size_t i = 0; i < SLAB_OTHER_COUNT; i++) {
+            if(g_slab_other_sizes[i] < size) continue;
+            cache = g_other_slabs[i];
+            break;
         }
-
-        heap_entry_t *new = (heap_entry_t *) ((uintptr_t) entry + offset);
-        new->free = true;
-        new->size = entry->size - offset;
-        list_append(&entry->list_elem, &new->list_elem);
-        entry->size = offset - sizeof(heap_entry_t);
-#if HEAP_PROTECTION
-        update_prot(new);
-        update_prot(entry);
-#endif
-        entry = new;
-
-    aligned:
-        entry->free = false;
-        if(entry->size - size > sizeof(heap_entry_t) + MIN_ENTRY_SIZE) {
-            heap_entry_t *overflow = (heap_entry_t *) ((uintptr_t) entry + sizeof(heap_entry_t) + size);
-            overflow->free = true;
-            overflow->size = entry->size - size - sizeof(heap_entry_t);
-            list_append(&entry->list_elem, &overflow->list_elem);
-            entry->size = size;
-#if HEAP_PROTECTION
-            update_prot(overflow);
-            update_prot(entry);
-#endif
-        }
-
-        spinlock_release(&g_lock, previous_ipl);
-
-        size_t address = (uintptr_t) entry + sizeof(heap_entry_t);
-        log(LOG_LEVEL_DEBUG_NOISY, "HEAP", "alloc success (address: %#lx)", address);
-        return (void *) address;
     }
-    panic("HEAP: Out of memory");
+    ASSERT(cache != NULL);
+    return cache;
+}
+
+void heap_initialize() {
+    for(size_t i = 0; i < SLAB_8X_COUNT; i++) g_8x_slabs[i] = slab_cache_create(g_slab_8x_names[i], g_slab_8x_sizes[i]);
+    for(size_t i = 0; i < SLAB_128X_COUNT; i++) g_128x_slabs[i] = slab_cache_create(g_slab_128x_names[i], g_slab_128x_sizes[i]);
+    for(size_t i = 0; i < SLAB_OTHER_COUNT; i++) g_other_slabs[i] = slab_cache_create(g_slab_other_names[i], g_slab_other_sizes[i]);
 }
 
 void *heap_alloc(size_t size) {
-    return heap_alloc_align(size, 1);
+    if(size == 0) return NULL;
+    if(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1]) return (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(size, ARCH_PAGE_GRANULARITY), PMM_FLAG_NONE)->paddr);
+    return slab_allocate(find_cache(size));
 }
 
-void heap_free(void *address) {
+void heap_free(void *address, size_t size) {
     if(address == NULL) return;
-    ipl_t previous_ipl = spinlock_acquire(&g_lock);
-    heap_entry_t *entry = (heap_entry_t *) (address - sizeof(heap_entry_t));
-#if HEAP_PROTECTION
-    ASSERT(get_prot(entry) == 0);
-#endif
-    entry->free = true;
-    if(LIST_NEXT(&entry->list_elem) != &g_entries) {
-        heap_entry_t *next = LIST_CONTAINER_GET(LIST_NEXT(&entry->list_elem), heap_entry_t, list_elem);
-        if(next->free) {
-            entry->size += sizeof(heap_entry_t) + next->size;
-            list_delete(&next->list_elem);
-#if HEAP_PROTECTION
-            update_prot(entry);
-#endif
-        }
-    }
-    if(LIST_PREVIOUS(&entry->list_elem) != &g_entries) {
-        heap_entry_t *prev = LIST_CONTAINER_GET(LIST_PREVIOUS(&entry->list_elem), heap_entry_t, list_elem);
-        if(prev->free) {
-            prev->size += sizeof(heap_entry_t) + entry->size;
-            list_delete(&entry->list_elem);
-#if HEAP_PROTECTION
-            update_prot(prev);
-#endif
-        }
-    }
-    spinlock_release(&g_lock, previous_ipl);
+    if(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1]) return pmm_free(&PAGE(HHDM_TO_PHYS(address))->block);
+    slab_free(find_cache(size), address);
 }
