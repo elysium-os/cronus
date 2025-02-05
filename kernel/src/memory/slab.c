@@ -103,7 +103,7 @@ slab_cache_t *slab_cache_create(const char *name, size_t object_size, pmm_order_
     cache->name = name;
     cache->object_size = object_size;
     cache->block_order = order;
-    cache->cpu_cache_enabled = false;
+    cache->cpu_cache_enabled = true;
 
     cache->slabs_lock = SPINLOCK_INIT;
     cache->slabs_full = LIST_INIT;
