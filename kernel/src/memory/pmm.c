@@ -26,11 +26,6 @@ static inline uint8_t pagecount_to_order(size_t pages) {
     return (uint8_t) ((sizeof(unsigned long long) * 8) - __builtin_clzll(pages - 1));
 }
 
-
-// TODO
-#include "common/log.h"
-
-
 void pmm_region_add(uintptr_t base, size_t size, size_t used) {
     pmm_zone_t *zones[] = {&g_pmm_zone_low, &g_pmm_zone_normal};
     for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
@@ -103,7 +98,6 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
     }
     spinlock_release(&zone->lock, previous_ipl);
 
-    if(block->paddr == 0) log(LOG_LEVEL_ERROR, "PMM", "> %#lx", ((uintptr_t) block - (uintptr_t) g_page_cache) / sizeof(page_t) * ARCH_PAGE_GRANULARITY);
     ASSERT(block->paddr != 0);
     block->order = order;
     block->free = false;
