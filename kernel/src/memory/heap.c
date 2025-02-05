@@ -20,8 +20,8 @@ static const char *g_slab_128x_names[] = {"heap-128", "heap-256", "heap-384", "h
 static size_t g_slab_128x_sizes[] = {128, 256, 384, 512};
 static slab_cache_t *g_128x_slabs[SLAB_128X_COUNT];
 
-static const char *g_slab_other_names[] = {"heap-1024"};
-static size_t g_slab_other_sizes[] = {1024};
+static const char *g_slab_other_names[] = {"heap-1024", "heap-2048"};
+static size_t g_slab_other_sizes[] = {1024, 2048};
 static slab_cache_t *g_other_slabs[SLAB_OTHER_COUNT];
 
 static slab_cache_t *find_cache(size_t size) {
@@ -42,9 +42,9 @@ static slab_cache_t *find_cache(size_t size) {
 }
 
 void heap_initialize() {
-    for(size_t i = 0; i < SLAB_8X_COUNT; i++) g_8x_slabs[i] = slab_cache_create(g_slab_8x_names[i], g_slab_8x_sizes[i]);
-    for(size_t i = 0; i < SLAB_128X_COUNT; i++) g_128x_slabs[i] = slab_cache_create(g_slab_128x_names[i], g_slab_128x_sizes[i]);
-    for(size_t i = 0; i < SLAB_OTHER_COUNT; i++) g_other_slabs[i] = slab_cache_create(g_slab_other_names[i], g_slab_other_sizes[i]);
+    for(size_t i = 0; i < SLAB_8X_COUNT; i++) g_8x_slabs[i] = slab_cache_create(g_slab_8x_names[i], g_slab_8x_sizes[i], 2);
+    for(size_t i = 0; i < SLAB_128X_COUNT; i++) g_128x_slabs[i] = slab_cache_create(g_slab_128x_names[i], g_slab_128x_sizes[i], 3);
+    for(size_t i = 0; i < SLAB_OTHER_COUNT; i++) g_other_slabs[i] = slab_cache_create(g_slab_other_names[i], g_slab_other_sizes[i], 5);
 }
 
 void *heap_alloc(size_t size) {

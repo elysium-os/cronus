@@ -98,11 +98,11 @@ void slab_init() {
     list_append(&g_slab_caches, &g_alloc_magazine.list_elem);
 }
 
-slab_cache_t *slab_cache_create(const char *name, size_t object_size) {
+slab_cache_t *slab_cache_create(const char *name, size_t object_size, pmm_order_t order) {
     slab_cache_t *cache = slab_allocate(&g_alloc_cache);
     cache->name = name;
     cache->object_size = object_size;
-    cache->block_order = 4;
+    cache->block_order = order;
     cache->cpu_cache_enabled = false;
 
     cache->slabs_lock = SPINLOCK_INIT;
