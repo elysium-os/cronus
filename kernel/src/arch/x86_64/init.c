@@ -90,6 +90,9 @@ static uintptr_t proper_alloc() {
 }
 
 static void thread_uacpi_setup() {
+    // This is purely an optimization (for UACPI ops of course)
+    ipl_t previous_ipl = ipl_raise(IPL_NORMAL);
+
     uacpi_status ret = uacpi_initialize(0);
     if(uacpi_unlikely_error(ret)) {
         log(LOG_LEVEL_WARN, "UACPI", "initialization failed (%s)", uacpi_status_to_string(ret));
@@ -97,6 +100,8 @@ static void thread_uacpi_setup() {
         ret = uacpi_namespace_load();
         if(uacpi_unlikely_error(ret)) log(LOG_LEVEL_WARN, "UACPI", "namespace load failed (%s)", uacpi_status_to_string(ret));
     }
+
+    ipl_lower(previous_ipl);
     log(LOG_LEVEL_INFO, "UACPI", "Setup Done");
 }
 
