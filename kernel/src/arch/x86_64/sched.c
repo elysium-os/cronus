@@ -62,7 +62,7 @@ static int g_sched_vector = 0;
     will stay in RDI throughout the asm routine and will still
     be present upon entry here
 */
-static void common_thread_init(x86_64_thread_t *prev) {
+[[gnu::no_instrument_function]] static void common_thread_init(x86_64_thread_t *prev) {
     sched_thread_drop(&prev->common);
 
     x86_64_lapic_timer_oneshot(g_sched_vector, INTERVAL);
@@ -70,7 +70,7 @@ static void common_thread_init(x86_64_thread_t *prev) {
     arch_interrupt_set_ipl(IPL_PREEMPT);
 }
 
-static void kernel_thread_exit() {
+[[gnu::no_instrument_function]] static void kernel_thread_exit() {
     arch_sched_thread_current()->state = THREAD_STATE_DESTROY;
     arch_sched_yield();
 }
@@ -83,7 +83,7 @@ static void kernel_thread_exit() {
     __builtin_unreachable();
 }
 
-static void sched_switch(x86_64_thread_t *this, x86_64_thread_t *next) {
+[[gnu::no_instrument_function]] static void sched_switch(x86_64_thread_t *this, x86_64_thread_t *next) {
     ASSERT(arch_interrupt_get_ipl() != IPL_PREEMPT);
     ASSERT(next != NULL);
 
@@ -109,7 +109,7 @@ static void sched_switch(x86_64_thread_t *this, x86_64_thread_t *next) {
     sched_thread_drop(&prev->common);
 }
 
-void arch_sched_yield() {
+[[gnu::no_instrument_function]] void arch_sched_yield() {
     ipl_t previous_ipl = ipl_raise(IPL_NORMAL);
     thread_t *current = arch_sched_thread_current();
 
@@ -153,6 +153,9 @@ static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t ker
     thread->state.fs = 0;
     thread->state.gs = 0;
     thread->state.fpu_area = (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(g_x86_64_fpu_area_size, ARCH_PAGE_GRANULARITY), PMM_FLAG_ZERO)->paddr);
+#ifdef __ENV_DEVELOPMENT
+    thread->prof_current_call_frame = 0;
+#endif
 
     g_x86_64_fpu_restore(thread->state.fpu_area);
     uint16_t x87cw = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (0b11 << 8);
@@ -164,7 +167,7 @@ static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t ker
     return thread;
 }
 
-static void sched_entry([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
+[[gnu::no_instrument_function]] static void sched_entry([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     arch_sched_yield();
 }
 
@@ -265,7 +268,7 @@ thread_t *arch_sched_thread_current() {
     return &thread->common;
 }
 
-[[noreturn]] void x86_64_sched_init_cpu(x86_64_cpu_t *cpu, bool release) {
+[[gnu::no_instrument_function]] [[noreturn]] void x86_64_sched_init_cpu(x86_64_cpu_t *cpu, bool release) {
     x86_64_thread_t *idle_thread = X86_64_THREAD(arch_sched_thread_create_kernel(sched_idle));
     idle_thread->common.id = 0;
     cpu->common.idle_thread = &idle_thread->common;
