@@ -129,7 +129,7 @@ oneshot:
 }
 
 void arch_sched_thread_destroy(thread_t *thread) {
-    if(thread->proc) {
+    if(thread->proc != NULL) {
         ipl_t previous_ipl = spinlock_acquire(&thread->proc->lock);
         list_delete(&thread->list_proc);
         if(list_is_empty(&thread->proc->threads)) {

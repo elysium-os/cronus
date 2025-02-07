@@ -11,7 +11,7 @@ process_t *sched_process_create(vm_address_space_t *address_space);
 
 /**
  * @brief Destroy a process.
- * @warning Assumes you have acquired the process lock & process is not on the scheduler queue.
+ * @warning Assumes you have acquired the process lock and threads are not in queue.
  */
 void sched_process_destroy(process_t *proc);
 
