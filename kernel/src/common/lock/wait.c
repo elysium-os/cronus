@@ -7,8 +7,6 @@
 #include "sched/thread.h"
 
 void wait_on(waitable_t *waitable) {
-    ASSERT(arch_interrupt_get_ipl() == IPL_PREEMPT);
-
     ipl_t previous_ipl = ipl_raise(IPL_NORMAL);
     ipl_t lock_ipl = spinlock_acquire(&waitable->lock);
 
@@ -22,8 +20,6 @@ void wait_on(waitable_t *waitable) {
 }
 
 void wait_signal(waitable_t *waitable) {
-    ASSERT(arch_interrupt_get_ipl() == IPL_PREEMPT);
-
     ipl_t lock_ipl = spinlock_acquire(&waitable->lock);
     LIST_FOREACH(&waitable->threads_waiting, elem) {
         thread_t *thread = LIST_CONTAINER_GET(elem, thread_t, list_wait);
