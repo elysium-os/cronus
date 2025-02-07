@@ -1,8 +1,32 @@
 #!/usr/bin/env bash
 clear
 
-chariot --hide-conflicts source/kernel target/kernel target/image
-if [[ "$1" = "efi" ]]; then
+build_args=()
+build_args+=(--hide-conflicts)
+build_args+=(source/kernel target/kernel target/image)
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --efi)
+            BOOT_EFI="yes"
+            ;;
+        --production)
+            build_args+=(--var "build_environment=production")
+            ;;
+        -*|--*)
+            echo "Unknown option \"$1\""
+            exit 1
+            ;;
+        *)
+            POSITIONAL_ARGS+=("$1")
+            ;;
+    esac
+    shift
+done
+set -- "${POSITIONAL_ARGS[@]}"
+
+../chariot/chariot "${build_args[@]}"
+if [[ "$BOOT_EFI" = "yes" ]]; then
     IMAGE_PATH=./.chariot-cache/target/image/install/elysium_efi.img
 else
     IMAGE_PATH=./.chariot-cache/target/image/install/elysium_bios.img
@@ -29,7 +53,7 @@ qemu_args+=(-accel kvm)
 # qemu_args+=(-accel tcg)
 # qemu_args+=(-s -S)
 
-if [[ "$1" = "efi" ]]; then
+if [[ "$BOOT_EFI" = "yes" ]]; then
     qemu-ovmf-x86-64 "${qemu_args[@]}"
 else
     qemu-system-x86_64 "${qemu_args[@]}"

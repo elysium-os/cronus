@@ -163,11 +163,14 @@ target/kernel {
     source: kernel
     dependencies [ host/freestanding_gcc target/tartarus target/uacpi ]
     configure {
-        @(source_dir)/conf.sh \
-            --prefix=@(prefix) \
-            --arch=x86_64 \
-            --toolchain-triplet=x86_64-elf \
-            --sysroot=@(sysroot_dir)
+        args=()
+        args+=(--prefix=@(prefix))
+        args+=(--arch=x86_64)
+        args+=(--toolchain-triplet=x86_64-elf)
+        args+=(--sysroot=@(sysroot_dir))
+        [[ "@(build_environment?)" = "production" ]] && args+=(--production)
+
+        @(source_dir)/conf.sh "${args[@]}"
     }
     build { make all }
     install { DESTDIR=@(install_dir) make install }
