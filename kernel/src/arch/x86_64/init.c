@@ -89,7 +89,7 @@ static uintptr_t proper_alloc() {
     return pmm_alloc_page(PMM_FLAG_ZERO)->paddr;
 }
 
-static void thread_uacpi_setup() {
+static void thread_init() {
     // This is purely an optimization (for UACPI ops of course)
     ipl_t previous_ipl = ipl_raise(IPL_NORMAL);
 
@@ -410,7 +410,7 @@ static void thread_uacpi_setup() {
 
     x86_64_init_flag_set(X86_64_INIT_FLAG_TIME);
 
-    sched_thread_schedule(arch_sched_thread_create_kernel(thread_uacpi_setup));
+    sched_thread_schedule(arch_sched_thread_create_kernel(thread_init));
 
     log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye for now!");
     x86_64_sched_init_cpu(cpu, true);
