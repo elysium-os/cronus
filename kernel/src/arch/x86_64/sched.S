@@ -15,6 +15,10 @@ x86_64_sched_context_switch:
     mov %rsp, THREAD_RSP_OFFSET(%rdi)
     mov THREAD_RSP_OFFSET(%rsi), %rsp
 
+    xor %r12, %r12
+    mov %ds, %r12
+    mov %es, %r12
+
     pop %r12
     pop %r13
     pop %r14
