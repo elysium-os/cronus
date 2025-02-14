@@ -291,7 +291,7 @@ thread_t *arch_sched_thread_current() {
 }
 
 void x86_64_sched_init() {
-    int sched_vector = x86_64_interrupt_request(X86_64_INTERRUPT_PRIORITY_PREEMPT, sched_entry);
+    int sched_vector = x86_64_interrupt_request(IPL_PREEMPT, sched_entry);
     ASSERT_COMMENT(sched_vector >= 0, "Unable to acquire an interrupt vector for the scheduler");
     g_sched_vector = sched_vector;
 }

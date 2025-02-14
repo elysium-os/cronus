@@ -1,5 +1,7 @@
 #pragma once
 
+#include "sys/ipl.h"
+
 #include <stdint.h>
 
 typedef struct [[gnu::packed]] {
@@ -8,12 +10,6 @@ typedef struct [[gnu::packed]] {
     uint64_t int_no;
     uint64_t err_code, rip, cs, rflags, rsp, ss;
 } x86_64_interrupt_frame_t;
-
-typedef enum {
-    X86_64_INTERRUPT_PRIORITY_PREEMPT = 0x2,
-    X86_64_INTERRUPT_PRIORITY_NORMAL = 0x5,
-    X86_64_INTERRUPT_PRIORITY_CRITICAL = 0xF
-} x86_64_interrupt_priority_t;
 
 typedef void (*x86_64_interrupt_handler_t)(x86_64_interrupt_frame_t *frame);
 typedef void (*x86_64_interrupt_irq_eoi_t)(uint8_t);
@@ -40,4 +36,4 @@ void x86_64_interrupt_set(uint8_t vector, x86_64_interrupt_handler_t handler);
  * @brief Request a free interrupt vector.
  * @return chosen interrupt vector, -1 on error
  */
-int x86_64_interrupt_request(x86_64_interrupt_priority_t priority, x86_64_interrupt_handler_t handler);
+int x86_64_interrupt_request(ipl_t ipl, x86_64_interrupt_handler_t handler);

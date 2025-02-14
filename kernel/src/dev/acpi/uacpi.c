@@ -351,7 +351,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
     handler->ctx = ctx;
     handler->fn = fn;
 
-    int interrupt = x86_64_interrupt_request(X86_64_INTERRUPT_PRIORITY_NORMAL, kernelapi_interrupt_handler);
+    int interrupt = x86_64_interrupt_request(IPL_NORMAL, kernelapi_interrupt_handler);
     ASSERT(interrupt >= 0);
     handler->vector = interrupt;
 

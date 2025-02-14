@@ -397,13 +397,13 @@ static void thread_init() {
         //     if(timer == -1) goto use_pit;
         //     int gsi_vector = x86_64_hpet_configure_timer(timer, HPET_TIMER_FREQ, false);
 
-        //     int hpet_time_vector = x86_64_interrupt_request(X86_64_INTERRUPT_PRIORITY_CRITICAL, hpet_time_handler);
+        //     int hpet_time_vector = x86_64_interrupt_request(IPL_CRITICAL, hpet_time_handler);
         //     ASSERT(hpet_time_vector != -1);
         //     x86_64_ioapic_map_gsi(gsi_vector, x86_64_lapic_id(), false, true, hpet_time_vector);
     } else {
         // use_pit:
         // x86_64_pit_match_frequency(PIT_TIMER_FREQ);
-        // int pit_time_vector = x86_64_interrupt_request(X86_64_INTERRUPT_PRIORITY_CRITICAL, pit_time_handler);
+        // int pit_time_vector = x86_64_interrupt_request(IPL_CRITICAL, pit_time_handler);
         // ASSERT(pit_time_vector != -1);
         // x86_64_ioapic_map_legacy_irq(0, x86_64_lapic_id(), false, true, pit_time_vector);
     }

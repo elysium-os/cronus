@@ -1,6 +1,7 @@
 #include "interrupt.h"
 
 #include "arch/interrupt.h"
+#include "common/assert.h"
 
 #include "arch/x86_64/cpu/cr.h"
 #include "arch/x86_64/cpu/gdt.h"
@@ -24,11 +25,9 @@ typedef struct {
     x86_64_interrupt_handler_t handler;
 } interrupt_entry_t;
 
-static x86_64_interrupt_priority_t g_ipl_to_interrupt_map[] =
-    {[IPL_PREEMPT] = X86_64_INTERRUPT_PRIORITY_PREEMPT, [IPL_NORMAL] = X86_64_INTERRUPT_PRIORITY_NORMAL, [IPL_CRITICAL] = X86_64_INTERRUPT_PRIORITY_CRITICAL};
+static uint64_t g_ipl_map[] = {[IPL_PREEMPT] = 0x2, [IPL_NORMAL] = 0x5, [IPL_CRITICAL] = 0xF};
 
-static ipl_t g_interrupt_to_ipl_map[] =
-    {[X86_64_INTERRUPT_PRIORITY_PREEMPT] = IPL_PREEMPT, [X86_64_INTERRUPT_PRIORITY_NORMAL] = IPL_NORMAL, [X86_64_INTERRUPT_PRIORITY_CRITICAL] = IPL_CRITICAL};
+static ipl_t g_ipl_map_reverse[] = {[0x2] = IPL_PREEMPT, [0x5] = IPL_NORMAL, [0xF] = IPL_CRITICAL};
 
 extern uint64_t g_isr_stubs[IDT_SIZE];
 
@@ -38,13 +37,21 @@ static interrupt_entry_t g_entries[IDT_SIZE];
 x86_64_interrupt_irq_eoi_t g_x86_64_interrupt_irq_eoi;
 
 void arch_interrupt_set_ipl(ipl_t ipl) {
-    x86_64_interrupt_priority_t priority = g_ipl_to_interrupt_map[ipl];
-    x86_64_cr8_write(((uint64_t) priority) - 1);
+    uint64_t priority;
+    switch(ipl) {
+        case IPL_MASK: priority = 0xF; break;
+        default:       priority = g_ipl_map[ipl] - 1; break;
+    }
+    x86_64_cr8_write(priority);
 }
 
+// TODO: should we just store ipl in cpu local
 ipl_t arch_interrupt_get_ipl() {
-    x86_64_interrupt_priority_t priority = (x86_64_interrupt_priority_t) (x86_64_cr8_read() + 1);
-    return g_interrupt_to_ipl_map[priority];
+    uint64_t priority = x86_64_cr8_read();
+    switch(priority) {
+        case 0xF: return IPL_MASK;
+        default:  return g_ipl_map_reverse[priority - 1];
+    }
 }
 
 void x86_64_interrupt_handler(x86_64_interrupt_frame_t *frame) {
@@ -85,8 +92,11 @@ void x86_64_interrupt_set(uint8_t vector, x86_64_interrupt_handler_t handler) {
     g_entries[vector].handler = handler;
 }
 
-int x86_64_interrupt_request(x86_64_interrupt_priority_t priority, x86_64_interrupt_handler_t handler) {
-    for(int i = (int) priority << 4; i < IDT_SIZE && i < ((int) priority << 4) + 16; i++) {
+int x86_64_interrupt_request(ipl_t ipl, x86_64_interrupt_handler_t handler) {
+    ASSERT(ipl != IPL_MASK);
+
+    int priority = g_ipl_map_reverse[ipl];
+    for(int i = priority << 4; i < IDT_SIZE && i < (priority << 4) + 16; i++) {
         if(!g_entries[i].free) continue;
         x86_64_interrupt_set(i, handler);
         return i;
