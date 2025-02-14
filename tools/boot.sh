@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${POSITIONAL_ARGS[@]}"
 
-../chariot/chariot "${build_args[@]}"
+chariot "${build_args[@]}"
 if [[ "$BOOT_EFI" = "yes" ]]; then
     IMAGE_PATH=./.chariot-cache/target/image/install/elysium_efi.img
 else
