@@ -8,14 +8,16 @@
     },
     "todo-tree.general.tags": [
         "TODO",
+        "todo",
         "OPTIMIZE",
         "UNIMPLEMENTED",
         "CRITICAL",
         "FIX",
         "TEMPORARY",
-        "NOTE"
+        "NOTE",
     ],
     "todo-tree.highlights.backgroundColourScheme": [
+        "yellow",
         "yellow",
         "purple",
         "orange",
@@ -26,6 +28,7 @@
     ],
     "todo-tree.highlights.foregroundColourScheme": [
         "black",
+        "black",
         "white",
         "black",
         "white",
@@ -35,5 +38,6 @@
     ],
     "todo-tree.highlights.customHighlight": {
         "TODO": { "icon": "check" }
-    }
+    },
+    "todo-tree.regex.regex": "(//|#|@|<!--|;|/\\*|^|^[ \\t]*(-|\\d+.))\\s*($TAGS)"
 }
