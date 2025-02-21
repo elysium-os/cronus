@@ -53,5 +53,5 @@ x86_64_sched_userspace_init:
     xor %r14, %r14
     xor %r15, %r15
 
-    mov (1 << 9) | (1 << 1), %r11
+    mov $((1 << 9) | (1 << 1)), %r11
     sysretq
