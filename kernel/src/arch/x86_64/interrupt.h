@@ -1,6 +1,6 @@
 #pragma once
 
-#include "sys/ipl.h"
+#include "sys/interrupt.h"
 
 #include <stdint.h>
 
@@ -36,4 +36,4 @@ void x86_64_interrupt_set(uint8_t vector, x86_64_interrupt_handler_t handler);
  * @brief Request a free interrupt vector.
  * @return chosen interrupt vector, -1 on error
  */
-int x86_64_interrupt_request(ipl_t ipl, x86_64_interrupt_handler_t handler);
+int x86_64_interrupt_request(interrupt_priority_t priority, x86_64_interrupt_handler_t handler);

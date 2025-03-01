@@ -2,20 +2,21 @@
 
 #include "arch/cpu.h"
 #include "common/assert.h"
+#include "sys/interrupt.h"
 
 #include <stdint.h>
 
 #define DEADLOCK_AT 100000000
 
-ipl_t spinlock_acquire(volatile spinlock_t *lock) {
-    ipl_t ipl = ipl_raise(IPL_NORMAL);
+interrupt_state_t spinlock_acquire(volatile spinlock_t *lock) {
+    interrupt_state_t previous_state = interrupt_state_mask();
     spinlock_primitive_acquire(lock);
-    return ipl;
+    return previous_state;
 }
 
-void spinlock_release(volatile spinlock_t *lock, ipl_t previous_ipl) {
+void spinlock_release(volatile spinlock_t *lock, interrupt_state_t interrupt_state) {
     spinlock_primitive_release(lock);
-    ipl_lower(previous_ipl);
+    interrupt_state_restore(interrupt_state);
 }
 
 void spinlock_primitive_acquire(volatile spinlock_t *lock) {

@@ -1,13 +1,17 @@
 #pragma once
 
-#include "sys/ipl.h"
+/**
+ * @brief Get the current interrupt state.
+ * @returns true for enabled, false for disabled
+ */
+bool arch_interrupt_state();
 
 /**
- * @brief Set IPL level.
+ * @brief Enable interrupts.
  */
-void arch_interrupt_set_ipl(ipl_t ipl);
+void arch_interrupt_enable();
 
 /**
- * @brief Get IPL level.
+ * @brief Disable interrupts.
  */
-ipl_t arch_interrupt_get_ipl();
+void arch_interrupt_disable();

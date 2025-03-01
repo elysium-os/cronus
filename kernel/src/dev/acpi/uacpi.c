@@ -62,9 +62,9 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address, uacpi_handl
     device->slot = address.device;
     device->func = address.function;
 
-    ipl_t previous_ipl = spinlock_acquire(&g_pci_devices_lock);
+    interrupt_state_t previous_state = spinlock_acquire(&g_pci_devices_lock);
     list_append(&g_pci_devices, &device->list);
-    spinlock_release(&g_pci_devices_lock, previous_ipl);
+    spinlock_release(&g_pci_devices_lock, previous_state);
 
     *out_handle = device;
 
@@ -298,8 +298,8 @@ uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle lock) {
     return (uacpi_cpu_flags) spinlock_acquire((volatile spinlock_t *) lock);
 }
 
-void uacpi_kernel_unlock_spinlock(uacpi_handle lock, uacpi_cpu_flags ipl) {
-    spinlock_release((volatile spinlock_t *) lock, (ipl_t) ipl);
+void uacpi_kernel_unlock_spinlock(uacpi_handle lock, uacpi_cpu_flags interrupt_state) {
+    spinlock_release((volatile spinlock_t *) lock, (interrupt_state_t) interrupt_state);
 }
 
 /* Events */
@@ -351,7 +351,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
     handler->ctx = ctx;
     handler->fn = fn;
 
-    int interrupt = x86_64_interrupt_request(IPL_NORMAL, kernelapi_interrupt_handler);
+    int interrupt = x86_64_interrupt_request(INTERRUPT_PRIORITY_NORMAL, kernelapi_interrupt_handler);
     ASSERT(interrupt >= 0);
     handler->vector = interrupt;
 

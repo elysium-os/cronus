@@ -40,7 +40,7 @@ static slab_t *cache_make_slab(slab_cache_t *cache) {
 }
 
 static void *slab_direct_alloc(slab_cache_t *cache) {
-    ipl_t previous_ipl = spinlock_acquire(&cache->slabs_lock);
+    interrupt_state_t previous_state = spinlock_acquire(&cache->slabs_lock);
 
     if(list_is_empty(&cache->slabs_partial)) list_append(&cache->slabs_partial, &cache_make_slab(cache)->list_elem);
     slab_t *slab = LIST_CONTAINER_GET(LIST_NEXT(&cache->slabs_partial), slab_t, list_elem);
@@ -54,12 +54,12 @@ static void *slab_direct_alloc(slab_cache_t *cache) {
         list_append(&cache->slabs_full, &slab->list_elem);
     }
 
-    spinlock_release(&cache->slabs_lock, previous_ipl);
+    spinlock_release(&cache->slabs_lock, previous_state);
     return obj;
 }
 
 static void slab_direct_free(slab_cache_t *cache, void *obj) {
-    ipl_t previous_ipl = spinlock_acquire(&cache->slabs_lock);
+    interrupt_state_t previous_state = spinlock_acquire(&cache->slabs_lock);
 
     slab_t *slab = (slab_t *) (((uintptr_t) obj) & ~(PMM_ORDER_TO_PAGECOUNT(cache->block_order) * ARCH_PAGE_GRANULARITY - 1));
     *(void **) obj = slab->freelist;
@@ -70,7 +70,7 @@ static void slab_direct_free(slab_cache_t *cache, void *obj) {
     }
     slab->free_count++;
 
-    spinlock_release(&cache->slabs_lock, previous_ipl);
+    spinlock_release(&cache->slabs_lock, previous_state);
 }
 
 void slab_init() {
@@ -136,9 +136,9 @@ slab_cache_t *slab_cache_create(const char *name, size_t object_size, pmm_order_
         }
     }
 
-    ipl_t previous_ipl = spinlock_acquire(&g_slab_caches_lock);
+    interrupt_state_t previous_state = spinlock_acquire(&g_slab_caches_lock);
     list_append(&g_slab_caches, &cache->list_elem);
-    spinlock_release(&g_slab_caches_lock, previous_ipl);
+    spinlock_release(&g_slab_caches_lock, previous_state);
 
     return cache;
 }
@@ -147,12 +147,12 @@ void *slab_allocate(slab_cache_t *cache) {
     if(!cache->cpu_cache_enabled) return slab_direct_alloc(cache);
 
     slab_cache_cpu_t *cc = &cache->cpu_cache[arch_cpu_id()];
-    ipl_t previous_ipl = spinlock_acquire(&cc->lock);
+    interrupt_state_t previous_state = spinlock_acquire(&cc->lock);
 
 alloc:
     if(cc->primary->round_count > 0) {
         void *obj = cc->primary->rounds[--cc->primary->round_count];
-        spinlock_release(&cc->lock, previous_ipl);
+        spinlock_release(&cc->lock, previous_state);
         return obj;
     }
 
@@ -177,7 +177,7 @@ alloc:
     }
     spinlock_primitive_release(&cache->magazines_lock);
 
-    spinlock_release(&cc->lock, previous_ipl);
+    spinlock_release(&cc->lock, previous_state);
     return slab_direct_alloc(cache);
 }
 
@@ -185,12 +185,12 @@ void slab_free(slab_cache_t *cache, void *obj) {
     if(!cache->cpu_cache_enabled) return slab_direct_free(cache, obj);
 
     slab_cache_cpu_t *cc = &cache->cpu_cache[arch_cpu_id()];
-    ipl_t previous_ipl = spinlock_acquire(&cc->lock);
+    interrupt_state_t previous_state = spinlock_acquire(&cc->lock);
 
 free:
     if(cc->primary->round_count < MAGAZINE_SIZE) {
         cc->primary->rounds[cc->primary->round_count++] = obj;
-        spinlock_release(&cc->lock, previous_ipl);
+        spinlock_release(&cc->lock, previous_state);
         return;
     }
 
@@ -215,6 +215,6 @@ free:
     }
     spinlock_primitive_release(&cache->magazines_lock);
 
-    spinlock_release(&cc->lock, previous_ipl);
+    spinlock_release(&cc->lock, previous_state);
     slab_direct_free(cache, obj);
 }

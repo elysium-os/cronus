@@ -27,9 +27,10 @@
 #define INTERVAL 100000
 #define KERNEL_STACK_SIZE_PG 16
 #define USER_STACK_SIZE (8 * ARCH_PAGE_GRANULARITY)
+#define INITIAL_RFLAGS (1 << 1)
 
 typedef struct [[gnu::packed]] {
-    uint64_t r12, r13, r14, r15, rbp, rbx;
+    uint64_t r12, r13, r14, r15, rbp, rbx, flags;
     void (*thread_init)(x86_64_thread_t *prev);
     void (*entry)();
     void (*thread_exit_kernel)();
@@ -41,7 +42,7 @@ typedef struct [[gnu::packed]] {
 } init_stack_kernel_t;
 
 typedef struct [[gnu::packed]] {
-    uint64_t r12, r13, r14, r15, rbp, rbx;
+    uint64_t r12, r13, r14, r15, rbp, rbx, flags;
     void (*thread_init)(x86_64_thread_t *prev);
     void (*thread_init_user)();
     void (*entry)();
@@ -65,9 +66,9 @@ static int g_sched_vector = 0;
 [[gnu::no_instrument_function]] static void common_thread_init(x86_64_thread_t *prev) {
     sched_thread_drop(&prev->common);
 
-    x86_64_lapic_timer_oneshot(g_sched_vector, INTERVAL);
+    arch_interrupt_enable();
 
-    arch_interrupt_set_ipl(IPL_PREEMPT);
+    x86_64_lapic_timer_oneshot(g_sched_vector, INTERVAL);
 }
 
 [[gnu::no_instrument_function]] static void kernel_thread_exit() {
@@ -84,7 +85,7 @@ static int g_sched_vector = 0;
 }
 
 [[gnu::no_instrument_function]] static void sched_switch(x86_64_thread_t *this, x86_64_thread_t *next) {
-    ASSERT(arch_interrupt_get_ipl() != IPL_PREEMPT);
+    ASSERT(!arch_interrupt_state());
     ASSERT(next != NULL);
 
     if(next->common.proc != NULL) {
@@ -110,7 +111,7 @@ static int g_sched_vector = 0;
 }
 
 [[gnu::no_instrument_function]] void arch_sched_yield() {
-    ipl_t previous_ipl = ipl_raise(IPL_NORMAL);
+    interrupt_state_t previous_state = interrupt_state_mask();
     thread_t *current = arch_sched_thread_current();
 
     thread_t *next = sched_thread_next();
@@ -125,18 +126,18 @@ static int g_sched_vector = 0;
 oneshot:
     x86_64_lapic_timer_oneshot(g_sched_vector, INTERVAL);
 
-    ipl_lower(previous_ipl);
+    interrupt_state_restore(previous_state);
 }
 
 void arch_sched_thread_destroy(thread_t *thread) {
     if(thread->proc != NULL) {
-        ipl_t previous_ipl = spinlock_acquire(&thread->proc->lock);
+        interrupt_state_t previous_state = spinlock_acquire(&thread->proc->lock);
         list_delete(&thread->list_proc);
         if(list_is_empty(&thread->proc->threads)) {
             sched_process_destroy(thread->proc);
-            ipl_lower(previous_ipl);
+            interrupt_state_restore(previous_state);
         } else {
-            spinlock_release(&thread->proc->lock, previous_ipl);
+            spinlock_release(&thread->proc->lock, previous_state);
         }
     }
     heap_free(X86_64_THREAD(thread), sizeof(x86_64_thread_t));
@@ -179,6 +180,7 @@ thread_t *arch_sched_thread_create_kernel(void (*func)()) {
     };
 
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));
+    init_stack->flags = INITIAL_RFLAGS;
     init_stack->entry = func;
     init_stack->thread_init = common_thread_init;
     init_stack->thread_exit_kernel = kernel_thread_exit;
@@ -193,15 +195,16 @@ thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t
     };
 
     init_stack_user_t *init_stack = (init_stack_user_t *) (kernel_stack.base - sizeof(init_stack_user_t));
+    init_stack->flags = INITIAL_RFLAGS;
     init_stack->entry = (void (*)()) ip;
     init_stack->thread_init = common_thread_init;
     init_stack->thread_init_user = x86_64_sched_userspace_init;
     init_stack->user_stack = sp;
 
     x86_64_thread_t *thread = create_thread(proc, kernel_stack, (uintptr_t) init_stack);
-    ipl_t previous_ipl = spinlock_acquire(&proc->lock);
+    interrupt_state_t previous_state = spinlock_acquire(&proc->lock);
     list_append(&proc->threads, &thread->common.list_proc);
-    spinlock_release(&proc->lock, previous_ipl);
+    spinlock_release(&proc->lock, previous_state);
     return &thread->common;
 }
 
@@ -283,15 +286,12 @@ thread_t *arch_sched_thread_current() {
         while(!x86_64_init_flag_check(X86_64_INIT_FLAG_SCHED)) arch_cpu_relax();
     }
 
-    arch_interrupt_set_ipl(IPL_NORMAL);
-    asm volatile("sti");
-
     sched_switch(bootstrap_thread, idle_thread);
     __builtin_unreachable();
 }
 
 void x86_64_sched_init() {
-    int sched_vector = x86_64_interrupt_request(IPL_PREEMPT, sched_entry);
+    int sched_vector = x86_64_interrupt_request(INTERRUPT_PRIORITY_LOW, sched_entry);
     ASSERT_COMMENT(sched_vector >= 0, "Unable to acquire an interrupt vector for the scheduler");
     g_sched_vector = sched_vector;
 }

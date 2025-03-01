@@ -90,8 +90,7 @@ static uintptr_t proper_alloc() {
 }
 
 static void thread_init() {
-    // This is purely an optimization (for UACPI ops of course)
-    ipl_t previous_ipl = ipl_raise(IPL_NORMAL);
+    // OPTIMIZE we can mask interrupts for uacpi perf lol
 
     uacpi_status ret = uacpi_initialize(0);
     if(uacpi_unlikely_error(ret)) {
@@ -101,7 +100,6 @@ static void thread_init() {
         if(uacpi_unlikely_error(ret)) log(LOG_LEVEL_WARN, "UACPI", "namespace load failed (%s)", uacpi_status_to_string(ret));
     }
 
-    ipl_lower(previous_ipl);
     log(LOG_LEVEL_INFO, "UACPI", "Setup Done");
 }
 
@@ -133,7 +131,6 @@ static void thread_init() {
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
     x86_64_lapic_initialize();
     x86_64_interrupt_load_idt();
-    arch_interrupt_set_ipl(IPL_PREEMPT);
 
     // CPU Local
     x86_64_tss_t *tss = heap_alloc(sizeof(x86_64_tss_t));
@@ -223,7 +220,6 @@ static void thread_init() {
             default: x86_64_interrupt_set(i, x86_64_exception_unhandled); break;
         }
     }
-    arch_interrupt_set_ipl(IPL_PREEMPT);
     x86_64_init_flag_set(X86_64_INIT_FLAG_INTERRUPTS);
 
     // Initialize early physical memory

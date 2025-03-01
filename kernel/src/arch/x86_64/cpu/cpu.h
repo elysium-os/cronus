@@ -38,8 +38,6 @@ typedef struct x86_64_cpu {
 
     x86_64_thread_t *current_thread;
 
-    ipl_t current_ipl;
-
     cpu_t common;
 } x86_64_cpu_t;
 

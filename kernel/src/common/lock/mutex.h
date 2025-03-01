@@ -1,12 +1,20 @@
 #pragma once
 
-#include "common/lock/wait.h"
+#include "common/lock/spinlock.h"
+#include "lib/list.h"
 
-#define MUTEX_INIT ((mutex_t) {.waitable = WAITABLE_INIT, .lock = 0})
+#define MUTEX_INIT ((mutex_t) {.state = MUTEX_STATE_UNLOCKED, .lock = 0, .wait_queue = LIST_INIT})
+
+typedef enum {
+    MUTEX_STATE_UNLOCKED,
+    MUTEX_STATE_LOCKED,
+    MUTEX_STATE_CONTESTED
+} mutex_state_t;
 
 typedef struct {
-    waitable_t waitable;
-    bool lock;
+    spinlock_t lock;
+    mutex_state_t state;
+    list_t wait_queue;
 } mutex_t;
 
 /**

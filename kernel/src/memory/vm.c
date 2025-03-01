@@ -72,11 +72,10 @@ static void region_unmap(vm_region_t *region, uintptr_t address, uintptr_t lengt
 }
 
 static vm_region_t *region_alloc(bool global_lock_acquired) {
-    ipl_t regions_previous_ipl = spinlock_acquire(&g_free_regions_lock);
+    interrupt_state_t previous_state = spinlock_acquire(&g_free_regions_lock);
     if(list_is_empty(&g_free_regions)) {
-        ipl_t as_previous_ipl;
         pmm_block_t *page = pmm_alloc_page(PMM_FLAG_ZERO);
-        if(!global_lock_acquired) as_previous_ipl = spinlock_acquire(&g_vm_global_address_space->lock);
+        if(!global_lock_acquired) spinlock_primitive_acquire(&g_vm_global_address_space->lock);
         uintptr_t address = find_space(g_vm_global_address_space, 0, ARCH_PAGE_GRANULARITY);
         arch_ptm_map(g_vm_global_address_space, address, page->paddr, (vm_protection_t) {.read = true, .write = true}, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
 
@@ -89,21 +88,21 @@ static vm_region_t *region_alloc(bool global_lock_acquired) {
         region[0].cache_behavior = VM_CACHE_STANDARD;
 
         list_append(&g_vm_global_address_space->regions, &region[0].list_elem);
-        if(!global_lock_acquired) spinlock_release(&g_vm_global_address_space->lock, as_previous_ipl);
+        if(!global_lock_acquired) spinlock_primitive_release(&g_vm_global_address_space->lock);
 
         for(unsigned int i = 1; i < ARCH_PAGE_GRANULARITY / sizeof(vm_region_t); i++) list_append(&g_free_regions, &region[i].list_elem);
     }
     list_element_t *elem = LIST_NEXT(&g_free_regions);
     ASSERT(elem != NULL);
     list_delete(elem);
-    spinlock_release(&g_free_regions_lock, regions_previous_ipl);
+    spinlock_release(&g_free_regions_lock, previous_state);
     return LIST_CONTAINER_GET(elem, vm_region_t, list_elem);
 }
 
 static void region_free(vm_region_t *region) {
-    ipl_t previous_ipl = spinlock_acquire(&g_free_regions_lock);
+    interrupt_state_t previous_state = spinlock_acquire(&g_free_regions_lock);
     list_append(&g_free_regions, &region->list_elem);
-    spinlock_release(&g_free_regions_lock, previous_ipl);
+    spinlock_release(&g_free_regions_lock, previous_state);
 }
 
 static vm_region_t *addr_to_region(vm_address_space_t *address_space, uintptr_t address) {
@@ -175,11 +174,11 @@ static void *map_common(
     }
 
     vm_region_t *region = region_alloc(false);
-    ipl_t as_previous_ipl = spinlock_acquire(&address_space->lock);
+    interrupt_state_t previous_state = spinlock_acquire(&address_space->lock);
     address = find_space(address_space, address, length);
     if(address == 0 || ((uintptr_t) hint != address && (flags & VM_FLAG_FIXED) != 0)) {
         region_free(region);
-        spinlock_release(&address_space->lock, as_previous_ipl);
+        spinlock_release(&address_space->lock, previous_state);
         return NULL;
     }
 
@@ -201,7 +200,7 @@ static void *map_common(
     if((flags & VM_FLAG_NO_DEMAND) != 0) region_map(region, region->base, region->length);
 
     list_append(&address_space->regions, &region->list_elem);
-    spinlock_release(&address_space->lock, as_previous_ipl);
+    spinlock_release(&address_space->lock, previous_state);
 
     log(LOG_LEVEL_DEBUG, "VM", "map success (base: %#lx, length: %#lx)", region->base, region->length);
     return (void *) region->base;
@@ -222,7 +221,7 @@ void vm_unmap(vm_address_space_t *address_space, void *address, size_t length) {
     ASSERT((uintptr_t) address % ARCH_PAGE_GRANULARITY == 0 && length % ARCH_PAGE_GRANULARITY == 0);
     ASSERT(SEGMENT_IN_BOUNDS((uintptr_t) address, length, address_space->start, address_space->end));
 
-    ipl_t as_previous_ipl = spinlock_acquire(&address_space->lock);
+    interrupt_state_t previous_state = spinlock_acquire(&address_space->lock);
     for(uintptr_t split_base = (uintptr_t) address, split_length = 0; split_base < (uintptr_t) address + length; split_base += split_length) {
         split_length = ARCH_PAGE_GRANULARITY;
         vm_region_t *split_region = addr_to_region(address_space, split_base);
@@ -259,7 +258,7 @@ void vm_unmap(vm_address_space_t *address_space, void *address, size_t length) {
             region_free(split_region);
         }
     }
-    spinlock_release(&address_space->lock, as_previous_ipl);
+    spinlock_release(&address_space->lock, previous_state);
 }
 
 bool vm_fault(uintptr_t address, vm_fault_t fault) {

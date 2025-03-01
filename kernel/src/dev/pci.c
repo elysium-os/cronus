@@ -204,9 +204,9 @@ static void check_function(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t 
         heap_free(device, sizeof(pci_device_t));
         return;
     }
-    ipl_t previous_ipl = spinlock_acquire(&g_pci_devices_lock);
+    interrupt_state_t previous_state = spinlock_acquire(&g_pci_devices_lock);
     list_append(&g_pci_devices, &device->list);
-    spinlock_release(&g_pci_devices_lock, previous_ipl);
+    spinlock_release(&g_pci_devices_lock, previous_state);
 
     uint8_t class = readb(device, offsetof(pci_device_header_t, class));
     uint8_t sub_class = readb(device, offsetof(pci_device_header_t, sub_class));

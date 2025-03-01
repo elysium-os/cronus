@@ -11,7 +11,6 @@
 #include "memory/heap.h"
 #include "memory/hhdm.h"
 #include "sys/cpu.h"
-#include "sys/ipl.h"
 
 #include "arch/x86_64/cpu/cpu.h"
 #include "arch/x86_64/cpu/cr.h"
@@ -95,7 +94,7 @@ static void tlb_shootdown(vm_address_space_t *address_space, uintptr_t addr) {
         return;
     }
 
-    ipl_t old_ipl = ipl_raise(IPL_CRITICAL);
+    interrupt_state_t previous_state = interrupt_state_mask();
     for(size_t i = 0; i < g_x86_64_cpu_count; i++) {
         x86_64_cpu_t *cpu = &g_x86_64_cpus[i];
 
@@ -106,7 +105,7 @@ static void tlb_shootdown(vm_address_space_t *address_space, uintptr_t addr) {
         }
         log(LOG_LEVEL_DEBUG_NOISY, "PTM", "issue shootdown from CPU(%u) to CPU(%u) for %#lx", x86_64_lapic_id(), cpu->lapic_id, addr);
 
-        ipl_t previous_ipl = spinlock_acquire(&cpu->tlb_shootdown_lock);
+        spinlock_primitive_acquire(&cpu->tlb_shootdown_lock);
         spinlock_primitive_acquire(&cpu->tlb_shootdown_check);
         cpu->tlb_shootdown_cr3 = X86_64_AS(address_space)->cr3;
         cpu->tlb_shootdown_addr = addr;
@@ -125,24 +124,24 @@ static void tlb_shootdown(vm_address_space_t *address_space, uintptr_t addr) {
         } while(!spinlock_primitive_try_acquire(&cpu->tlb_shootdown_check));
 
         spinlock_primitive_release(&cpu->tlb_shootdown_check);
-        spinlock_release(&cpu->tlb_shootdown_lock, previous_ipl);
+        spinlock_primitive_release(&cpu->tlb_shootdown_lock);
     }
-    ipl_lower(old_ipl);
+    interrupt_state_restore(previous_state);
 }
 
 static void tlb_shootdown_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     ASSERT(x86_64_init_flag_check(X86_64_INIT_FLAG_SMP | X86_64_INIT_FLAG_SCHED));
-    ipl_t previous_ipl = ipl_raise(IPL_NORMAL);
+    interrupt_state_t previous_state = interrupt_state_mask();
     x86_64_cpu_t *cpu = X86_64_CPU_LOCAL_MEMBER(self);
     if(spinlock_primitive_try_acquire(&cpu->tlb_shootdown_check)) {
         log(LOG_LEVEL_WARN, "PTM", "Spurious TLB shootdown");
         spinlock_primitive_release(&cpu->tlb_shootdown_check);
-        ipl_lower(previous_ipl);
+        interrupt_state_restore(previous_state);
         return;
     }
     if(cpu->tlb_shootdown_cr3 == g_initial_address_space.cr3 || x86_64_cr3_read() == cpu->tlb_shootdown_cr3) invlpg(cpu->tlb_shootdown_addr);
     spinlock_primitive_release(&cpu->tlb_shootdown_check);
-    ipl_lower(previous_ipl);
+    interrupt_state_restore(previous_state);
 }
 
 vm_address_space_t *x86_64_ptm_init() {
@@ -153,7 +152,7 @@ vm_address_space_t *x86_64_ptm_init() {
     g_initial_address_space.cr3 = g_x86_64_ptm_phys_allocator();
     g_initial_address_space.cr3_lock = SPINLOCK_INIT;
 
-    int vector = x86_64_interrupt_request(IPL_NORMAL, tlb_shootdown_handler);
+    int vector = x86_64_interrupt_request(INTERRUPT_PRIORITY_CRITICAL, tlb_shootdown_handler);
     ASSERT(vector != -1);
     g_tlb_shootdown_vector = (uint8_t) vector;
 
@@ -196,7 +195,7 @@ void arch_ptm_load_address_space(vm_address_space_t *address_space) {
 
 void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t paddr, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global) {
     if(!prot.read) log(LOG_LEVEL_ERROR, "PTM", "No-read mapping is not supported on x86_64");
-    ipl_t previous_ipl = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
+    interrupt_state_t previous_state = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
     uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
     for(int i = 4; i > 1; i--) {
         int index = VADDR_TO_INDEX(vaddr, i);
@@ -222,16 +221,16 @@ void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t 
 
     tlb_shootdown(address_space, vaddr);
 
-    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_ipl);
+    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
 }
 
 void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr) {
-    ipl_t previous_ipl = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
+    interrupt_state_t previous_state = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
     uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
     for(int i = 4; i > 1; i--) {
         int index = VADDR_TO_INDEX(vaddr, i);
         if((current_table[index] & PTE_FLAG_PRESENT) != 0) {
-            spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_ipl);
+            spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
             return;
         }
         current_table = (uint64_t *) HHDM(current_table[index] & ADDRESS_MASK);
@@ -240,22 +239,22 @@ void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr) {
 
     tlb_shootdown(address_space, vaddr);
 
-    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_ipl);
+    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
 }
 
 bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t *out) {
-    ipl_t previous_ipl = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
+    interrupt_state_t previous_state = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
     uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
     for(int i = 4; i > 1; i--) {
         int index = VADDR_TO_INDEX(vaddr, i);
         if((current_table[index] & PTE_FLAG_PRESENT) != 0) {
-            spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_ipl);
+            spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
             return false;
         }
         current_table = (uint64_t *) HHDM(current_table[index] & ADDRESS_MASK);
     }
     uint64_t entry = current_table[VADDR_TO_INDEX(vaddr, 1)];
-    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_ipl);
+    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
     if((entry & PTE_FLAG_PRESENT) != 0) return false;
     *out = (entry & ADDRESS_MASK);
     return true;
