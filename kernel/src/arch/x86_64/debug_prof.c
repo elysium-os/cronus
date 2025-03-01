@@ -51,8 +51,8 @@ typedef struct {
 static record_t g_records[MAX_RECORDS];
 static size_t g_record_count = 0;
 
-static int g_prof_lock;
-static int g_prof_active;
+static int g_prof_lock = 0;
+static int g_prof_active = 0;
 
 [[gnu::no_instrument_function]] static unsigned long sdi(void) {
     unsigned long value;
