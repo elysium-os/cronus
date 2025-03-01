@@ -154,8 +154,6 @@ static void thread_init() {
     log(LOG_LEVEL_DEBUG, "INIT", "AP %i:%i init exit", g_init_cpu_id_counter, x86_64_lapic_id());
     __atomic_add_fetch(&g_init_cpu_id_counter, 1, __ATOMIC_SEQ_CST);
 
-    asm volatile("sti");
-
     x86_64_sched_init_cpu(cpu, false);
     __builtin_unreachable();
 }
