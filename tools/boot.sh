@@ -5,6 +5,8 @@ build_args=()
 build_args+=(--hide-conflicts)
 build_args+=(source/kernel target/kernel target/image)
 
+ACCEL="kvm"
+
 while [[ $# -gt 0 ]]; do
     case $1 in
         --efi)
@@ -12,6 +14,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --production)
             build_args+=(--var "build_environment=production")
+            ;;
+        --tcg)
+            ACCEL="tcg"
             ;;
         -*|--*)
             echo "Unknown option \"$1\""
@@ -49,8 +54,7 @@ qemu_args+=(-monitor stdio)
 qemu_args+=(-no-reboot)
 qemu_args+=(-no-shutdown)
 qemu_args+=(-net none)
-qemu_args+=(-accel kvm)
-# qemu_args+=(-accel tcg)
+qemu_args+=(-accel $ACCEL)
 # qemu_args+=(-s -S)
 
 if [[ "$BOOT_EFI" = "yes" ]]; then
