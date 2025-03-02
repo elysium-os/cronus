@@ -18,6 +18,9 @@ while [[ $# -gt 0 ]]; do
         --tcg)
             ACCEL="tcg"
             ;;
+        --build-only)
+            RUN_QEMU="no"
+            ;;
         -*|--*)
             echo "Unknown option \"$1\""
             exit 1
@@ -35,6 +38,10 @@ if [[ "$BOOT_EFI" = "yes" ]]; then
     IMAGE_PATH=./.chariot-cache/target/image/install/elysium_efi.img
 else
     IMAGE_PATH=./.chariot-cache/target/image/install/elysium_bios.img
+fi
+
+if [[ "$RUN_QEMU" = "no" ]]; then
+    exit 0
 fi
 
 qemu_args=()
