@@ -149,7 +149,14 @@ static void thread_init() {
     cpu->tlb_shootdown_check = SPINLOCK_INIT;
     cpu->tlb_shootdown_lock = SPINLOCK_INIT;
 
+    // Initialize FPU
     x86_64_fpu_init_cpu();
+
+    // Setup ISTs
+    x86_64_tss_set_ist(tss, 0, HHDM(pmm_alloc_page(PMM_FLAG_NONE) + ARCH_PAGE_GRANULARITY));
+    x86_64_tss_set_ist(tss, 1, HHDM(pmm_alloc_page(PMM_FLAG_NONE) + ARCH_PAGE_GRANULARITY));
+    x86_64_interrupt_set_ist(2, 1); // Non-maskable
+    x86_64_interrupt_set_ist(18, 2); // Machine check
 
     log(LOG_LEVEL_DEBUG, "INIT", "AP %i:%i init exit", g_init_cpu_id_counter, x86_64_lapic_id());
     __atomic_add_fetch(&g_init_cpu_id_counter, 1, __ATOMIC_SEQ_CST);
@@ -381,6 +388,12 @@ static void thread_init() {
 
     log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%i/%i cpus initialized)", g_init_cpu_id_counter, boot_info->cpu_count);
     x86_64_init_flag_set(X86_64_INIT_FLAG_SMP);
+
+    // Initialize ISTs
+    x86_64_tss_set_ist(tss, 0, HHDM(pmm_alloc_page(PMM_FLAG_NONE) + ARCH_PAGE_GRANULARITY));
+    x86_64_tss_set_ist(tss, 1, HHDM(pmm_alloc_page(PMM_FLAG_NONE) + ARCH_PAGE_GRANULARITY));
+    x86_64_interrupt_set_ist(2, 1); // Non-maskable
+    x86_64_interrupt_set_ist(18, 2); // Machine check
 
     // Initialize timer
     acpi_sdt_header_t *hpet_header = acpi_find_table((uint8_t *) "HPET");

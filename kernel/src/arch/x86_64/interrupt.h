@@ -22,6 +22,11 @@ extern x86_64_interrupt_irq_eoi_t g_x86_64_interrupt_irq_eoi;
 void x86_64_interrupt_init();
 
 /**
+ * @brief Set an IST for a given interrupt vector.
+ */
+void x86_64_interrupt_set_ist(uint8_t vector, uint8_t ist);
+
+/**
  * @brief Load the IDT.
  */
 void x86_64_interrupt_load_idt();

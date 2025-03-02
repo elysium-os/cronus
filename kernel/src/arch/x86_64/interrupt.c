@@ -67,6 +67,10 @@ void x86_64_interrupt_init() {
     }
 }
 
+void x86_64_interrupt_set_ist(uint8_t vector, uint8_t ist) {
+    g_idt[vector].ist = ist;
+}
+
 void x86_64_interrupt_load_idt() {
     struct [[gnu::packed]] {
         uint16_t limit;
