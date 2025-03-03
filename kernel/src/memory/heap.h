@@ -16,11 +16,6 @@ void heap_initialize();
 void *heap_alloc(size_t size);
 
 /**
- * @brief Allocate a block of memory in the heap, with an alignment.
- */
-void *heap_alloc_align(size_t size, size_t alignment);
-
-/**
  * @brief Free a block of memory in the heap.
  */
 void heap_free(void *address, size_t size);
