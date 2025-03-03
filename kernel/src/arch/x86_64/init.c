@@ -153,8 +153,8 @@ static void thread_init() {
     x86_64_fpu_init_cpu();
 
     // Setup ISTs
-    x86_64_tss_set_ist(tss, 0, HHDM(pmm_alloc_page(PMM_FLAG_NONE) + ARCH_PAGE_GRANULARITY));
-    x86_64_tss_set_ist(tss, 1, HHDM(pmm_alloc_page(PMM_FLAG_NONE) + ARCH_PAGE_GRANULARITY));
+    x86_64_tss_set_ist(tss, 0, HHDM(pmm_alloc_page(PMM_FLAG_NONE)->paddr + ARCH_PAGE_GRANULARITY));
+    x86_64_tss_set_ist(tss, 1, HHDM(pmm_alloc_page(PMM_FLAG_NONE)->paddr + ARCH_PAGE_GRANULARITY));
     x86_64_interrupt_set_ist(2, 1); // Non-maskable
     x86_64_interrupt_set_ist(18, 2); // Machine check
 
@@ -390,8 +390,8 @@ static void thread_init() {
     x86_64_init_flag_set(X86_64_INIT_FLAG_SMP);
 
     // Initialize ISTs
-    x86_64_tss_set_ist(tss, 0, HHDM(pmm_alloc_page(PMM_FLAG_NONE) + ARCH_PAGE_GRANULARITY));
-    x86_64_tss_set_ist(tss, 1, HHDM(pmm_alloc_page(PMM_FLAG_NONE) + ARCH_PAGE_GRANULARITY));
+    x86_64_tss_set_ist(tss, 0, HHDM(pmm_alloc_page(PMM_FLAG_NONE)->paddr + ARCH_PAGE_GRANULARITY));
+    x86_64_tss_set_ist(tss, 1, HHDM(pmm_alloc_page(PMM_FLAG_NONE)->paddr + ARCH_PAGE_GRANULARITY));
     x86_64_interrupt_set_ist(2, 1); // Non-maskable
     x86_64_interrupt_set_ist(18, 2); // Machine check
 
