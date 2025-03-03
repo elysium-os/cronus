@@ -3,6 +3,7 @@
 #include "arch/page.h"
 #include "common/assert.h"
 #include "lib/math.h"
+#include "lib/mem.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"
 #include "memory/pmm.h"
@@ -51,6 +52,18 @@ void *heap_alloc(size_t size) {
     if(size == 0) return NULL;
     if(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1]) return (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(size, ARCH_PAGE_GRANULARITY), PMM_FLAG_NONE)->paddr);
     return slab_allocate(find_cache(size));
+}
+
+void *heap_realloc(void *address, size_t current_size, size_t new_size) {
+    if(current_size == new_size) return address;
+    if(address == NULL && new_size == 0) return address;
+
+    void *new_address = heap_alloc(new_size);
+    if(address == NULL) return new_address;
+
+    memcpy(new_address, address, current_size > new_size ? current_size : new_size);
+    heap_free(address, current_size);
+    return new_address;
 }
 
 void heap_free(void *address, size_t size) {

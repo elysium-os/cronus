@@ -11,11 +11,16 @@
 void heap_initialize();
 
 /**
- * @brief Allocate a block of memory in the heap, without an alignment.
+ * @brief Allocate a block of memory.
  */
 void *heap_alloc(size_t size);
 
 /**
- * @brief Free a block of memory in the heap.
+ * @brief Reallocate a block of memory with a new size.
+ */
+void *heap_realloc(void *address, size_t current_size, size_t new_size);
+
+/**
+ * @brief Free a block of memory.
  */
 void heap_free(void *address, size_t size);
