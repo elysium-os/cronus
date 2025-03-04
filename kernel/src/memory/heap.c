@@ -66,6 +66,10 @@ void *heap_realloc(void *address, size_t current_size, size_t new_size) {
     return new_address;
 }
 
+void *heap_reallocarray(void *array, size_t element_size, size_t current_count, size_t new_count) {
+    return heap_realloc(array, current_count * element_size, new_count * element_size);
+}
+
 void heap_free(void *address, size_t size) {
     if(address == NULL) return;
     if(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1]) return pmm_free(&PAGE(HHDM_TO_PHYS(address))->block);
