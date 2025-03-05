@@ -130,27 +130,27 @@ static int g_prof_active = 0;
         }
     }
 
-    log(LOG_LEVEL_DEBUG, "PROFILE", "Profiler results for `%s` (%llu):", name, g_record_count);
+    log(LOG_LEVEL_DEBUG, "PROFILE", "Profiler results for `%s` (%lu):", name, g_record_count);
     for(size_t i = 0; i < g_record_count; i++) {
         x86_64_debug_symbol_t debug_symbol = x86_64_debug_symbol((uintptr_t) g_records[i].function);
 
         if(debug_symbol.found && debug_symbol.address == (uintptr_t) g_records[i].function) {
             log(LOG_LEVEL_DEBUG,
                 "PROFILE",
-                "%llu. %.*s <%#llx>: %llu (calls: %llu, average: %llu)",
+                "%lu. %.*s <%#lx>: %lu (calls: %lu, average: %lu)",
                 i + 1,
-                debug_symbol.length,
+                (int) debug_symbol.length,
                 debug_symbol.name,
-                g_records[i].function,
+                (uintptr_t) g_records[i].function,
                 g_records[i].total,
                 g_records[i].calls,
                 (g_records[i].total + (g_records[i].calls / 2)) / g_records[i].calls);
         } else {
             log(LOG_LEVEL_DEBUG,
                 "PROFILE",
-                "%llu. %#llx: %llu (calls: %llu, average: %llu)",
+                "%lu. %#lx: %lu (calls: %lu, average: %lu)",
                 i + 1,
-                g_records[i].function,
+                (uintptr_t) g_records[i].function,
                 g_records[i].total,
                 g_records[i].calls,
                 (g_records[i].total + (g_records[i].calls / 2)) / g_records[i].calls);

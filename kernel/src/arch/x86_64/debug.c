@@ -91,7 +91,7 @@ void x86_64_debug_stack_trace_from(x86_64_debug_stack_frame_t *stack_frame) {
         if(!symbol.found) {
             log(LOG_LEVEL_DEBUG, "DEBUG", "    [UNKNOWN] <%#lx>", stack_frame->rip);
         } else {
-            log(LOG_LEVEL_DEBUG, "DEBUG", "    %.*s+%lu <%#lx>", symbol.length, symbol.name, stack_frame->rip - symbol.address, stack_frame->rip);
+            log(LOG_LEVEL_DEBUG, "DEBUG", "    %.*s+%lu <%#lx>", (int) symbol.length, symbol.name, stack_frame->rip - symbol.address, stack_frame->rip);
         }
         stack_frame = stack_frame->rbp;
     }

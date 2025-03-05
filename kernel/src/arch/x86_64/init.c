@@ -158,7 +158,7 @@ static void thread_init() {
     x86_64_interrupt_set_ist(2, 1); // Non-maskable
     x86_64_interrupt_set_ist(18, 2); // Machine check
 
-    log(LOG_LEVEL_DEBUG, "INIT", "AP %i:%i init exit", g_init_cpu_id_counter, x86_64_lapic_id());
+    log(LOG_LEVEL_DEBUG, "INIT", "AP %lu:%i init exit", g_init_cpu_id_counter, x86_64_lapic_id());
     __atomic_add_fetch(&g_init_cpu_id_counter, 1, __ATOMIC_SEQ_CST);
 
     x86_64_sched_init_cpu(cpu, false);
@@ -400,7 +400,7 @@ static void thread_init() {
     ASSERT(cpu != NULL);
     ASSERT(g_init_cpu_id_counter == g_x86_64_cpu_count);
 
-    log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%i/%i cpus initialized)", g_init_cpu_id_counter, boot_info->cpu_count);
+    log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%lu/%i cpus initialized)", g_init_cpu_id_counter, boot_info->cpu_count);
     x86_64_init_flag_set(X86_64_INIT_FLAG_SMP);
 
     // Initialize ISTs
