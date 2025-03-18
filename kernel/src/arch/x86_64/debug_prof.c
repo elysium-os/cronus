@@ -160,7 +160,7 @@ static int g_prof_active = 0;
     ri(state);
 }
 
-[[gnu::no_instrument_function]] [[gnu::no_sanitize_undefined]] void __cyg_profile_func_enter(void *function, void *call_site) {
+[[gnu::no_instrument_function]] [[clang::no_sanitize("undefined")]] void __cyg_profile_func_enter(void *function, void *call_site) {
     uint64_t start = __builtin_ia32_rdtsc();
     if(!__atomic_load_n(&g_prof_active, __ATOMIC_ACQUIRE)) return;
 
@@ -184,7 +184,7 @@ static int g_prof_active = 0;
     frame->start = __builtin_ia32_rdtsc();
 }
 
-[[gnu::no_instrument_function]] [[gnu::no_sanitize_undefined]] void __cyg_profile_func_exit(void *function, void *call_site) {
+[[gnu::no_instrument_function]] [[clang::no_sanitize("undefined")]] void __cyg_profile_func_exit(void *function, void *call_site) {
     uint64_t start = __builtin_ia32_rdtsc();
     if(!__atomic_load_n(&g_prof_active, __ATOMIC_ACQUIRE)) return;
 

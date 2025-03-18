@@ -82,7 +82,6 @@ static const uint8_t lookup[][26] = {
 };
 
 typedef union {
-    long double floatp;
     uintmax_t integer;
     void *pointer;
 } arg_t;

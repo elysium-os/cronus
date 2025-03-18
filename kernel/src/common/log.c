@@ -19,14 +19,14 @@ void log_sink_remove(log_sink_t *sink) {
     spinlock_release(&g_lock, previous_state);
 }
 
-[[gnu::format(gnu_printf, 3, 4)]] void log(log_level_t level, const char *tag, const char *fmt, ...) {
+[[gnu::format(printf, 3, 4)]] void log(log_level_t level, const char *tag, const char *fmt, ...) {
     va_list list;
     va_start(list, fmt);
     log_list(level, tag, fmt, list);
     va_end(list);
 }
 
-[[gnu::format(gnu_printf, 3, 0)]] void log_list(log_level_t level, const char *tag, const char *fmt, va_list list) {
+[[gnu::format(printf, 3, 0)]] void log_list(log_level_t level, const char *tag, const char *fmt, va_list list) {
     va_list local_list;
     interrupt_state_t previous_state = spinlock_acquire(&g_lock);
     LIST_FOREACH(&g_sinks, elem) {

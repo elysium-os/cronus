@@ -72,6 +72,11 @@ typedef struct {
     uint8_t kind;
 } data_invalid_builtin_t;
 
+typedef struct {
+	source_location_t location;
+	struct type_descriptor_t* type;
+} data_function_type_mismatch_t;
+
 const char *kind_to_type(uint16_t kind) {
     const char *type;
     switch(kind) {
@@ -304,4 +309,8 @@ void __ubsan_handle_pointer_overflow(data_only_location_t *data, void *, void *)
 [[noreturn]] void __ubsan_handle_missing_return(data_only_location_t *data) {
     log(LOG_LEVEL_ERROR, "UBSAN", "missing_return @ %s:%u:%u", data->location.filename, data->location.line, data->location.column);
     panic("UBSAN");
+}
+
+void __ubsan_handle_function_type_mismatch(data_function_type_mismatch_t *data, void *value_raw) {
+    log(LOG_LEVEL_WARN, "UBSAN", "function type mismatch @ %s:%u:%u", data->location.filename, data->location.line, data->location.column);
 }

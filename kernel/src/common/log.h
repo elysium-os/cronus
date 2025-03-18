@@ -39,12 +39,12 @@ void log_sink_remove(log_sink_t *sink);
 /**
  * @brief Emit log.
  */
-[[gnu::format(gnu_printf, 3, 4)]] void log(log_level_t level, const char *tag, const char *fmt, ...);
+[[gnu::format(printf, 3, 4)]] void log(log_level_t level, const char *tag, const char *fmt, ...);
 
 /**
  * @brief Emit log using `va_list`.
  */
-[[gnu::format(gnu_printf, 3, 0)]] void log_list(log_level_t level, const char *tag, const char *fmt, va_list list);
+[[gnu::format(printf, 3, 0)]] void log_list(log_level_t level, const char *tag, const char *fmt, va_list list);
 
 /**
  * @brief Convert log level to string.
