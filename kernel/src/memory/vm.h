@@ -28,6 +28,7 @@ typedef enum {
 } vm_cache_t;
 
 typedef enum {
+    VM_FAULT_UNKNOWN,
     VM_FAULT_NOT_PRESENT
 } vm_fault_t;
 

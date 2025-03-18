@@ -260,7 +260,7 @@ bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, uintp
 }
 
 void x86_64_ptm_page_fault_handler(x86_64_interrupt_frame_t *frame) {
-    vm_fault_t fault;
+    vm_fault_t fault = VM_FAULT_UNKNOWN;
     if((frame->err_code & PAGEFAULT_FLAG_PRESENT) == 0) fault = VM_FAULT_NOT_PRESENT;
 
     if(vm_fault(x86_64_cr2_read(), fault)) return;
