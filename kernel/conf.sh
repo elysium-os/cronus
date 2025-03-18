@@ -25,8 +25,14 @@ while [[ $# -gt 0 ]]; do
         --production)
             ENVIRONMENT="production"
             ;;
-        --toolchain-triplet=*)
-            TC_TRIPLET=${1#*=}
+        --toolchain-assembler=*)
+            TC_ASSEMBLER=${1#*=}
+            ;;
+        --toolchain-compiler=*)
+            TC_COMPILER=${1#*=}
+            ;;
+        --toolchain-linker=*)
+            TC_LINKER=${1#*=}
             ;;
         -*|--*)
             echo "Unknown option \"$1\""
@@ -45,8 +51,18 @@ if [ -z "$ARCH" ]; then
     exit 1
 fi
 
-if [ -z "$TC_TRIPLET" ]; then
-    >&2 echo "No toolchain triplet provided"
+if [ -z "$TC_ASSEMBLER" ]; then
+    >&2 echo "No assembler provided"
+    exit 1
+fi
+
+if [ -z "$TC_COMPILER" ]; then
+    >&2 echo "No compiler provided"
+    exit 1
+fi
+
+if [ -z "$TC_LINKER" ]; then
+    >&2 echo "No linker provided"
     exit 1
 fi
 
@@ -64,7 +80,6 @@ echo "SYSROOT := $SYSROOT" >> $CONFIG_FILE
 echo "ARCH := $ARCH" >> $CONFIG_FILE
 echo "ENVIRONMENT := $ENVIRONMENT" >> $CONFIG_FILE
 
-echo "ASMC := $TC_TRIPLET-as" >> $CONFIG_FILE
-echo "CC := $TC_TRIPLET-gcc" >> $CONFIG_FILE
-echo "LD := $TC_TRIPLET-ld" >> $CONFIG_FILE
-echo "AR := $TC_TRIPLET-ar" >> $CONFIG_FILE
+echo "ASMC := $TC_ASSEMBLER" >> $CONFIG_FILE
+echo "CC := $TC_COMPILER" >> $CONFIG_FILE
+echo "LD := $TC_LINKER" >> $CONFIG_FILE

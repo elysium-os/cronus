@@ -13,9 +13,11 @@
                     inputs.chariot.defaultPackage.${system}
                     wget # Required by Chariot
 
-                    gdb
+                    clang_19
                     llvmPackages_19.clang-tools
+                    bear
 
+                    gdb
                     bochs
                     qemu_full
                     (pkgs.writeShellScriptBin "qemu-ovmf-x86-64" ''

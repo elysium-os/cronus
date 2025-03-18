@@ -4,59 +4,6 @@ source/support {
     type: local
 }
 
-// Freestanding Toolchain
-source/freestanding_binutils {
-    url: https://ftp.gnu.org/gnu/binutils/binutils-2.41.tar.gz
-    b2sum: 5a4c2bc5e4dfcb9902732d8393c58e8b435dbc91db974672a4d2fd6f6c5ae6d7651ccbcb7faf8915bb2405ff11c0788a5994ea717f929b76ca86dbcb567f7029
-    type: tar.gz
-}
-
-source/freestanding_gcc {
-    url: https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.gz
-    b2sum: 749671e29fb8bcd35e5bb9d1f8a5a4b815d1764c48f996ce406ef198731962d58b86d69db7b04a75a4ebcaf5d9f80d0715fe6b14139a60da5b4d2445388efa58
-    type: tar.gz
-    patch: freestanding-gcc.diff
-}
-
-host/freestanding_binutils {
-    source: freestanding_binutils
-    dependencies [ image/gcc image/binutils ]
-    configure {
-        CFLAGS="-O2 -pipe" CXXFLAGS="-O2 -pipe" \
-        @(source_dir)/configure \
-            --target=x86_64-elf \
-            --prefix=@(prefix) \
-            --with-sysroot \
-            --disable-nls \
-            --disable-werror
-    }
-    build { make -j@(thread_count) all }
-    install { DESTDIR=@(install_dir) make install }
-}
-
-host/freestanding_gcc {
-    source: freestanding_gcc
-    dependencies [ *host/freestanding_binutils image/gcc *image/libisl *image/libmpc ]
-    configure {
-        CFLAGS="-O2 -pipe" CXXFLAGS="-O2 -pipe" \
-        @(source_dir)/configure \
-            --target=x86_64-elf \
-            --prefix=@(prefix) \
-            --disable-nls \
-            --enable-languages=c \
-            --without-headers
-    }
-    build {
-        make -j@(thread_count) all-gcc
-        make -j@(thread_count) all-target-libgcc
-    }
-    install {
-        DESTDIR=@(install_dir) make install-gcc
-        DESTDIR=@(install_dir) make install-target-libgcc
-    }
-}
-
-
 // mkimg
 source/mkimg {
     url: https://git.thenest.dev/wux/mkimg/-/archive/main/mkimg-main.tar.gz
@@ -77,14 +24,14 @@ host/mkimg {
 
 // Tartarus (Bootloader)
 source/tartarus {
-    url: https://git.thenest.dev/wux/tartarus-bootloader/-/archive/928c02398c2437495bcca5cebcacbba091a40414/tartarus-bootloader-928c02398c2437495bcca5cebcacbba091a40414.tar.gz
-    b2sum: cbff71b461cc066dd0e7a06bc1e1860ff262eea9308d9e092da84bf7d76580db5dc22d01ae172dc50b82f9c2141fceb24449b14e27b64fe5f292f9b1513e12f9
+    url: https://git.thenest.dev/wux/tartarus-bootloader/-/archive/b26e9095468e247e8be5efd737dcffeea63cf0a5/tartarus-bootloader-b26e9095468e247e8be5efd737dcffeea63cf0a5.tar.gz
+    b2sum: 2eb6f030b0a7a188b1bdd11648a7ecb9a4b73ef4a51e9dda5d1f6ef178eb0e87987f8164e588ae0c96a3deac6c45207a4d224316d0cb7c8e70bc947761020c0f
     type: tar.gz
 }
 
 source/vendor_libgcc {
-    url: https://github.com/osdev0/libgcc-binaries/archive/refs/heads/trunk.tar.gz
-    b2sum: badf839396a04781c1d5d3d92daf43664675cc4a00aa68775706856e6e731759c8bdfb749bffe41ccc0c75c9a8c2cd69be922ef7bb88aff1fbd0d55cb6bf1455
+    url: https://github.com/osdev0/libgcc-binaries/archive/6f547f8a77bd569dc7f9a49e979abd85e5d6a8ae.tar.gz
+    b2sum: e9e3a9b2af38b9d8189237f43b0649aa663b48f05728346f08c9997d19c2a458e3e61f96f9adee7e896a58c0f40fe2684c8f1d885d9bbc2380775a4005fafcbb
     type: tar.gz
 }
 
@@ -96,12 +43,14 @@ source/vendor_nyu-efi {
 
 target/tartarus {
     source: tartarus
-    dependencies [ source/vendor_libgcc host/freestanding_gcc image/nasm image/git ]
+    dependencies [ source/vendor_libgcc image/git image/nasm image/llvm image/clang image/lld ]
     configure {
         @(source_dir)/conf.sh \
             --prefix=@(prefix) \
             --platform=x86_64-bios \
-            --toolchain-triplet=x86_64-elf \
+            --toolchain-compiler=clang \
+            --toolchain-linker=ld.lld \
+            --toolchain-objcopy=llvm-objcopy \
             --vendor-libgcc=@(sources_dir)/vendor_libgcc
     }
     build { make -j@(thread_count) all }
@@ -110,12 +59,14 @@ target/tartarus {
 
 target/tartarus_efi {
     source: tartarus
-    dependencies [ source/vendor_libgcc source/vendor_nyu-efi host/freestanding_gcc image/nasm image/git ]
+    dependencies [ source/vendor_libgcc source/vendor_nyu-efi image/git image/nasm image/llvm image/clang image/lld ]
     configure {
         @(source_dir)/conf.sh \
             --prefix=@(prefix) \
             --platform=x86_64-uefi \
-            --toolchain-triplet=x86_64-elf \
+            --toolchain-compiler=clang \
+            --toolchain-linker=ld.lld \
+            --toolchain-objcopy=llvm-objcopy \
             --vendor-libgcc=@(sources_dir)/vendor_libgcc \
             --vendor-efi=@(sources_dir)/vendor_nyu-efi
     }
@@ -132,18 +83,21 @@ source/uacpi {
 
 target/uacpi {
     source: uacpi
-    dependencies [ host/freestanding_gcc ]
+    dependencies [ image/llvm image/clang ]
     build {
-        x86_64-elf-gcc \
+        clang \
             -ffreestanding \
             -mcmodel=kernel \
             -mno-red-zone \
             -mgeneral-regs-only \
+            -fno-stack-protector \
+            -fno-stack-check \
+            -fno-strict-aliasing \
             -O3 \
             -DUACPI_NATIVE_ALLOC_ZEROED -DUACPI_FORMATTED_LOGGING -DUACPI_SIZED_FREES \
             -I@(source_dir)/include \
             -c $(find @(source_dir)/source -type f -name "*.c")
-        x86_64-elf-ar cr uacpi.a $(find . -type f -name "*.o")
+        llvm-ar cr uacpi.a $(find . -type f -name "*.o")
     }
     install {
         mkdir -p @(install_dir)@(prefix)/share
@@ -161,12 +115,16 @@ source/kernel {
 
 target/kernel {
     source: kernel
-    dependencies [ host/freestanding_gcc target/tartarus target/uacpi ]
+    dependencies [ target/tartarus target/uacpi image/llvm image/clang image/lld image/bear ]
     configure {
         args=()
         args+=(--prefix=@(prefix))
         args+=(--arch=x86_64)
-        args+=(--toolchain-triplet=x86_64-elf)
+
+        args+=(--toolchain-assembler=llvm-as)
+        args+=(--toolchain-compiler=clang)
+        args+=(--toolchain-linker=ld.lld)
+
         args+=(--sysroot=@(sysroot_dir))
         [[ "@(build_environment?)" = "production" ]] && args+=(--production)
 
@@ -178,7 +136,7 @@ target/kernel {
 
 // Image
 target/image {
-    dependencies [ host/mkimg source/support target/tartarus target/tartarus_efi target/kernel image/qemu-img ]
+    dependencies [ host/mkimg source/support target/tartarus target/tartarus_efi target/kernel image/llvm image/qemu-img ]
     build {
         cp @(sysroot_dir)@(prefix)/share/tartarus/tartarus.sys .
         cp @(sysroot_dir)@(prefix)/share/tartarus/x86_64-bios.bin .
@@ -186,7 +144,7 @@ target/image {
         mkdir -p ./image_root
         cp @(sources_dir)/support/tartarus.cfg ./image_root
         cp @(sysroot_dir)@(prefix)/share/kernel.elf ./image_root
-        cp @(sysroot_dir)@(prefix)/share/kernel_symbols.txt ./image_root
+        llvm-nm @(sysroot_dir)@(prefix)/share/kernel.elf -n > ./image_root/kernel_symbols.txt
 
         mkimg --config=@(sources_dir)/support/mkimg_bios.toml
 
