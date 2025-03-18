@@ -11,3 +11,8 @@ typedef struct {
     list_t threads;
     list_element_t list_sched;
 } process_t;
+
+/**
+ * @brief Create a process.
+ */
+process_t *process_create(vm_address_space_t *address_space);

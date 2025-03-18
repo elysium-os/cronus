@@ -14,6 +14,7 @@
 #include "memory/hhdm.h"
 #include "memory/pmm.h"
 #include "memory/vm.h"
+#include "sched/process.h"
 #include "sched/sched.h"
 #include "sched/thread.h"
 
@@ -110,6 +111,31 @@ static int g_sched_vector = 0;
     sched_thread_drop(&prev->common);
 }
 
+static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t kernel_stack, uintptr_t rsp) {
+    x86_64_thread_t *thread = heap_alloc(sizeof(x86_64_thread_t));
+    memclear(thread, sizeof(x86_64_thread_t));
+    thread->common.id = __atomic_fetch_add(&g_next_tid, 1, __ATOMIC_RELAXED);
+    thread->common.state = THREAD_STATE_READY;
+    thread->common.proc = proc;
+    thread->rsp = rsp;
+    thread->kernel_stack = kernel_stack;
+    thread->state.fs = 0;
+    thread->state.gs = 0;
+    thread->state.fpu_area = (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(g_x86_64_fpu_area_size, ARCH_PAGE_GRANULARITY), PMM_FLAG_ZERO)->paddr);
+#ifdef __ENV_DEVELOPMENT
+    thread->prof_current_call_frame = 0;
+#endif
+
+    g_x86_64_fpu_restore(thread->state.fpu_area);
+    uint16_t x87cw = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (0b11 << 8);
+    asm volatile("fldcw %0" : : "m"(x87cw) : "memory");
+    uint32_t mxcsr = (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12);
+    asm volatile("ldmxcsr %0" : : "m"(mxcsr) : "memory");
+    g_x86_64_fpu_save(thread->state.fpu_area);
+
+    return thread;
+}
+
 [[gnu::no_instrument_function]] void arch_sched_yield() {
     interrupt_state_t previous_state = interrupt_state_mask();
     thread_t *current = arch_sched_thread_current();
@@ -134,38 +160,13 @@ void arch_sched_thread_destroy(thread_t *thread) {
         interrupt_state_t previous_state = spinlock_acquire(&thread->proc->lock);
         list_delete(&thread->list_proc);
         if(list_is_empty(&thread->proc->threads)) {
-            sched_process_destroy(thread->proc);
+            // TODO: reap process
             interrupt_state_restore(previous_state);
         } else {
             spinlock_release(&thread->proc->lock, previous_state);
         }
     }
     heap_free(X86_64_THREAD(thread), sizeof(x86_64_thread_t));
-}
-
-static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t kernel_stack, uintptr_t rsp) {
-    x86_64_thread_t *thread = heap_alloc(sizeof(x86_64_thread_t));
-    memclear(thread, sizeof(x86_64_thread_t));
-    thread->common.id = __atomic_fetch_add(&g_next_tid, 1, __ATOMIC_RELAXED);
-    thread->common.state = THREAD_STATE_READY;
-    thread->common.proc = proc;
-    thread->rsp = rsp;
-    thread->kernel_stack = kernel_stack;
-    thread->state.fs = 0;
-    thread->state.gs = 0;
-    thread->state.fpu_area = (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(g_x86_64_fpu_area_size, ARCH_PAGE_GRANULARITY), PMM_FLAG_ZERO)->paddr);
-#ifdef __ENV_DEVELOPMENT
-    thread->prof_current_call_frame = 0;
-#endif
-
-    g_x86_64_fpu_restore(thread->state.fpu_area);
-    uint16_t x87cw = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (0b11 << 8);
-    asm volatile("fldcw %0" : : "m"(x87cw) : "memory");
-    uint32_t mxcsr = (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12);
-    asm volatile("ldmxcsr %0" : : "m"(mxcsr) : "memory");
-    g_x86_64_fpu_save(thread->state.fpu_area);
-
-    return thread;
 }
 
 [[gnu::no_instrument_function]] static void sched_entry([[maybe_unused]] x86_64_interrupt_frame_t *frame) {

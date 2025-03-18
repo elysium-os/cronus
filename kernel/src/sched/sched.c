@@ -9,32 +9,8 @@
 #include "sched/thread.h"
 #include "sys/cpu.h"
 
-#define DEFAULT_RESOURCE_COUNT 256
-
-static long g_next_pid = 1;
-
-static spinlock_t g_sched_processes_lock = SPINLOCK_INIT;
-list_t g_sched_processes = LIST_INIT;
-
 static spinlock_t g_sched_threads_lock = SPINLOCK_INIT;
 list_t g_sched_threads_queued = LIST_INIT_CIRCULAR(g_sched_threads_queued);
-
-process_t *sched_process_create(vm_address_space_t *address_space) {
-    process_t *proc = heap_alloc(sizeof(process_t));
-    proc->id = __atomic_fetch_add(&g_next_pid, 1, __ATOMIC_RELAXED);
-    proc->lock = SPINLOCK_INIT;
-    proc->threads = LIST_INIT;
-    proc->address_space = address_space;
-
-    interrupt_state_t previous_state = spinlock_acquire(&g_sched_processes_lock);
-    list_append(&g_sched_processes, &proc->list_sched);
-    spinlock_release(&g_sched_processes_lock, previous_state);
-    return proc;
-}
-
-void sched_process_destroy(process_t *proc) {
-    heap_free(proc, sizeof(process_t));
-}
 
 void sched_thread_schedule(thread_t *thread) {
     thread->state = THREAD_STATE_READY;
