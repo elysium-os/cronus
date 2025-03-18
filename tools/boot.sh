@@ -6,6 +6,8 @@ build_args+=(--hide-conflicts)
 build_args+=(source/kernel target/kernel target/image)
 
 ACCEL="kvm"
+DEBUG="no"
+DISPLAY="default"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -20,6 +22,15 @@ while [[ $# -gt 0 ]]; do
             ;;
         --build-only)
             RUN_QEMU="no"
+            ;;
+        --debug)
+            DEBUG="yes"
+            ;;
+        --headless)
+            DISPLAY="headless"
+            ;;
+        --vnc)
+            DISPLAY="vnc"
             ;;
         -*|--*)
             echo "Unknown option \"$1\""
@@ -51,7 +62,9 @@ qemu_args+=(-machine q35)
 qemu_args+=(-cpu qemu64,pdpe1gb)
 qemu_args+=(-smp cores=4)
 qemu_args+=(-vga virtio)
-qemu_args+=(-display gtk,zoom-to-fit=on,show-tabs=on,gl=on)
+[[ "$DISPLAY" = "default" ]] && qemu_args+=(-display gtk,zoom-to-fit=on,show-tabs=on,gl=on)
+[[ "$DISPLAY" = "vnc" ]] && qemu_args+=(-vnc :0,websocket=on)
+[[ "$DISPLAY" = "headless" ]] && qemu_args+=(-display none)
 qemu_args+=(-D ./log.txt)
 qemu_args+=(-d int)
 qemu_args+=(-M smm=off)
@@ -62,7 +75,7 @@ qemu_args+=(-no-reboot)
 qemu_args+=(-no-shutdown)
 qemu_args+=(-net none)
 qemu_args+=(-accel $ACCEL)
-# qemu_args+=(-s -S)
+[[ "$DEBUG" = "yes" ]] && qemu_args+=(-s -S)
 
 if [[ "$BOOT_EFI" = "yes" ]]; then
     qemu-ovmf-x86-64 "${qemu_args[@]}"
