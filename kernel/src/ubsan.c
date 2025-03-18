@@ -311,6 +311,6 @@ void __ubsan_handle_pointer_overflow(data_only_location_t *data, void *, void *)
     panic("UBSAN");
 }
 
-void __ubsan_handle_function_type_mismatch(data_function_type_mismatch_t *data, void *value_raw) {
+void __ubsan_handle_function_type_mismatch(data_function_type_mismatch_t *data, [[maybe_unused]] void *value) {
     log(LOG_LEVEL_WARN, "UBSAN", "function type mismatch @ %s:%u:%u", data->location.filename, data->location.line, data->location.column);
 }
