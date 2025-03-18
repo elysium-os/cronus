@@ -1,9 +1,6 @@
 #pragma once
 
-#include "memory/vm.h"
-
 #include <stddef.h>
-#include <stdint.h>
 
 /**
  * @brief Initialize the heap.

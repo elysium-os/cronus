@@ -4,8 +4,6 @@
 #include "arch/sched.h"
 #include "common/lock/spinlock.h"
 #include "lib/list.h"
-#include "lib/mem.h"
-#include "memory/heap.h"
 #include "sched/thread.h"
 #include "sys/cpu.h"
 

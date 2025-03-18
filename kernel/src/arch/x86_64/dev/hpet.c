@@ -1,6 +1,5 @@
 #include "hpet.h"
 
-#include "common/assert.h"
 #include "memory/hhdm.h"
 #include "sys/time.h"
 

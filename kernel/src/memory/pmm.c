@@ -3,8 +3,6 @@
 #include "arch/mem.h"
 #include "arch/page.h"
 #include "common/assert.h"
-#include "common/panic.h"
-#include "lib/math.h"
 #include "lib/mem.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"

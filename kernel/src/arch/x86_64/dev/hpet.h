@@ -3,8 +3,6 @@
 #include "dev/acpi/acpi.h"
 #include "sys/time.h"
 
-#include <stdint.h>
-
 extern time_source_t g_hpet_time_source;
 
 /**

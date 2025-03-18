@@ -73,8 +73,8 @@ typedef struct {
 } data_invalid_builtin_t;
 
 typedef struct {
-	source_location_t location;
-	struct type_descriptor_t* type;
+    source_location_t location;
+    struct type_descriptor_t *type;
 } data_function_type_mismatch_t;
 
 const char *kind_to_type(uint16_t kind) {

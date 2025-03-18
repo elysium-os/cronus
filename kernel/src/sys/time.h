@@ -1,7 +1,5 @@
 #pragma once
 
-#include "lib/list.h"
-
 #include <stdint.h>
 
 #define TIME_NANOSECONDS_IN_SECOND 1'000'000'000

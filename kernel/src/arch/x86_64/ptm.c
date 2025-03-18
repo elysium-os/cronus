@@ -10,7 +10,6 @@
 #include "lib/mem.h"
 #include "memory/heap.h"
 #include "memory/hhdm.h"
-#include "sys/cpu.h"
 
 #include "arch/x86_64/cpu/cpu.h"
 #include "arch/x86_64/cpu/cr.h"

@@ -1,9 +1,7 @@
 #include "interrupt.h"
 
 #include "arch/interrupt.h"
-#include "common/assert.h"
 
-#include "arch/x86_64/cpu/cr.h"
 #include "arch/x86_64/cpu/gdt.h"
 
 #define FLAGS_NORMAL 0x8E

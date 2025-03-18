@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define X86_64_DEBUG_PROF_MAX_FRAMES 128

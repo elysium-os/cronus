@@ -1,6 +1,5 @@
 #include "lapic.h"
 
-#include "arch/cpu.h"
 #include "memory/hhdm.h"
 
 #include "arch/x86_64/cpu/cpu.h"

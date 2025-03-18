@@ -29,13 +29,10 @@
 
 #ifdef __ENV_DEVELOPMENT
 
-#include "arch/cpu.h"
-#include "common/lock/spinlock.h"
 #include "common/log.h"
 
 #include "arch/x86_64/cpu/cpu.h"
 #include "arch/x86_64/debug.h"
-#include "arch/x86_64/dev/qemu_debug.h"
 
 #include <stddef.h>
 #include <stdint.h>

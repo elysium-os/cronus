@@ -1,7 +1,5 @@
 #include "arch/cpu.h"
 
-#include "common/assert.h"
-
 #include "arch/x86_64/cpu/cpu.h"
 
 cpu_t *arch_cpu_current() {

@@ -1,6 +1,5 @@
 #include "time.h"
 
-#include "common/lock/spinlock.h"
 #include "common/log.h"
 
 #include <stddef.h>
