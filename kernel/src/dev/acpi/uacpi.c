@@ -17,7 +17,9 @@
 #include <uacpi/types.h>
 
 // FIX using x86_64 in generic code
+#include "arch/x86_64/cpu/lapic.h"
 #include "arch/x86_64/cpu/port.h"
+#include "arch/x86_64/dev/ioapic.h"
 #include "arch/x86_64/interrupt.h"
 
 typedef struct {
@@ -345,15 +347,18 @@ static void kernelapi_interrupt_handler(x86_64_interrupt_frame_t *frame) {
     handler->fn(handler->ctx);
 }
 
-// TODO use irq?
 uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interrupt_handler fn, uacpi_handle ctx, uacpi_handle *out_irq_handle) {
     interrupt_handler_t *handler = heap_alloc(sizeof(interrupt_handler_t));
     handler->ctx = ctx;
     handler->fn = fn;
 
+    // TODO: this routine is unstable at best (besides it references x86 code anyway)
     int interrupt = x86_64_interrupt_request(INTERRUPT_PRIORITY_NORMAL, kernelapi_interrupt_handler);
     ASSERT(interrupt >= 0);
     handler->vector = interrupt;
+
+    x86_64_ioapic_map_legacy_irq(irq, x86_64_lapic_id(), false, true, interrupt);
+    // //
 
     *out_irq_handle = handler;
     return UACPI_STATUS_OK;
