@@ -17,7 +17,6 @@ interrupt_state_t spinlock_acquire(volatile spinlock_t *lock);
  */
 void spinlock_release(volatile spinlock_t *lock, interrupt_state_t interrupt_state);
 
-
 /**
  * @brief Acquire spinlock.
  * @warning Spins until acquired.
