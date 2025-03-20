@@ -59,7 +59,7 @@ void *heap_realloc(void *address, size_t current_size, size_t new_size) {
     if(address == NULL && new_size == 0) return address;
 
     void *new_address = heap_alloc(new_size);
-    if(address == NULL) return new_address;
+    if(address == NULL || current_size == 0) return new_address;
 
     memcpy(new_address, address, current_size > new_size ? current_size : new_size);
     heap_free(address, current_size);
