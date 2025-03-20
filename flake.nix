@@ -8,7 +8,7 @@
     outputs = { nixpkgs, flake-utils, ... } @ inputs: flake-utils.lib.eachDefaultSystem (system:
         let pkgs = import nixpkgs { inherit system; }; in {
             devShells.default = pkgs.mkShell {
-                shellHook = "export DEVSHELL_PS1_PREFIX='elysium-os'";
+                shellHook = "export NIX_SHELL_NAME='elysium-os'";
                 nativeBuildInputs = with pkgs; [
                     inputs.chariot.defaultPackage.${system}
                     wget # Required by Chariot
