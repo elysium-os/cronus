@@ -30,12 +30,7 @@ FLAGS[12]=-fno-omit-frame-pointer
 FLAGS[13]=-fno-strict-aliasing
 FLAGS[14]=-fno-lto
 
-
-
-chariot target/tartarus source/uacpi
-
-case $1 in
-zed)
+setup_zed() {
     cat > .clangd <<EOF
 CompileFlags:
     Add:
@@ -44,10 +39,11 @@ $(for FLAG in ${FLAGS[@]}; do echo -e "    - \"$FLAG\""; done)
 $(for DEF in ${DEFINES[@]}; do echo -e "    - \"-D$DEF\""; done)
 $(for INC in ${INCLUDES[@]}; do echo -e "    - \"-I$(readlink -f $INC)\""; done)
 EOF
-    ;;
-    vscode)
-        mkdir -p .vscode
-        cat > .vscode/c_cpp_properties.json <<EOF
+}
+
+setup_vscode() {
+    mkdir -p .vscode
+    cat > .vscode/c_cpp_properties.json <<EOF
 {
     "configurations": [
         {
@@ -98,6 +94,16 @@ EOF
     "todo-tree.regex.regex": "(//|#|@|<!--|;|/\\\\*|^|^[ \\\\t]*(-|\\\\d+.))\\\\s*(\$TAGS)"
 }
 EOF
+}
+
+chariot target/tartarus source/uacpi
+
+case $1 in
+    zed)
+        setup_zed
+        ;;
+    vscode)
+        setup_vscode
         ;;
     *)
         echo "Unknown IDE \"$1\", available is vscode/zed"
