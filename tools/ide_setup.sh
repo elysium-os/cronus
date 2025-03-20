@@ -30,6 +30,8 @@ FLAGS[12]=-fno-omit-frame-pointer
 FLAGS[13]=-fno-strict-aliasing
 FLAGS[14]=-fno-lto
 
+
+
 chariot target/tartarus source/uacpi
 
 case $1 in
@@ -77,46 +79,22 @@ EOF
 
     cat > .vscode/settings.json <<EOF
 {
-    "C_Cpp.files.exclude": {
-        "**/.chariot-cache": true
-    },
+    "[c]": { "editor.formatOnSave": true },
+    "C_Cpp.files.exclude": { "**/.chariot-cache": true },
     "C_Cpp.autoAddFileAssociations": false,
-    "[c]": {
-        "editor.formatOnSave": true
-    },
     "todo-tree.general.tags": [
-        "TODO",
-        "todo",
-        "OPTIMIZE",
-        "UNIMPLEMENTED",
-        "CRITICAL",
-        "FIX",
-        "TEMPORARY",
-        "NOTE",
+        "TODO", "todo", "OPTIMIZE", "UNIMPLEMENTED",
+        "CRITICAL", "FIX", "TEMPORARY", "NOTE",
     ],
     "todo-tree.highlights.backgroundColourScheme": [
-        "yellow",
-        "yellow",
-        "purple",
-        "orange",
-        "red",
-        "coral",
-        "cyan",
-        "grey"
+        "yellow", "yellow", "purple", "orange",
+        "red", "coral", "cyan", "grey"
     ],
     "todo-tree.highlights.foregroundColourScheme": [
-        "black",
-        "black",
-        "white",
-        "black",
-        "white",
-        "black",
-        "black",
-        "black"
+        "black", "black", "white", "black",
+        "white", "black", "black", "black"
     ],
-    "todo-tree.highlights.customHighlight": {
-        "TODO": { "icon": "check" }
-    },
+    "todo-tree.highlights.customHighlight": { "TODO": { "icon": "check" } },
     "todo-tree.regex.regex": "(//|#|@|<!--|;|/\\\\*|^|^[ \\\\t]*(-|\\\\d+.))\\\\s*(\$TAGS)"
 }
 EOF
