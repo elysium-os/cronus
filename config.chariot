@@ -17,8 +17,24 @@ host/mkimg {
     configure { cp @(source_dir)/go.mod @(source_dir)/go.sum @(source_dir)/main.go . }
     build { go build }
     install {
-        mkdir -p @(install_dir)@(prefix)/bin
-        cp mkimg @(install_dir)@(prefix)/bin
+        install -d @(install_dir)@(prefix)/bin
+        install mkimg @(install_dir)@(prefix)/bin
+    }
+}
+
+// rdsk
+source/rdsk {
+    url: tools/rdsk
+    type: local
+}
+
+host/rdsk {
+    source: rdsk
+    dependencies [ image/clang ]
+    build { clang @(source_dir)/rdsk.c -o rdsk }
+    install {
+        install -d @(install_dir)@(prefix)/bin
+        install rdsk @(install_dir)@(prefix)/bin
     }
 }
 
@@ -135,15 +151,32 @@ target/kernel {
 }
 
 // Image
+target/root {
+    dependencies [ host/rdsk ]
+    build {
+        mkdir ./root_directory
+        # cp -r @(sysroot_dir)/* ./root_directory
+        mkdir ./root_directory/modules
+        mkdir ./root_directory/tmp
+
+        rdsk -c ./root_directory -o root.rdk
+    }
+    install {
+        install -d @(install_dir)@(prefix)/share
+        install root.rdk @(install_dir)@(prefix)/share
+    }
+}
+
 target/image {
-    dependencies [ host/mkimg source/support target/tartarus target/tartarus_efi target/kernel image/llvm image/qemu-img ]
+    dependencies [ host/mkimg source/support target/tartarus target/tartarus_efi target/kernel target/root image/llvm image/qemu-img ]
     build {
         cp @(sysroot_dir)@(prefix)/share/tartarus/tartarus.sys .
         cp @(sysroot_dir)@(prefix)/share/tartarus/x86_64-bios.bin .
 
-        mkdir -p ./image_root
+        mkdir ./image_root
         cp @(sources_dir)/support/tartarus.cfg ./image_root
         cp @(sysroot_dir)@(prefix)/share/kernel.elf ./image_root
+        cp @(sysroot_dir)@(prefix)/share/root.rdk ./image_root
         llvm-nm @(sysroot_dir)@(prefix)/share/kernel.elf -n > ./image_root/kernel_symbols.txt
 
         mkimg --config=@(sources_dir)/support/mkimg_bios.toml
