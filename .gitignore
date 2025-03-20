@@ -2,6 +2,7 @@
 !.chariot-cache/patches
 
 .vscode/
+.clangd
 
 build/
 log.txt
