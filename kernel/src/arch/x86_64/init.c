@@ -220,7 +220,7 @@ static void thread_init() {
 
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_MSR));
 
-    x86_64_gdt_load();
+    x86_64_gdt_init();
 
     // Initialize interrupt & exception handling
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));

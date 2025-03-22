@@ -36,7 +36,7 @@ typedef struct [[gnu::packed]] {
     uint64_t base;
 } gdt_descriptor_t;
 
-void gdt_load(gdt_descriptor_t *gdtr, uint64_t selector_code, uint64_t selector_data);
+void x86_64_gdt_load(gdt_descriptor_t *gdtr, uint64_t selector_code, uint64_t selector_data);
 
 // clang-format off
 static gdt_entry_t g_gdt[] = {
@@ -77,12 +77,12 @@ static gdt_entry_t g_gdt[] = {
 };
 // clang-format on
 
-void x86_64_gdt_load() {
+void x86_64_gdt_init() {
     gdt_descriptor_t gdtr;
     gdtr.limit = sizeof(g_gdt) - 1;
     gdtr.base = (uint64_t) &g_gdt;
     log(LOG_LEVEL_DEBUG, "GDT", "Loading GDT(%#lx, %#lx)", gdtr.base, (uint64_t) gdtr.limit);
-    gdt_load(&gdtr, X86_64_GDT_SELECTOR_CODE64_RING0, X86_64_GDT_SELECTOR_DATA64_RING0);
+    x86_64_gdt_load(&gdtr, X86_64_GDT_SELECTOR_CODE64_RING0, X86_64_GDT_SELECTOR_DATA64_RING0);
 }
 
 void x86_64_gdt_load_tss(x86_64_tss_t *tss) {

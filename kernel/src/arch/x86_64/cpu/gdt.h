@@ -10,7 +10,7 @@
 /**
  * @brief Loads the GDT
  */
-void x86_64_gdt_load();
+void x86_64_gdt_init();
 
 /**
  * @brief Loads a TSS

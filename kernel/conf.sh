@@ -25,8 +25,8 @@ while [[ $# -gt 0 ]]; do
         --production)
             ENVIRONMENT="production"
             ;;
-        --toolchain-assembler=*)
-            TC_ASSEMBLER=${1#*=}
+        --toolchain-nasm=*)
+            TC_NASM=${1#*=}
             ;;
         --toolchain-compiler=*)
             TC_COMPILER=${1#*=}
@@ -51,8 +51,8 @@ if [ -z "$ARCH" ]; then
     exit 1
 fi
 
-if [ -z "$TC_ASSEMBLER" ]; then
-    >&2 echo "No assembler provided"
+if [ "$ARCH" = "x86_64" ] && [ -z "$TC_NASM" ]; then
+    >&2 echo "No nasm provided"
     exit 1
 fi
 
@@ -80,6 +80,6 @@ echo "SYSROOT := $SYSROOT" >> $CONFIG_FILE
 echo "ARCH := $ARCH" >> $CONFIG_FILE
 echo "ENVIRONMENT := $ENVIRONMENT" >> $CONFIG_FILE
 
-echo "ASMC := $TC_ASSEMBLER" >> $CONFIG_FILE
+echo "NASM := $TC_NASM" >> $CONFIG_FILE
 echo "CC := $TC_COMPILER" >> $CONFIG_FILE
 echo "LD := $TC_LINKER" >> $CONFIG_FILE
