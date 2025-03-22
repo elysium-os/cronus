@@ -3,7 +3,13 @@ include conf.mk
 DESTDIR ?= /
 
 # Kernel Flags
-CFLAGS := -std=gnu2x -ffreestanding -mcmodel=kernel -mno-red-zone -mgeneral-regs-only -mabi=sysv
+CFLAGS := -std=gnu23 -ffreestanding
+ifeq ($(ARCH), x86_64)
+CFLAGS += --target=x86_64-none-elf -mcmodel=kernel -mno-red-zone -mgeneral-regs-only -mabi=sysv
+else
+$(error unknown architecture)
+endif
+
 CFLAGS += -Wall -Wextra -Wvla -Wshadow
 CFLAGS += -fno-stack-protector -fno-stack-check -fno-strict-aliasing
 
@@ -36,15 +42,12 @@ OBJS += $(patsubst %.S,$(BUILD_DIRECTORY)/%_S.o,$(S_SOURCES))
 # Targets
 .PHONY: all install clean
 
-all: $(BUILD_DIRECTORY)/kernel.elf $(BUILD_DIRECTORY)/kernel_symbols.txt clean
+all: $(BUILD_DIRECTORY)/kernel.elf
 
 ifeq ($(ARCH), x86_64)
-$(BUILD_DIRECTORY)/kernel.elf: $(OBJS) $(SYSROOT)$(PREFIX)/share/uacpi.a /usr/local/lib/gcc/x86_64-elf/13.2.0/no-red-zone/libgcc.a
+$(BUILD_DIRECTORY)/kernel.elf: $(OBJS) $(SYSROOT)$(PREFIX)/share/uacpi.a
 	mkdir -p $(@D)
 	$(LD) -o $@ -T"$(SUPPORT_DIRECTORY)/link.x86_64.ld" $^
-
-$(BUILD_DIRECTORY)/kernel_symbols.txt: $(BUILD_DIRECTORY)/kernel.elf
-	x86_64-elf-nm $< -n > $@
 endif
 
 $(BUILD_DIRECTORY)/%_S.o: %.S
@@ -58,7 +61,6 @@ $(BUILD_DIRECTORY)/%_c.o: %.c
 install:
 	install -d $(DESTDIR)$(PREFIX)/share
 	install $(BUILD_DIRECTORY)/kernel.elf $(DESTDIR)$(PREFIX)/share
-	install $(BUILD_DIRECTORY)/kernel_symbols.txt $(DESTDIR)$(PREFIX)/share
 
 clean:
 	rm -f $(shell find $(BUILD_DIRECTORY) -type f -name "*.o")
