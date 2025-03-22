@@ -111,12 +111,12 @@ ISR %i, 0
 .quad isr_\vec
 .endm
 
-.global g_isr_stubs
-.type g_isr_stubs, "object"
-g_isr_stubs:
+.global g_x86_64_isr_stubs
+.type g_x86_64_isr_stubs, "object"
+g_x86_64_isr_stubs:
 .set i, 0
 .rept 256
 ISR_ARR %i
 .set i, i+1
 .endr
-.size g_isr_stubs, . - g_isr_stubs
+.size g_x86_64_isr_stubs, . - g_x86_64_isr_stubs

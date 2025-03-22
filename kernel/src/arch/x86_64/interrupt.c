@@ -25,7 +25,7 @@ typedef struct {
 
 static uint64_t g_priority_map[] = {[INTERRUPT_PRIORITY_LOW] = 0x2, [INTERRUPT_PRIORITY_NORMAL] = 0x5, [INTERRUPT_PRIORITY_CRITICAL] = 0xF};
 
-extern uint64_t g_isr_stubs[IDT_SIZE];
+extern uint64_t g_x86_64_isr_stubs[IDT_SIZE];
 
 static idt_entry_t g_idt[IDT_SIZE];
 static interrupt_entry_t g_entries[IDT_SIZE];
@@ -53,9 +53,9 @@ void x86_64_interrupt_handler(x86_64_interrupt_frame_t *frame) {
 
 void x86_64_interrupt_init() {
     for(unsigned long i = 0; i < sizeof(g_idt) / sizeof(idt_entry_t); i++) {
-        g_idt[i].low_offset = (uint16_t) g_isr_stubs[i];
-        g_idt[i].middle_offset = (uint16_t) (g_isr_stubs[i] >> 16);
-        g_idt[i].high_offset = (uint32_t) (g_isr_stubs[i] >> 32);
+        g_idt[i].low_offset = (uint16_t) g_x86_64_isr_stubs[i];
+        g_idt[i].middle_offset = (uint16_t) (g_x86_64_isr_stubs[i] >> 16);
+        g_idt[i].high_offset = (uint32_t) (g_x86_64_isr_stubs[i] >> 32);
         g_idt[i].segment_selector = X86_64_GDT_SELECTOR_CODE64_RING0;
         g_idt[i].flags = FLAGS_NORMAL;
         g_idt[i].ist = 0;
