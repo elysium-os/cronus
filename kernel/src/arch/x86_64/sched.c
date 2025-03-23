@@ -50,8 +50,6 @@ typedef struct [[gnu::packed]] {
     uint64_t user_stack;
 } init_stack_user_t;
 
-static_assert(offsetof(x86_64_thread_t, rsp) == 0, "rsp in thread_t changed. Update arch/x86_64/sched.S::THREAD_RSP_OFFSET");
-
 extern x86_64_thread_t *x86_64_sched_context_switch(x86_64_thread_t *this, x86_64_thread_t *next);
 extern void x86_64_sched_userspace_init();
 

@@ -31,3 +31,10 @@ typedef struct {
 
     thread_t common;
 } x86_64_thread_t;
+
+static_assert(offsetof(x86_64_thread_t, rsp) == 0, "rsp in thread_t changed. Update arch/x86_64/sched.asm::THREAD_RSP_OFFSET");
+static_assert(offsetof(x86_64_thread_t, syscall_rsp) == 8, "syscall_rsp in thread_t changed. Update arch/amd64/sched/syscall.asm::SYSCALL_RSP_OFFSET");
+static_assert(
+    offsetof(x86_64_thread_t, kernel_stack) + offsetof(x86_64_thread_stack_t, base) == 16,
+    "kernel_stack::base in thread_t changed. Update arch/x86_64/syscall.asm::KERNEL_STACK_BASE_OFFSET"
+);

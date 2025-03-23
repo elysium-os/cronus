@@ -43,8 +43,10 @@
 #include "arch/x86_64/interrupt.h"
 #include "arch/x86_64/ptm.h"
 #include "arch/x86_64/sched.h"
+#include "arch/x86_64/syscall.h"
 
 #include <stddef.h>
+#include <stdint.h>
 #include <tartarus.h>
 #include <uacpi/uacpi.h>
 
@@ -106,7 +108,7 @@ static void thread_init() {
 [[noreturn]] static void init_ap() {
     log(LOG_LEVEL_INFO, "INIT", "Initializing AP %i", x86_64_lapic_id());
 
-    x86_64_gdt_load();
+    x86_64_gdt_init();
 
     // Virtual Memory
     uint64_t pat = x86_64_msr_read(X86_64_MSR_PAT);
@@ -157,6 +159,9 @@ static void thread_init() {
     x86_64_tss_set_ist(tss, 1, HHDM(pmm_alloc_page(PMM_FLAG_NONE)->paddr + ARCH_PAGE_GRANULARITY));
     x86_64_interrupt_set_ist(2, 1); // Non-maskable
     x86_64_interrupt_set_ist(18, 2); // Machine check
+
+    // Initialize syscalls
+    x86_64_syscall_init_cpu();
 
     log(LOG_LEVEL_DEBUG, "INIT", "AP %lu:%i init exit", g_init_cpu_id_counter, x86_64_lapic_id());
     __atomic_add_fetch(&g_init_cpu_id_counter, 1, __ATOMIC_SEQ_CST);
