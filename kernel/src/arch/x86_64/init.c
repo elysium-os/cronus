@@ -6,8 +6,12 @@
 #include "arch/sched.h"
 #include "common/assert.h"
 #include "common/log.h"
+#include "common/panic.h"
 #include "dev/acpi/acpi.h"
 #include "dev/pci.h"
+#include "fs/rdsk.h"
+#include "fs/tmpfs.h"
+#include "fs/vfs.h"
 #include "graphics/draw.h"
 #include "graphics/framebuffer.h"
 #include "lib/math.h"
@@ -207,15 +211,15 @@ static void thread_init() {
     }
     log(LOG_LEVEL_INFO, "INIT", "Running on %.*s (%.*s)", 12, brand1, 48, brand2);
 
-    log(LOG_LEVEL_DEBUG, "INIT", "Enumerating modules");
+    log(LOG_LEVEL_DEBUG, "INIT", "Enumerating %u modules", boot_info->module_count);
     for(uint16_t i = 0; i < boot_info->module_count; i++) {
         tartarus_module_t *module = &boot_info->modules[i];
-        log(LOG_LEVEL_DEBUG, "INIT", "Module found: %s", module->name);
+        log(LOG_LEVEL_DEBUG, "INIT", "| Module found: `%s`", module->name);
+
         if(!string_eq("kernel_symbols.txt", module->name)) continue;
         g_arch_debug_symbols = (char *) HHDM(module->paddr);
         g_arch_debug_symbols_length = module->size;
-        log(LOG_LEVEL_DEBUG, "INIT", "Kernel symbols loaded");
-        break;
+        log(LOG_LEVEL_DEBUG, "INIT", "| -> Kernel symbols loaded");
     }
 
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_MSR));
@@ -427,8 +431,45 @@ static void thread_init() {
 
     x86_64_init_flag_set(X86_64_INIT_FLAG_TIME);
 
+    // Initialize syscalls
+    x86_64_syscall_init_cpu();
+
+    // Initialize VFS
+    tartarus_module_t *sysroot_module = NULL;
+    for(uint16_t i = 0; i < boot_info->module_count; i++) {
+        tartarus_module_t *module = &boot_info->modules[i];
+        if(!string_eq(module->name, "root.rdk")) continue;
+        sysroot_module = module;
+        break;
+    }
+    if(sysroot_module == NULL) panic("could not locate root.rdk");
+
+    vfs_result_t res = vfs_mount(&g_rdsk_ops, NULL, (void *) HHDM(sysroot_module->paddr));
+    if(res != VFS_RESULT_OK) panic("failed to mount rdsk (%i)", res);
+
+    vfs_node_t *root_node;
+    ASSERT(vfs_root(&root_node) == VFS_RESULT_OK);
+
+    log(LOG_LEVEL_DEBUG, "INIT", "| FS Root Listing");
+    for(size_t i = 0;;) {
+        const char *filename;
+        res = root_node->ops->readdir(root_node, &i, &filename);
+        ASSERT(res == VFS_RESULT_OK);
+        if(filename == NULL) break;
+        log(LOG_LEVEL_DEBUG, "INIT", "| - %s", filename);
+    }
+
+    res = vfs_mount(&g_tmpfs_ops, "/modules", NULL);
+    if(res != VFS_RESULT_OK) panic("failed to mount /modules (%i)", res);
+    res = vfs_mount(&g_tmpfs_ops, "/tmp", NULL);
+    if(res != VFS_RESULT_OK) panic("failed to mount /tmp (%i)", res);
+
+    x86_64_init_flag_set(X86_64_INIT_FLAG_VFS);
+
+    // Schedule init thread
     sched_thread_schedule(arch_sched_thread_create_kernel(thread_init));
 
+    // Scheduler handoff
     log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye for now!");
     x86_64_sched_init_cpu(cpu, true);
     __builtin_unreachable();

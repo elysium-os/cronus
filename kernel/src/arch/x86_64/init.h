@@ -9,6 +9,7 @@
 #define X86_64_INIT_FLAG_SMP (1 << 4)
 #define X86_64_INIT_FLAG_TIME (1 << 5)
 #define X86_64_INIT_FLAG_SCHED (1 << 6)
+#define X86_64_INIT_FLAG_VFS (1 << 7)
 
 /**
  * @brief Check if given initialization flags are set.
