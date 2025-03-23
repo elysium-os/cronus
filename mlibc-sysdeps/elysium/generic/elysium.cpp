@@ -4,22 +4,21 @@
 #include <mlibc/all-sysdeps.hpp>
 #include <mlibc/debug.hpp>
 #include <stddef.h>
-#include <stdint.h>
 #include <string.h>
 
 namespace mlibc {
 
 void sys_libc_log(const char *message) {
-    syscall2(SYSCALL_DEBUG, strlen(message), message);
+    syscall2(SYSCALL_DEBUG, strlen(message), (syscall_int_t) message);
 }
 
 [[noreturn]] void sys_libc_panic() {
-    syscall1(SYSCALL_EXIT, 0, true);
+    syscall2(SYSCALL_EXIT, 0, true);
     __builtin_unreachable();
 }
 
 [[noreturn]] void sys_exit(int status) {
-    syscall1(SYSCALL_EXIT, status, false);
+    syscall2(SYSCALL_EXIT, status, false);
     __builtin_unreachable();
 }
 
