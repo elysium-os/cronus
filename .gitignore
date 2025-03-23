@@ -1,7 +1,7 @@
 .chariot-cache/*
 !.chariot-cache/patches
 
-.vscode/
+.vscode
 .clangd
 
 build/
