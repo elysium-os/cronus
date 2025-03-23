@@ -4,7 +4,7 @@ x86_64_gdt_load:
     push rsi
     lea rax, [rel .load_code]
     push rax
-    retf
+    retfq
 .load_code:
     mov ss, rdx
     xor rax, rax
