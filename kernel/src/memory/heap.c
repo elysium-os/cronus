@@ -2,6 +2,7 @@
 
 #include "arch/page.h"
 #include "common/assert.h"
+#include "lib/expect.h"
 #include "lib/math.h"
 #include "lib/mem.h"
 #include "memory/hhdm.h"
@@ -27,9 +28,9 @@ static slab_cache_t *g_other_slabs[SLAB_OTHER_COUNT];
 
 static slab_cache_t *find_cache(size_t size) {
     slab_cache_t *cache = NULL;
-    if(size <= g_slab_8x_sizes[SLAB_8X_COUNT - 1]) {
+    if(EXPECT_LIKELY(size <= g_slab_8x_sizes[SLAB_8X_COUNT - 1])) {
         cache = g_8x_slabs[MATH_DIV_CEIL(size, 8) - 1];
-    } else if(size <= g_slab_128x_sizes[SLAB_128X_COUNT - 1]) {
+    } else if(EXPECT_LIKELY(size <= g_slab_128x_sizes[SLAB_128X_COUNT - 1])) {
         cache = g_128x_slabs[MATH_DIV_CEIL(size, 128) - 1];
     } else {
         for(size_t i = 0; i < SLAB_OTHER_COUNT; i++) {
@@ -50,7 +51,8 @@ void heap_initialize() {
 
 void *heap_alloc(size_t size) {
     if(size == 0) return NULL;
-    if(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1]) return (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(size, ARCH_PAGE_GRANULARITY), PMM_FLAG_NONE)->paddr);
+    if(EXPECT_UNLIKELY(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1]))
+        return (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(size, ARCH_PAGE_GRANULARITY), PMM_FLAG_NONE)->paddr);
     return slab_allocate(find_cache(size));
 }
 
