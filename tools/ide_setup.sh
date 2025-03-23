@@ -9,8 +9,9 @@ DEFINES[3]=UACPI_FORMATTED_LOGGING
 DEFINES[4]=UACPI_SIZED_FREES
 
 INCLUDES[0]=kernel/src
-INCLUDES[1]=.chariot-cache/target/tartarus/install/usr/include
+INCLUDES[1]=.chariot-cache/source/tartarus/src
 INCLUDES[2]=.chariot-cache/source/uacpi/src/include
+INCLUDES[3]=.chariot-cache/source/mlibc-sysdeps/src/elysium/include
 
 FLAGS[0]=-std=gnu2x
 FLAGS[1]=-ffreestanding
@@ -96,7 +97,7 @@ EOF
 EOF
 }
 
-chariot target/tartarus source/uacpi
+chariot target/tartarus source/uacpi target/mlibc_headers
 
 case $1 in
     zed)

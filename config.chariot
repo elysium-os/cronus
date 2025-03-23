@@ -135,21 +135,15 @@ target/kernel {
     source: kernel
     dependencies [ target/tartarus target/uacpi target/mlibc_headers image/nasm image/clang image/lld image/meson ]
     configure {
-        args=()
-        args+=(--prefix=@(prefix))
-        args+=(--arch=x86_64)
-
-        args+=(--toolchain-nasm=nasm)
-        args+=(--toolchain-compiler=clang)
-        args+=(--toolchain-linker=ld.lld)
-
-        args+=(--sysroot=@(sysroot_dir))
-        [[ "@(build_environment?)" = "production" ]] && args+=(--production)
-
-        @(source_dir)/conf.sh "${args[@]}"
+        CC=clang CC_LD=lld meson setup \
+            --prefix=@(prefix) \
+            --buildtype=debug \
+            -Dexternal_headers=@(sysroot_dir)@(prefix)/include \
+            -Duacpi_path=@(sysroot_dir)@(prefix)/share/uacpi.a \
+            @(source_dir)
     }
-    build { make all }
-    install { DESTDIR=@(install_dir) make install }
+    build { ninja -j@(thread_count) }
+    install { DESTDIR=@(install_dir) ninja install }
 }
 
 // image
@@ -177,9 +171,9 @@ target/image {
 
         mkdir ./image_root
         cp @(sources_dir)/support/tartarus.cfg ./image_root
-        cp @(sysroot_dir)@(prefix)/share/kernel.elf ./image_root
         cp @(sysroot_dir)@(prefix)/share/root.rdk ./image_root
-        llvm-nm @(sysroot_dir)@(prefix)/share/kernel.elf -n > ./image_root/kernel_symbols.txt
+        cp @(sysroot_dir)@(prefix)/bin/kernel.elf ./image_root
+        llvm-nm @(sysroot_dir)@(prefix)/bin/kernel.elf -n > ./image_root/kernel_symbols.txt
 
         mkimg --config=@(sources_dir)/support/mkimg_bios.toml
 

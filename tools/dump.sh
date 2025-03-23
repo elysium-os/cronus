@@ -2,7 +2,7 @@
 
 ADDRESS=0x$1
 
-objdump .chariot-cache/target/kernel/install/usr/share/kernel.elf \
+objdump .chariot-cache/target/kernel/install/usr/bin/kernel.elf \
     -d -wrC \
     --visualize-jumps=color \
     --disassembler-color=on \

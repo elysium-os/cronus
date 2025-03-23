@@ -1,0 +1,3 @@
+option('external_headers', type : 'string')
+option('uacpi_path', type : 'string')
+option('arch', type: 'combo', choices: ['x86_64'])

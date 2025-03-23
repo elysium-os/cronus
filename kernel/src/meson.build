@@ -1,0 +1,29 @@
+sources += files(
+    'common/lock/mutex.c',
+    'common/lock/spinlock.c',
+    'common/log.c',
+    'common/panic.c',
+    'dev/acpi/acpi.c',
+    'dev/acpi/uacpi.c',
+    'dev/pci.c',
+    'fs/rdsk.c',
+    'fs/tmpfs.c',
+    'fs/vfs.c',
+    'graphics/draw.c',
+    'graphics/font_basic.c',
+    'lib/format.c',
+    'lib/list.c',
+    'lib/mem.c',
+    'lib/string.c',
+    'memory/heap.c',
+    'memory/pmm.c',
+    'memory/slab.c',
+    'memory/vm.c',
+    'sched/sched.c',
+    'sys/time.c',
+    'syscall/syscall.c',
+    'terminal.c',
+    'ubsan.c'
+)
+
+subdir('arch/' / get_option('arch'))
