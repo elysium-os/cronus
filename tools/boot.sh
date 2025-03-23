@@ -18,7 +18,7 @@ while [[ $# -gt 0 ]]; do
             build_args+=(--var "build_environment=production")
             ;;
         --rebuild-mlibc)
-            build_args+=(source/mlibc-sysdeps source/mlibc target/mlibc_headers)
+            build_args+=(source/mlibc-sysdeps source/mlibc target/mlibc_headers target/mlibc)
             ;;
         --tcg)
             ACCEL="tcg"
