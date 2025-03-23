@@ -31,21 +31,20 @@ KERN_FLAGS[12]=-fno-omit-frame-pointer
 KERN_FLAGS[13]=-fno-strict-aliasing
 KERN_FLAGS[14]=-fno-lto
 
-SYSDEP_INCLUDES[0]=mlibc-sysdeps/elysium/include
-SYSDEP_INCLUDES[1]=.chariot-cache/target/mlibc/build/ld.a.p
-SYSDEP_INCLUDES[2]=.chariot-cache/target/mlibc/build
-SYSDEP_INCLUDES[3]=.chariot-cache/source/mlibc/src
-SYSDEP_INCLUDES[4]=.chariot-cache/source/mlibc/src/options/internal/include
-SYSDEP_INCLUDES[5]=.chariot-cache/source/mlibc/src/options/internal/x86_64-include
-SYSDEP_INCLUDES[6]=.chariot-cache/source/mlibc/src/options/rtld/x86_64
-SYSDEP_INCLUDES[7]=.chariot-cache/source/mlibc/src/options/rtld/include
+SYSDEP_INCLUDES[0]=.chariot-cache/target/mlibc/build/ld.a.p
+SYSDEP_INCLUDES[1]=.chariot-cache/target/mlibc/build
+SYSDEP_INCLUDES[2]=.chariot-cache/source/mlibc/src
+SYSDEP_INCLUDES[3]=.chariot-cache/source/mlibc/src/options/internal/include
+SYSDEP_INCLUDES[4]=.chariot-cache/source/mlibc/src/options/internal/x86_64-include
+SYSDEP_INCLUDES[5]=.chariot-cache/source/mlibc/src/options/rtld/x86_64
+SYSDEP_INCLUDES[6]=.chariot-cache/source/mlibc/src/options/rtld/include
+SYSDEP_INCLUDES[7]=.chariot-cache/source/mlibc/src/sysdeps/elysium/include
 SYSDEP_INCLUDES[8]=.chariot-cache/source/mlibc/src/sysdeps/generic-helpers/include
-SYSDEP_INCLUDES[9]=.chariot-cache/source/mlibc/src/sysdeps/generic-helpers/include
-SYSDEP_INCLUDES[11]=.chariot-cache/source/mlibc/src/options/ansi/include
-SYSDEP_INCLUDES[12]=.chariot-cache/source/mlibc/src/options/elf/include
-SYSDEP_INCLUDES[13]=.chariot-cache/source/freestanding_c_headers/src/x86_64/include
-SYSDEP_INCLUDES[14]=.chariot-cache/source/freestanding_cxx_headers/src/x86_64/include
-SYSDEP_INCLUDES[15]=.chariot-cache/source/frigg/src/include
+SYSDEP_INCLUDES[9]=.chariot-cache/source/mlibc/src/options/ansi/include
+SYSDEP_INCLUDES[10]=.chariot-cache/source/mlibc/src/options/elf/include
+SYSDEP_INCLUDES[11]=.chariot-cache/source/freestanding_c_headers/src/x86_64/include
+SYSDEP_INCLUDES[12]=.chariot-cache/source/freestanding_cxx_headers/src/x86_64/include
+SYSDEP_INCLUDES[13]=.chariot-cache/source/frigg/src/include
 
 SYSDEP_FLAGS[0]=-std=c++20
 
