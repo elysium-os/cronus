@@ -1,0 +1,81 @@
+diff -Naru binutils-2.44/bfd/config.bfd binutils-2.44-patched/bfd/config.bfd
+--- binutils-2.44/bfd/config.bfd	2025-02-02 02:00:00.000000000 +0200
++++ binutils-2.44-patched/bfd/config.bfd	2025-03-21 18:12:01.544959790 +0200
+@@ -735,7 +735,17 @@
+     targ_selvecs="i386_elf32_vec iamcu_elf32_vec x86_64_elf32_vec"
+     want64=true
+     ;;
++  x86_64-*-elysium*)
++    targ_defvec=x86_64_elf64_vec
++    targ_selvecs=i386_elf32_vec
++    want64=true
++    ;;
+ #endif
++  i[3-7]86-*-elysium*)
++    targ_defvec=i386_elf32_vec
++    targ_selvecs=
++    targ64_selvecs=x86_64_elf64_vec
++    ;;
+   i[3-7]86-*-lynxos*)
+     targ_defvec=i386_elf32_vec
+     targ_selvecs="iamcu_elf32_vec i386_coff_lynx_vec i386_aout_lynx_vec"
+diff -Naru binutils-2.44/gas/configure.tgt binutils-2.44-patched/gas/configure.tgt
+--- binutils-2.44/gas/configure.tgt	2025-02-02 02:00:00.000000000 +0200
++++ binutils-2.44-patched/gas/configure.tgt	2025-03-21 18:15:35.467354331 +0200
+@@ -229,6 +229,7 @@
+   i386-*-beos*)				fmt=elf ;;
+   i386-*-elfiamcu)			fmt=elf arch=iamcu ;;
+   i386-*-elf*)				fmt=elf ;;
++  i386-*-elysium*)      fmt=elf em=gnu ;;
+   i386-*-fuchsia*)			fmt=elf ;;
+   i386-*-haiku*)			fmt=elf em=haiku ;;
+   i386-*-genode*)			fmt=elf ;;
+diff -Naru binutils-2.44/gprofng/libcollector/configure.ac binutils-2.44-patched/gprofng/libcollector/configure.ac
+--- binutils-2.44/gprofng/libcollector/configure.ac	2025-02-02 02:00:00.000000000 +0200
++++ binutils-2.44-patched/gprofng/libcollector/configure.ac	2025-03-21 18:16:17.504630719 +0200
+@@ -18,7 +18,7 @@
+ 
+ m4_include([../../bfd/version.m4])
+ AC_INIT([gprofng], [BFD_VERSION])
+-AC_CONFIG_MACRO_DIRS([../../config ../..])
++#AC_CONFIG_MACRO_DIRS([../../config ../..])
+ AC_CONFIG_AUX_DIR(../..)
+ AC_CANONICAL_TARGET
+ AM_INIT_AUTOMAKE
+diff -Naru binutils-2.44/ld/configure.tgt binutils-2.44-patched/ld/configure.tgt
+--- binutils-2.44/ld/configure.tgt	2025-02-02 02:00:00.000000000 +0200
++++ binutils-2.44-patched/ld/configure.tgt	2025-03-21 18:18:15.068406886 +0200
+@@ -406,6 +406,10 @@
+ 			targ_emul=elf_i386
+ 			targ_extra_emuls=elf_iamcu
+ 			;;
++i[3-7]86-*-elysium-*)
++			targ_emul=elf_i386
++			targ_extra_emuls=elf_x86_64
++			;;
+ i[3-7]86-*-dragonfly*)	targ_emul=elf_i386
+ 			targ_extra_emuls="elf_iamcu i386bsd"
+ 			;;
+@@ -1038,6 +1042,10 @@
+ 			targ_extra_libpath="elf_i386 elf_iamcu elf32_x86_64"
+ 			tdir_elf_i386=`echo ${targ_alias} | sed -e 's/x86_64/i386/'`
+ 			;;
++x86_64-*-elysium*)
++			targ_emul=elf_x86_64
++			targ_extra_emuls=elf_i386
++			;;
+ x86_64-*-dragonfly*)	targ_emul=elf_x86_64
+ 			targ_extra_emuls="elf_i386 elf_iamcu"
+ 			;;
+diff -Naru binutils-2.44/libiberty/configure.ac binutils-2.44-patched/libiberty/configure.ac
+--- binutils-2.44/libiberty/configure.ac	2025-02-02 02:00:00.000000000 +0200
++++ binutils-2.44-patched/libiberty/configure.ac	2025-03-21 18:29:32.783937527 +0200
+@@ -37,7 +37,7 @@
+   libiberty_topdir="${srcdir}/.."
+ fi
+ AC_SUBST(libiberty_topdir)
+-AC_CONFIG_AUX_DIR($libiberty_topdir)
++AC_CONFIG_AUX_DIR([.])
+ 
+ dnl Very limited version of automake's enable-maintainer-mode
+ 

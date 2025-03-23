@@ -1,0 +1,13 @@
+[binaries]
+c = 'x86_64-elysium-gcc'
+cpp = 'x86_64-elysium-g++'
+ld = 'x86_64-elysium-ld'
+ar = 'x86_64-elysium-ar'
+strip = 'x86_64-elysium-strip'
+pkg-config = 'x86_64-elysium-pkg-config'
+
+[host_machine]
+system = 'elysium'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'

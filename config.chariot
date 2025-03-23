@@ -1,3 +1,5 @@
+@import ports.chariot
+
 // Support
 source/support {
     url: support
@@ -131,7 +133,7 @@ source/kernel {
 
 target/kernel {
     source: kernel
-    dependencies [ target/tartarus target/uacpi image/nasm image/clang image/lld ]
+    dependencies [ target/tartarus target/uacpi target/mlibc_headers image/nasm image/clang image/lld image/meson ]
     configure {
         args=()
         args+=(--prefix=@(prefix))
@@ -152,10 +154,10 @@ target/kernel {
 
 // image
 target/root {
-    dependencies [ host/rdsk ]
+    dependencies [ host/rdsk target/mlibc_headers ]
     build {
         mkdir ./root_directory
-        # cp -r @(sysroot_dir)/* ./root_directory
+        cp -r @(sysroot_dir)/* ./root_directory
         mkdir ./root_directory/modules
         mkdir ./root_directory/tmp
 

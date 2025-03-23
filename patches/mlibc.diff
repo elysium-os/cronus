@@ -1,0 +1,14 @@
+diff -Naru mlibc/meson.build mlibc-patched/meson.build
+--- mlibc/meson.build	2025-03-20 10:24:53.427778838 +0200
++++ mlibc-patched/meson.build	2025-03-20 10:25:53.253793019 +0200
+@@ -262,6 +262,10 @@
+ 	internal_conf.set10('MLIBC_MAP_DSO_SEGMENTS', true)
+ 	internal_conf.set10('MLIBC_MAP_FILE_WINDOWS', true)
+ 	subdir('sysdeps/astral')
++elif host_machine.system() == 'elysium'
++	rtld_include_dirs += include_directories('sysdeps/elysium/include')
++	libc_include_dirs += include_directories('sysdeps/elysium/include')
++	subdir('sysdeps/elysium')
+ else
+ 	error('No sysdeps defined for OS: ' + host_machine.system())
+ endif

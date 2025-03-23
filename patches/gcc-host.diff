@@ -1,0 +1,170 @@
+diff -Naru gcc-14.2.0/fixincludes/mkfixinc.sh gcc-14.2.0-patched/fixincludes/mkfixinc.sh
+--- gcc-14.2.0/fixincludes/mkfixinc.sh	2024-08-01 11:17:13.000000000 +0300
++++ gcc-14.2.0-patched/fixincludes/mkfixinc.sh	2025-03-22 00:37:16.690219702 +0200
+@@ -20,6 +20,7 @@
+     powerpcle-*-eabisim* | \
+     powerpcle-*-eabi* | \
+     *-*-vxworks7* | \
++    *-*-*-mlibc | \
+     *-musl* )
+ 	#  IF there is no include fixing,
+ 	#  THEN create a no-op fixer and exit
+diff -Naru gcc-14.2.0/gcc/config/elysium.h gcc-14.2.0-patched/gcc/config/elysium.h
+--- gcc-14.2.0/gcc/config/elysium.h	1970-01-01 02:00:00.000000000 +0200
++++ gcc-14.2.0-patched/gcc/config/elysium.h	2025-03-22 00:40:03.107441875 +0200
+@@ -0,0 +1,29 @@
++#undef TARGET_ELYSIUM
++#define TARGET_ELYSIUM 1
++
++#undef LIB_SPEC
++#define LIB_SPEC "-lc"
++
++#undef STARTFILE_SPEC
++#define STARTFILE_SPEC "%{!shared:crt0.o%s} crti.o%s %{shared|static-pie|pie|!no-pie:crtbeginS.o%s;:crtbegin.o%s}"
++
++#undef ENDFILE_SPEC
++#define ENDFILE_SPEC "%{shared|static-pie|pie|!no-pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
++#define GNU_USER_LINK_EMULATION32 "elf_i386"
++#define GNU_USER_LINK_EMULATION64 "elf_x86_64"
++#define GNU_USER_LINK_EMULATIONX32 "elf32_x86_64"
++
++#define GNU_USER_DYNAMIC_LINKER32 "/does_not_exist"
++#define GNU_USER_DYNAMIC_LINKER64 "/usr/lib/ld.so"
++#define GNU_USER_DYNAMIC_LINKERX32 "/usr/lib/ld32.so"
++
++#undef TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()            \
++    do {                                    \
++        builtin_define("__elysium__");      \
++        builtin_define("__unix__");         \
++        builtin_assert("system=elysium");   \
++        builtin_assert("system=unix");      \
++        builtin_assert("system=posix");     \
++    } while(0);
+diff -Naru gcc-14.2.0/gcc/config.gcc gcc-14.2.0-patched/gcc/config.gcc
+--- gcc-14.2.0/gcc/config.gcc	2024-08-01 11:17:14.000000000 +0300
++++ gcc-14.2.0-patched/gcc/config.gcc	2025-03-22 00:44:28.767786985 +0200
+@@ -878,6 +878,15 @@
+   rust_target_objs="${rust_target_objs} freebsd-rust.o"
+   target_has_targetrustm=yes
+   ;;
++*-*-*-mlibc)
++  extra_options="$extra_options gnu-user.opt"
++  gas=yes
++  gnu_ld=yes
++  default_use_cxa_atexit=yes
++  use_gcc_stdint=wrap
++  tmake_file="${tmake_file} t-slibgcc"
++  thread_file='posix'
++  ;;
+ *-*-fuchsia*)
+   native_system_header_dir=/include
+   tmake_file="t-fuchsia"
+@@ -2284,6 +2293,9 @@
+ 			;;
+ 	esac
+ 	;;
++x86_64-*-elysium*)
++  tm_file="${tm_file} i386/unix.h i386/att.h elfos.h gnu-user.h glibc-stdint.h i386/x86-64.h i386/gnu-user-common.h i386/gnu-user64.h elysium.h"
++  ;;
+ x86_64-*-fuchsia*)
+ 	tmake_file="${tmake_file} i386/t-x86_64-elf"
+ 	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h fuchsia.h"
+diff -Naru gcc-14.2.0/libcpp/Makefile.in gcc-14.2.0-patched/libcpp/Makefile.in
+--- gcc-14.2.0/libcpp/Makefile.in	2024-08-01 11:18:42.000000000 +0300
++++ gcc-14.2.0-patched/libcpp/Makefile.in	2025-03-22 00:52:54.808547354 +0200
+@@ -32,10 +32,10 @@
+ AUTOHEADER = @AUTOHEADER@
+ CATALOGS = $(patsubst %,po/%,@CATALOGS@)
+ CC = @CC@
+-CFLAGS = @CFLAGS@
++override CFLAGS = @CFLAGS@
+ WARN_CFLAGS = @warn@ @c_warn@ @WARN_PEDANTIC@ @WERROR@
+ CXX = @CXX@
+-CXXFLAGS = @CXXFLAGS@
++override CXXFLAGS = @CXXFLAGS@
+ WARN_CXXFLAGS = @warn@ @WARN_PEDANTIC@ @WERROR@
+ CPP = @CPP@
+ CPPFLAGS = @CPPFLAGS@
+@@ -45,7 +45,7 @@
+ INSTALL_DATA = @INSTALL_DATA@
+ INSTALL_PROGRAM = @INSTALL_PROGRAM@
+ INSTALL_SCRIPT = @INSTALL_SCRIPT@
+-LDFLAGS = @LDFLAGS@
++override LDFLAGS = @LDFLAGS@
+ LIBICONV = @LIBICONV@
+ LIBINTL = @LIBINTL@
+ PACKAGE = @PACKAGE@
+diff -Naru gcc-14.2.0/libgcc/config.host gcc-14.2.0-patched/libgcc/config.host
+--- gcc-14.2.0/libgcc/config.host	2024-08-01 11:17:17.000000000 +0300
++++ gcc-14.2.0-patched/libgcc/config.host	2025-03-22 00:48:15.578679817 +0200
+@@ -304,6 +304,11 @@
+   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-fuchsia"
+   extra_parts="crtbegin.o crtend.o"
+   ;;
++*-*-*-mlibc)
++  extra_parts="$extra_parts crtbegin.o crtbeginS.o crtend.o crtendS.o"
++  tmake_file="$tmake_file t-crtstuff-pic"
++  tmake_file="$tmake_file t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-libgcc-pic"
++  ;;
+ *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
+   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
+   extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
+@@ -752,6 +757,10 @@
+ x86_64-*-fuchsia*)
+ 	tmake_file="$tmake_file t-libgcc-pic"
+ 	;;
++x86_64-*-*-mlibc)
++	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
++	tmake_file="$tmake_file i386/t-crtpc t-crtfm i386/t-crtstuff t-dfprules"
++	;;
+ i[34567]86-*-dragonfly*)
+ 	tmake_file="${tmake_file} i386/t-dragonfly i386/t-crtstuff"
+ 	md_unwind_header=i386/dragonfly-unwind.h
+diff -Naru gcc-14.2.0/libgcc/configure.ac gcc-14.2.0-patched/libgcc/configure.ac
+--- gcc-14.2.0/libgcc/configure.ac	2024-08-01 11:17:17.000000000 +0300
++++ gcc-14.2.0-patched/libgcc/configure.ac	2025-03-22 00:49:17.647382825 +0200
+@@ -46,7 +46,7 @@
+   libgcc_topdir="${srcdir}/.."
+ fi
+ AC_SUBST(libgcc_topdir)
+-AC_CONFIG_AUX_DIR($libgcc_topdir)
++AC_CONFIG_AUX_DIR([.])
+ AC_CONFIG_HEADER(auto-target.h:config.in)
+ 
+ AC_ARG_ENABLE(shared,
+diff -Naru gcc-14.2.0/libiberty/configure.ac gcc-14.2.0-patched/libiberty/configure.ac
+--- gcc-14.2.0/libiberty/configure.ac	2024-08-01 11:17:18.000000000 +0300
++++ gcc-14.2.0-patched/libiberty/configure.ac	2025-03-22 00:49:47.296168679 +0200
+@@ -37,7 +37,7 @@
+   libiberty_topdir="${srcdir}/.."
+ fi
+ AC_SUBST(libiberty_topdir)
+-AC_CONFIG_AUX_DIR($libiberty_topdir)
++AC_CONFIG_AUX_DIR([.])
+ 
+ dnl Very limited version of automake's enable-maintainer-mode
+ 
+diff -Naru gcc-14.2.0/libstdc++-v3/crossconfig.m4 gcc-14.2.0-patched/libstdc++-v3/crossconfig.m4
+--- gcc-14.2.0/libstdc++-v3/crossconfig.m4	2024-08-01 11:17:18.000000000 +0300
++++ gcc-14.2.0-patched/libstdc++-v3/crossconfig.m4	2025-03-22 00:51:54.491133176 +0200
+@@ -136,6 +136,18 @@
+     AC_CHECK_FUNCS(uselocale)
+     ;;
+ 
++  *-mlibc*)
++    GLIBCXX_CHECK_COMPILER_FEATURES
++    GLIBCXX_CHECK_LINKER_FEATURES
++    GLIBCXX_CHECK_MATH_SUPPORT
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    AC_DEFINE(_GLIBCXX_USE_DEV_RANDOM)
++    AC_DEFINE(_GLIBCXX_USE_RANDOM_TR1)
++    GCC_CHECK_TLS
++    AC_CHECK_FUNCS(aligned_alloc posix_memalign memalign _aligned_malloc)
++    AC_CHECK_FUNCS(timespec_get)
++    ;;
++
+   *-fuchsia*)
+     SECTION_FLAGS='-ffunction-sections -fdata-sections'
+     AC_SUBST(SECTION_FLAGS)
