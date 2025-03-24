@@ -171,7 +171,7 @@ static void create_recurse(const char *name, uint64_t cur_dir_index) {
             }
             void *buf = malloc(s.st_size);
             fseek(file, 0, SEEK_SET);
-            if(fread(buf, s.st_size, 1, file) != (size_t) s.st_size) {
+            if(fread(buf, s.st_size, 1, file) != 1) {
                 fclose(file);
                 printf("Failed to read file %s (%s)\n", path, strerror(errno));
                 continue;
