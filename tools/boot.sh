@@ -9,14 +9,15 @@ ACCEL="kvm"
 DEBUG="no"
 DISPLAY="default"
 CORES="4"
+BUILDTYPE="debug"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --efi)
             BOOT_EFI="yes"
             ;;
-        --production)
-            build_args+=(--var "build_environment=production")
+        --release)
+            BUILDTYPE="release"
             ;;
         --rebuild-mlibc)
             build_args+=(source/mlibc-sysdeps source/mlibc target/mlibc_headers target/mlibc)
@@ -50,6 +51,8 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 set -- "${POSITIONAL_ARGS[@]}"
+
+build_args+=(--var "build_type=$BUILDTYPE")
 
 chariot "${build_args[@]}"
 if [[ "$BOOT_EFI" = "yes" ]]; then

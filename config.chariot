@@ -137,7 +137,7 @@ target/kernel {
     configure {
         CC=clang CC_LD=lld meson setup \
             --prefix=@(prefix) \
-            --buildtype=debug \
+            --buildtype=@(build_type) \
             -Dexternal_headers=@(sysroot_dir)@(prefix)/include \
             -Duacpi_path=@(sysroot_dir)@(prefix)/share/uacpi.a \
             @(source_dir)
