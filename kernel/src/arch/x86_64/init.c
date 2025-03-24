@@ -23,8 +23,12 @@
 #include "memory/pmm.h"
 #include "memory/slab.h"
 #include "memory/vm.h"
+#include "sched/process.h"
 #include "sched/sched.h"
 #include "sys/time.h"
+#include "sysv/auxv.h"
+#include "sysv/elf.h"
+#include "sysv/sysv.h"
 #include "terminal.h"
 
 #include "arch/x86_64/cpu/cpu.h"
@@ -53,8 +57,7 @@
 #define PIT_TIMER_FREQ 1'000
 #define LAPIC_CALIBRATION_TICKS 0x1'0000
 
-#define ADJUST_STACK(OFFSET)                                                                                                                                \
-    asm volatile("mov %%rsp, %%rax\nadd %0, %%rax\nmov %%rax, %%rsp\nmov %%rbp, %%rax\nadd %0, %%rax\nmov %%rax, %%rbp" : : "rm"(OFFSET) : "rax", "memory")
+#define ADJUST_STACK(OFFSET) asm volatile("mov %%rsp, %%rax\nadd %0, %%rax\nmov %%rax, %%rsp\nmov %%rbp, %%rax\nadd %0, %%rax\nmov %%rax, %%rbp" : : "rm"(OFFSET) : "rax", "memory")
 
 uintptr_t g_hhdm_offset;
 size_t g_hhdm_size;
@@ -315,15 +318,7 @@ static void thread_init() {
         uintptr_t end = pagecache_start + MATH_CEIL(((entry.base + entry.length) / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
         if(start > pagecache_end) pagecache_end = start;
         for(; pagecache_end < end; pagecache_end += ARCH_PAGE_GRANULARITY) {
-            arch_ptm_map(
-                g_vm_global_address_space,
-                pagecache_end,
-                bootmem_alloc(),
-                (vm_protection_t) {.read = true, .write = true},
-                VM_CACHE_STANDARD,
-                VM_PRIVILEGE_KERNEL,
-                true
-            );
+            arch_ptm_map(g_vm_global_address_space, pagecache_end, bootmem_alloc(), (vm_protection_t) {.read = true, .write = true}, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
         }
 
         pmm_region_add(entry.base, entry.length, (g_bootmem_base / ARCH_PAGE_GRANULARITY) - (entry.base / ARCH_PAGE_GRANULARITY));
@@ -467,8 +462,45 @@ static void thread_init() {
 
     x86_64_init_flag_set(X86_64_INIT_FLAG_VFS);
 
-    // Schedule init thread
+    // Schedule init threads
     sched_thread_schedule(arch_sched_thread_create_kernel(thread_init));
+
+    {
+        log(LOG_LEVEL_DEBUG, "INIT", "loading /usr/bin/init");
+        vm_address_space_t *as = arch_ptm_address_space_create();
+
+        vfs_node_t *startup_exec;
+        res = vfs_lookup(&VFS_ABSOLUTE_PATH("/usr/bin/init"), &startup_exec);
+        if(res != VFS_RESULT_OK) panic("Could not lookup test executable (%i)", res);
+
+        x86_64_auxv_t auxv = {};
+        char *interpreter = 0;
+        bool elf_r = elf_load(startup_exec, as, &interpreter, &auxv);
+        if(elf_r) panic("Could not load test executable");
+
+        x86_64_auxv_t interp_auxv = {};
+        if(interpreter) {
+            log(LOG_LEVEL_DEBUG, "INIT", "Found init interpreter: %s", interpreter);
+            vfs_node_t *interp_exec;
+            res = vfs_lookup(&VFS_ABSOLUTE_PATH(interpreter), &interp_exec);
+            if(res != VFS_RESULT_OK) panic("Could not lookup the interpreter for startup (%i)", res);
+
+            elf_r = elf_load(interp_exec, as, 0, &interp_auxv);
+            if(elf_r) panic("Could not load the interpreter for startup");
+        }
+
+        log(LOG_LEVEL_DEBUG, "INIT", "entry: %#lx; phdr: %#lx; phent: %#lx; phnum: %#lx;", auxv.entry, auxv.phdr, auxv.phent, auxv.phnum);
+
+        char *argv[] = {"/usr/bin/init", NULL};
+        char *envp[] = {NULL};
+
+        process_t *proc = process_create(as);
+        uintptr_t thread_stack = x86_64_sysv_stack_setup(proc->address_space, ARCH_PAGE_GRANULARITY * 8, argv, envp, &auxv);
+        thread_t *thread = arch_sched_thread_create_user(proc, interpreter ? interp_auxv.entry : auxv.entry, thread_stack);
+
+        log(LOG_LEVEL_DEBUG, "INIT", "init thread >> entry: %#lx, stack: %#lx", interpreter ? interp_auxv.entry : auxv.entry, thread_stack);
+        sched_thread_schedule(thread);
+    }
 
     // Scheduler handoff
     log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye for now!");

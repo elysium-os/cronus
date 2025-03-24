@@ -146,9 +146,28 @@ target/kernel {
     install { DESTDIR=@(install_dir) ninja install }
 }
 
+// init
+source/init {
+    url: init
+    type: local
+}
+
+target/init {
+    source: init
+    dependencies [ host/gcc target/mlibc_headers ]
+    build {
+        cp -r @(source_dir)/* .
+        make init
+    }
+    install {
+        install -d @(install_dir)@(prefix)/bin
+        install init @(install_dir)@(prefix)/bin
+    }
+}
+
 // image
 target/root {
-    dependencies [ host/rdsk target/mlibc_headers ]
+    dependencies [ host/rdsk target/mlibc_headers target/init ]
     build {
         mkdir ./root_directory
         cp -r @(sysroot_dir)/* ./root_directory
