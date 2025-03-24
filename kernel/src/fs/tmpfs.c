@@ -1,6 +1,7 @@
 #include "tmpfs.h"
 
 #include "common/assert.h"
+#include "common/log.h"
 #include "fs/vfs.h"
 #include "lib/mem.h"
 #include "lib/string.h"
@@ -63,7 +64,7 @@ static tmpfs_node_t *make_tmpfs_node(tmpfs_node_t *parent, vfs_t *vfs, bool is_d
 
     vfs_node_t *vnode = heap_alloc(sizeof(vfs_node_t));
     vnode->vfs = vfs;
-    vnode->type = is_dir ? VFS_NODE_TYPE_FILE : VFS_NODE_TYPE_DIR;
+    vnode->type = is_dir ? VFS_NODE_TYPE_DIR : VFS_NODE_TYPE_FILE;
     vnode->mounted_vfs = NULL;
     vnode->private_data = tmpfs_node;
     vnode->ops = &g_tmpfs_node_ops;
