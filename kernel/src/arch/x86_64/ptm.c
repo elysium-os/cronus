@@ -17,6 +17,9 @@
 #include "arch/x86_64/exception.h"
 #include "arch/x86_64/init.h"
 
+#include <stddef.h>
+#include <stdint.h>
+
 #define X86_64_AS(ADDRESS_SPACE) (CONTAINER_OF((ADDRESS_SPACE), x86_64_address_space_t, common))
 
 #define VADDR_TO_INDEX(VADDR, LEVEL) (((VADDR) >> ((LEVEL) * 9 + 3)) & 0x1FF)
@@ -62,11 +65,16 @@ typedef struct {
 } x86_64_address_space_t;
 
 static uint8_t g_tlb_shootdown_vector;
+static spinlock_t g_tlb_shootdown_lock;
+static size_t g_tlb_shootdown_complete;
+static uintptr_t g_tlb_shootdown_address;
+
 static x86_64_address_space_t g_initial_address_space;
 
 uintptr_t (*g_x86_64_ptm_phys_allocator)();
 
 static inline void invlpg(uint64_t value) {
+    LOG_DEVELOPMENT("PTM", "invlpg on CPU(%u) for %#lx", x86_64_lapic_id(), value);
     asm volatile("invlpg (%0)" : : "r"(value) : "memory");
 }
 
@@ -86,61 +94,44 @@ static uint64_t cache_to_x86_flags(vm_cache_t cache) {
     __builtin_unreachable();
 }
 
-static void tlb_shootdown(vm_address_space_t *address_space, uintptr_t addr) {
-    log(LOG_LEVEL_DEBUG_NOISY, "PTM", "shootdown from CPU(%u) to %#lx", x86_64_lapic_id(), addr);
+static void tlb_shootdown(uintptr_t addr) {
+    LOG_DEVELOPMENT("PTM", "shootdown from CPU(%u) for %#lx", x86_64_lapic_id(), addr);
     if(!x86_64_init_flag_check(X86_64_INIT_FLAG_SMP | X86_64_INIT_FLAG_SCHED)) {
-        if(address_space == g_vm_global_address_space || x86_64_cr3_read() == X86_64_AS(address_space)->cr3) invlpg(addr);
+        invlpg(addr);
         return;
     }
 
-    interrupt_state_t previous_state = interrupt_state_mask();
+    interrupt_state_t previous_state = spinlock_acquire(&g_tlb_shootdown_lock);
+    g_tlb_shootdown_address = addr;
+    g_tlb_shootdown_complete = 0;
+
     for(size_t i = 0; i < g_x86_64_cpu_count; i++) {
         x86_64_cpu_t *cpu = &g_x86_64_cpus[i];
-
         if(cpu == X86_64_CPU(arch_cpu_current())) {
-            log(LOG_LEVEL_DEBUG_NOISY, "PTM", "local shootdown on CPU(%u) for %#lx", cpu->lapic_id, addr);
-            if(address_space == g_vm_global_address_space || x86_64_cr3_read() == X86_64_AS(address_space)->cr3) invlpg(addr);
+            invlpg(addr);
+            __atomic_add_fetch(&g_tlb_shootdown_complete, 1, __ATOMIC_RELEASE);
             continue;
         }
-        log(LOG_LEVEL_DEBUG_NOISY, "PTM", "issue shootdown from CPU(%u) to CPU(%u) for %#lx", x86_64_lapic_id(), cpu->lapic_id, addr);
 
-        spinlock_primitive_acquire(&cpu->tlb_shootdown_lock);
-        spinlock_primitive_acquire(&cpu->tlb_shootdown_check);
-        cpu->tlb_shootdown_cr3 = X86_64_AS(address_space)->cr3;
-        cpu->tlb_shootdown_addr = addr;
-
-        asm volatile("" : : : "memory");
         x86_64_lapic_ipi(cpu->lapic_id, g_tlb_shootdown_vector | X86_64_LAPIC_IPI_ASSERT);
-
-        volatile int timeout = 0;
-        do {
-            if(timeout++ % 500 != 0) {
-                asm volatile("pause");
-                continue;
-            }
-            if(timeout >= 3000) break;
-            x86_64_lapic_ipi(cpu->lapic_id, g_tlb_shootdown_vector | X86_64_LAPIC_IPI_ASSERT);
-        } while(!spinlock_primitive_try_acquire(&cpu->tlb_shootdown_check));
-
-        spinlock_primitive_release(&cpu->tlb_shootdown_check);
-        spinlock_primitive_release(&cpu->tlb_shootdown_lock);
     }
-    interrupt_state_restore(previous_state);
+
+    while(__atomic_load_n(&g_tlb_shootdown_complete, __ATOMIC_ACQUIRE) != g_x86_64_cpu_count) asm volatile("pause");
+
+    spinlock_release(&g_tlb_shootdown_lock, previous_state);
 }
 
 static void tlb_shootdown_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     ASSERT(x86_64_init_flag_check(X86_64_INIT_FLAG_SMP | X86_64_INIT_FLAG_SCHED));
-    interrupt_state_t previous_state = interrupt_state_mask();
-    x86_64_cpu_t *cpu = X86_64_CPU_LOCAL_MEMBER(self);
-    if(spinlock_primitive_try_acquire(&cpu->tlb_shootdown_check)) {
+
+    if(spinlock_primitive_try_acquire(&g_tlb_shootdown_lock)) {
+        spinlock_primitive_release(&g_tlb_shootdown_lock);
         log(LOG_LEVEL_WARN, "PTM", "Spurious TLB shootdown");
-        spinlock_primitive_release(&cpu->tlb_shootdown_check);
-        interrupt_state_restore(previous_state);
         return;
     }
-    if(cpu->tlb_shootdown_cr3 == g_initial_address_space.cr3 || x86_64_cr3_read() == cpu->tlb_shootdown_cr3) invlpg(cpu->tlb_shootdown_addr);
-    spinlock_primitive_release(&cpu->tlb_shootdown_check);
-    interrupt_state_restore(previous_state);
+
+    invlpg(g_tlb_shootdown_address);
+    __atomic_add_fetch(&g_tlb_shootdown_complete, 1, __ATOMIC_RELEASE);
 }
 
 vm_address_space_t *x86_64_ptm_init() {
@@ -179,11 +170,7 @@ vm_address_space_t *arch_ptm_address_space_create() {
     address_space->common.start = USERSPACE_START;
     address_space->common.end = USERSPACE_END;
 
-    memcpy(
-        (void *) HHDM(address_space->cr3 + 256 * sizeof(uint64_t)),
-        (void *) HHDM(X86_64_AS(g_vm_global_address_space)->cr3 + 256 * sizeof(uint64_t)),
-        256 * sizeof(uint64_t)
-    );
+    memcpy((void *) HHDM(address_space->cr3 + 256 * sizeof(uint64_t)), (void *) HHDM(X86_64_AS(g_vm_global_address_space)->cr3 + 256 * sizeof(uint64_t)), 256 * sizeof(uint64_t));
 
     return &address_space->common;
 }
@@ -218,7 +205,7 @@ void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t 
     if(global) entry |= PTE_FLAG_GLOBAL;
     __atomic_store(&current_table[index], &entry, __ATOMIC_SEQ_CST);
 
-    tlb_shootdown(address_space, vaddr);
+    tlb_shootdown(vaddr);
 
     spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
 }
@@ -228,7 +215,7 @@ void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr) {
     uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
     for(int i = 4; i > 1; i--) {
         int index = VADDR_TO_INDEX(vaddr, i);
-        if((current_table[index] & PTE_FLAG_PRESENT) != 0) {
+        if((current_table[index] & PTE_FLAG_PRESENT) == 0) {
             spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
             return;
         }
@@ -236,7 +223,7 @@ void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr) {
     }
     __atomic_store_n(&current_table[VADDR_TO_INDEX(vaddr, 1)], 0, __ATOMIC_SEQ_CST);
 
-    tlb_shootdown(address_space, vaddr);
+    tlb_shootdown(vaddr);
 
     spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
 }
@@ -246,7 +233,7 @@ bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, uintp
     uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
     for(int i = 4; i > 1; i--) {
         int index = VADDR_TO_INDEX(vaddr, i);
-        if((current_table[index] & PTE_FLAG_PRESENT) != 0) {
+        if((current_table[index] & PTE_FLAG_PRESENT) == 0) {
             spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
             return false;
         }
@@ -254,7 +241,7 @@ bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, uintp
     }
     uint64_t entry = current_table[VADDR_TO_INDEX(vaddr, 1)];
     spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
-    if((entry & PTE_FLAG_PRESENT) != 0) return false;
+    if((entry & PTE_FLAG_PRESENT) == 0) return false;
     *out = (entry & ADDRESS_MASK);
     return true;
 }

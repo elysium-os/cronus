@@ -1,6 +1,5 @@
 #pragma once
 
-#include "common/lock/spinlock.h"
 #include "lib/container.h"
 #include "sys/cpu.h"
 
@@ -29,17 +28,14 @@ typedef struct x86_64_cpu {
     uint32_t lapic_id;
     uint64_t lapic_timer_frequency;
 
-    uintptr_t tlb_shootdown_cr3;
-    uintptr_t tlb_shootdown_addr;
-    spinlock_t tlb_shootdown_check; /* used as a primitive spinlock */
-    spinlock_t tlb_shootdown_lock;
-
     x86_64_tss_t *tss;
 
     x86_64_thread_t *current_thread;
 
     cpu_t common;
 } x86_64_cpu_t;
+
+static_assert(offsetof(x86_64_cpu_t, current_thread) == 40, "current_thread in x86_64_cpu_t changed. Update arch/x86_64/syscall.asm::CURRENT_THREAD_OFFSET");
 
 extern size_t g_x86_64_cpu_count;
 extern x86_64_cpu_t *g_x86_64_cpus;

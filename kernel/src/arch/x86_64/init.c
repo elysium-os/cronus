@@ -148,8 +148,6 @@ static void thread_init() {
     cpu->lapic_id = x86_64_lapic_id();
     cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * X86_64_PIT_BASE_FREQ;
     cpu->tss = tss;
-    cpu->tlb_shootdown_check = SPINLOCK_INIT;
-    cpu->tlb_shootdown_lock = SPINLOCK_INIT;
 
     // Initialize FPU
     x86_64_fpu_init_cpu();
@@ -391,8 +389,6 @@ static void thread_init() {
             cpu->lapic_id = x86_64_lapic_id();
             cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * X86_64_PIT_BASE_FREQ;
             cpu->tss = tss;
-            cpu->tlb_shootdown_check = SPINLOCK_INIT;
-            cpu->tlb_shootdown_lock = SPINLOCK_INIT;
             x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
             g_init_cpu_id_counter++;
             continue;
