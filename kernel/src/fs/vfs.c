@@ -1,6 +1,5 @@
 #include "vfs.h"
 
-#include "common/log.h"
 #include "lib/list.h"
 #include "lib/mem.h"
 #include "memory/heap.h"
@@ -131,5 +130,5 @@ vfs_result_t vfs_mkfile(vfs_path_t *path, const char *name, PARAM_OUT(vfs_node_t
     vfs_node_t *node;
     vfs_result_t res = vfs_lookup(path, &node);
     if(res != VFS_RESULT_OK) return res;
-    return node->ops->mkdir(node, name, new_node);
+    return node->ops->mkfile(node, name, new_node);
 }
