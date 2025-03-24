@@ -1,16 +1,22 @@
 #pragma once
 
-#include "lib/format.h"
 #include "lib/list.h"
 
+#include <stdarg.h>
 #include <stddef.h>
+
+#ifdef __ENV_DEVELOPMENT
+#define LOG_DEVELOPMENT(TAG, FMT, ...) log(LOG_LEVEL_DEVONLY, TAG, FMT, __VA_ARGS__)
+#elif
+#define LOG_DEVELOPMENT(TAG, FMT, ...)
+#endif
 
 typedef enum {
     LOG_LEVEL_ERROR,
     LOG_LEVEL_WARN,
     LOG_LEVEL_INFO,
     LOG_LEVEL_DEBUG,
-    LOG_LEVEL_DEBUG_NOISY
+    LOG_LEVEL_DEVONLY
 } log_level_t;
 
 typedef struct {

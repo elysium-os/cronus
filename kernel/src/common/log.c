@@ -1,7 +1,6 @@
 #include "log.h"
 
 #include "common/lock/spinlock.h"
-#include "lib/format.h"
 #include "lib/string.h"
 
 static spinlock_t g_lock = SPINLOCK_INIT;
@@ -44,11 +43,11 @@ void log_sink_remove(log_sink_t *sink) {
 
 const char *log_level_stringify(log_level_t level) {
     switch(level) {
-        case LOG_LEVEL_ERROR:       return "ERROR";
-        case LOG_LEVEL_WARN:        return "WARN";
-        case LOG_LEVEL_INFO:        return "INFO";
-        case LOG_LEVEL_DEBUG:       return "DEBUG";
-        case LOG_LEVEL_DEBUG_NOISY: return "DEBUG";
+        case LOG_LEVEL_ERROR:   return "ERROR";
+        case LOG_LEVEL_WARN:    return "WARN";
+        case LOG_LEVEL_INFO:    return "INFO";
+        case LOG_LEVEL_DEBUG:   return "DEBUG";
+        case LOG_LEVEL_DEVONLY: return "DEVEL";
     }
     return "UNKNOWN";
 }
