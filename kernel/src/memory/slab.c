@@ -96,6 +96,8 @@ void slab_init() {
 }
 
 slab_cache_t *slab_cache_create(const char *name, size_t object_size, pmm_order_t order) {
+    ASSERT(object_size >= 8);
+
     slab_cache_t *cache = slab_allocate(&g_alloc_cache);
     cache->name = name;
     cache->object_size = object_size;
