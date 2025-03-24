@@ -10,11 +10,12 @@
 uintptr_t x86_64_sysv_stack_setup(vm_address_space_t *address_space, size_t stack_size, char **argv, char **envp, x86_64_auxv_t *auxv) {
     ASSERT(stack_size % ARCH_PAGE_GRANULARITY == 0);
 
-#define WRITE_QWORD(VALUE)                                      \
-    {                                                           \
-        stack -= sizeof(uint64_t);                              \
-        uint64_t tmp = (VALUE);                                 \
-        ASSERT(vm_copy_to(address_space, stack, &tmp, 4) == 4); \
+#define WRITE_QWORD(VALUE)                                               \
+    {                                                                    \
+        stack -= sizeof(uint64_t);                                       \
+        uint64_t tmp = (VALUE);                                          \
+        size_t copyto_count = vm_copy_to(address_space, stack, &tmp, 4); \
+        ASSERT(copyto_count == 4);                                       \
     }
 
     void *stack_ptr = vm_map_anon(address_space, NULL, stack_size, (vm_protection_t) {.read = true, .write = true}, VM_CACHE_STANDARD, VM_FLAG_NONE);
@@ -49,7 +50,8 @@ uintptr_t x86_64_sysv_stack_setup(vm_address_space_t *address_space, size_t stac
     for(int i = 0; i < envc; i++) {
         WRITE_QWORD(env_data);
         size_t str_sz = string_length(envp[i]) + 1;
-        ASSERT(vm_copy_to(address_space, env_data, envp[i], str_sz) == str_sz);
+        size_t copyto_count = vm_copy_to(address_space, env_data, envp[i], str_sz);
+        ASSERT(copyto_count == str_sz);
         env_data += str_sz;
     }
 
@@ -57,7 +59,8 @@ uintptr_t x86_64_sysv_stack_setup(vm_address_space_t *address_space, size_t stac
     for(int i = 0; i < argc; i++) {
         WRITE_QWORD(arg_data);
         size_t str_sz = string_length(argv[i]) + 1;
-        ASSERT(vm_copy_to(address_space, arg_data, argv[i], str_sz) == str_sz);
+        size_t copyto_count = vm_copy_to(address_space, arg_data, argv[i], str_sz);
+        ASSERT(copyto_count == str_sz);
         arg_data += str_sz;
     }
     WRITE_QWORD(argc);

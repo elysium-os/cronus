@@ -73,7 +73,10 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
     pmm_order_t avl_order = order;
     pmm_zone_t *zone = (flags & PMM_FLAG_ZONE_LOW) != 0 ? &g_pmm_zone_low : &g_pmm_zone_normal;
     interrupt_state_t previous_state = spinlock_acquire(&zone->lock);
-    while(list_is_empty(&zone->lists[avl_order])) ASSERT_COMMENT(++avl_order <= PMM_MAX_ORDER, "Out of memory");
+    while(list_is_empty(&zone->lists[avl_order])) {
+        avl_order++;
+        ASSERT_COMMENT(avl_order <= PMM_MAX_ORDER, "Out of memory");
+    }
 
     pmm_block_t *block = LIST_CONTAINER_GET(LIST_NEXT(&zone->lists[avl_order]), pmm_block_t, list_elem);
     list_delete(&block->list_elem);

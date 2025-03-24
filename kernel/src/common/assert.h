@@ -6,7 +6,7 @@
  * @brief Make an assertion and panic on failure.
  */
 #ifdef __ENV_PRODUCTION
-#define ASSERT(ASSERTION) ({ ASSERTION; })
+#define ASSERT(ASSERTION)
 #else
 #define ASSERT(ASSERTION)                                          \
     if(!(ASSERTION)) panic("Assertion \"%s\" failed", #ASSERTION);
@@ -16,7 +16,7 @@
  * @brief Make an assertion and panic with a comment on failure.
  */
 #ifdef __ENV_PRODUCTION
-#define ASSERT_COMMENT(ASSERTION, COMMENT) ({ ASSERTION; })
+#define ASSERT_COMMENT(ASSERTION, COMMENT)
 #else
 #define ASSERT_COMMENT(ASSERTION, COMMENT)                                     \
     if(!(ASSERTION)) panic("Assertion \"%s\" failed: %s", #ASSERTION, COMMENT)

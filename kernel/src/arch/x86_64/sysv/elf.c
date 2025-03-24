@@ -139,7 +139,8 @@ elf_result_t elf_load(vfs_node_t *file, vm_address_space_t *as, PARAM_OUT(char *
                 uintptr_t aligned_vaddr = MATH_FLOOR(phdr->vaddr, ARCH_PAGE_GRANULARITY);
                 size_t length = MATH_CEIL(phdr->memsz + (phdr->vaddr - aligned_vaddr), ARCH_PAGE_GRANULARITY);
 
-                ASSERT(vm_map_anon(as, (void *) aligned_vaddr, length, prot, VM_CACHE_STANDARD, VM_FLAG_FIXED | VM_FLAG_ZERO) != NULL);
+                void *ptr = vm_map_anon(as, (void *) aligned_vaddr, length, prot, VM_CACHE_STANDARD, VM_FLAG_FIXED | VM_FLAG_ZERO);
+                ASSERT(ptr != NULL);
                 if(phdr->filesz > 0) {
                     size_t buffer_size = MATH_CEIL(phdr->filesz, ARCH_PAGE_GRANULARITY);
                     void *buffer = vm_map_anon(g_vm_global_address_space, NULL, buffer_size, VM_PROT_RW, VM_CACHE_STANDARD, VM_FLAG_NO_DEMAND);
@@ -151,7 +152,8 @@ elf_result_t elf_load(vfs_node_t *file, vm_address_space_t *as, PARAM_OUT(char *
                         heap_free(interpreter, interpreter_size);
                         return ELF_RESULT_ERR_FS;
                     }
-                    ASSERT(vm_copy_to(as, phdr->vaddr, buffer, phdr->filesz) == phdr->filesz);
+                    size_t copyto_count = vm_copy_to(as, phdr->vaddr, buffer, phdr->filesz);
+                    ASSERT(copyto_count == phdr->filesz);
                     vm_unmap(g_vm_global_address_space, buffer, buffer_size);
                 }
                 break;

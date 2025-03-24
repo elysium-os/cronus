@@ -444,7 +444,8 @@ static void thread_init() {
     if(res != VFS_RESULT_OK) panic("failed to mount rdsk (%i)", res);
 
     vfs_node_t *root_node;
-    ASSERT(vfs_root(&root_node) == VFS_RESULT_OK);
+    res = vfs_root(&root_node);
+    ASSERT(res == VFS_RESULT_OK);
 
     log(LOG_LEVEL_DEBUG, "INIT", "| FS Root Listing");
     for(size_t i = 0;;) {

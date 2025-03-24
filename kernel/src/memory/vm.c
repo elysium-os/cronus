@@ -260,7 +260,8 @@ size_t vm_copy_to(vm_address_space_t *dest_as, uintptr_t dest_addr, void *src, s
         uintptr_t phys;
         if(!arch_ptm_physical(dest_as, dest_addr + i, &phys)) {
             if(!address_space_fix_page(dest_as, dest_addr + i)) return i;
-            ASSERT(arch_ptm_physical(dest_as, dest_addr + i, &phys));
+            bool success = arch_ptm_physical(dest_as, dest_addr + i, &phys);
+            ASSERT(success);
         }
 
         size_t len = math_min(count - i, ARCH_PAGE_GRANULARITY - offset);
@@ -279,7 +280,8 @@ size_t vm_copy_from(void *dest, vm_address_space_t *src_as, uintptr_t src_addr, 
         uintptr_t phys;
         if(!arch_ptm_physical(src_as, src_addr + i, &phys)) {
             if(!address_space_fix_page(src_as, src_addr + i)) return i;
-            ASSERT(arch_ptm_physical(src_as, src_addr + i, &phys));
+            bool success = arch_ptm_physical(src_as, src_addr + i, &phys);
+            ASSERT(success);
         }
 
         size_t len = math_min(count - i, ARCH_PAGE_GRANULARITY - offset);
