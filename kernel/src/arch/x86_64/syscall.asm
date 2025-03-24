@@ -1,21 +1,32 @@
+CURRENT_THREAD_OFFSET equ 40
 SYSCALL_RSP_OFFSET equ 8
 KERNEL_STACK_BASE_OFFSET equ 16
 
 extern syscall_exit
 extern syscall_debug
+extern syscall_system_info
+extern syscall_mem_anon_allocate
+extern syscall_mem_anon_free
+extern x86_64_syscall_fs_set
 
 section .rodata
 syscall_table:
     dq syscall_exit ; 0
     dq syscall_debug ; 1
+    dq syscall_system_info ; 2
+    dq syscall_mem_anon_allocate ; 3
+    dq syscall_mem_anon_free ; 4
+    dq x86_64_syscall_fs_set ; 5
 .length: dq ($ - syscall_table) / 8
 
 section .text
 global x86_64_syscall_entry
 x86_64_syscall_entry:
     swapgs
-    mov qword [gs:SYSCALL_RSP_OFFSET], rsp
-    mov rsp, qword [gs:KERNEL_STACK_BASE_OFFSET]
+
+    mov r15, qword [gs:CURRENT_THREAD_OFFSET]
+    mov qword [r15 + SYSCALL_RSP_OFFSET], rsp
+    mov rsp, qword [r15 + KERNEL_STACK_BASE_OFFSET]
 
     push rcx
     push rdx
@@ -41,7 +52,10 @@ x86_64_syscall_entry:
     ; RDI, RSI, RDX contain the first 3 arguments, this also matches the first 3 arguments for the Sys V ABI.
     ; R10 contains the next argument, this does not match SysV. Lastly, R8 and R9 are passed which will match SysV again.
     mov rcx, r10
+
+    sti
     call rax
+    cli
 
     mov rbx, rdx ; Cannot use rdx for return value
 
@@ -65,6 +79,8 @@ x86_64_syscall_entry:
     pop rdx
     pop rcx
 
-    mov rsp, qword [gs:SYSCALL_RSP_OFFSET]
+    mov rsp, qword [r15 + SYSCALL_RSP_OFFSET]
+    xor r15, r15
+
     swapgs
     o64 sysret
