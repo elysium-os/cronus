@@ -33,12 +33,12 @@ typedef struct {
 } log_sink_t;
 
 /**
- * Add log sink.
+ * @brief Add log sink.
  */
 void log_sink_add(log_sink_t *sink);
 
 /**
- * Remove log sink.
+ * @brief Remove log sink.
  */
 void log_sink_remove(log_sink_t *sink);
 
