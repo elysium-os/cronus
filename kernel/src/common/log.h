@@ -7,7 +7,7 @@
 
 #ifdef __ENV_DEVELOPMENT
 #define LOG_DEVELOPMENT(TAG, FMT, ...) log(LOG_LEVEL_DEVONLY, TAG, FMT, __VA_ARGS__)
-#elif
+#else
 #define LOG_DEVELOPMENT(TAG, FMT, ...)
 #endif
 
