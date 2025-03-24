@@ -2,6 +2,7 @@
 
 # **Cursed** script for generating IDE config
 
+# kernel config
 KERN_DEFINES[0]=__ARCH_X86_64
 KERN_DEFINES[1]=__ENV_DEVELOPMENT
 KERN_DEFINES[2]=UACPI_NATIVE_ALLOC_ZEROED
@@ -31,6 +32,7 @@ KERN_FLAGS[12]=-fno-omit-frame-pointer
 KERN_FLAGS[13]=-fno-strict-aliasing
 KERN_FLAGS[14]=-fno-lto
 
+# mlibc sysdep config
 SYSDEP_INCLUDES[0]=.chariot-cache/target/mlibc/build/ld.a.p
 SYSDEP_INCLUDES[1]=.chariot-cache/target/mlibc/build
 SYSDEP_INCLUDES[2]=.chariot-cache/source/mlibc/src
@@ -48,6 +50,15 @@ SYSDEP_INCLUDES[13]=.chariot-cache/source/frigg/src/include
 
 SYSDEP_FLAGS[0]=-std=c++20
 
+# init program config
+INIT_INCLUDES[0]=.chariot-cache/target/mlibc_headers/install/usr/include
+
+INIT_FLAGS[0]=-std=gnu2x
+INIT_FLAGS[1]=-static
+INIT_FLAGS[2]=-O0
+INIT_FLAGS[3]=-g
+
+# zed setup
 setup_zed() {
     cat > .clangd <<EOF
 If:
@@ -65,9 +76,17 @@ CompileFlags:
     Add:
 $(for FLAG in ${SYSDEP_FLAGS[@]}; do echo -e "    - \"$FLAG\""; done)
 $(for INC in ${SYSDEP_INCLUDES[@]}; do echo -e "    - \"-I$(readlink -f $INC)\""; done)
+---
+If:
+    PathMatch: init/.*
+CompileFlags:
+    Add:
+$(for FLAG in ${INIT_FLAGS[@]}; do echo -e "    - \"$FLAG\""; done)
+$(for INC in ${INIT_INCLUDES[@]}; do echo -e "    - \"-I$(readlink -f $INC)\""; done)
 EOF
 }
 
+# vscode setup
 setup_vscode() {
     mkdir -p .vscode
     cat > .vscode/c_cpp_properties.json <<EOF
@@ -123,8 +142,10 @@ EOF
 EOF
 }
 
+# build
 chariot target/tartarus source/uacpi target/mlibc_headers
 
+# generate config
 case $1 in
     zed)
         setup_zed
