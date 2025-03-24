@@ -33,7 +33,7 @@ if get_option('external_headers') != ''
 endif
 
 if get_option('buildtype') == 'release'
-    cflags += [ '-O3', '-D__ENV_PRODUCTION' ]
+    cflags += [ '-O3', '-flto', '-D__ENV_PRODUCTION' ]
 endif
 
 if get_option('buildtype') == 'debug'
