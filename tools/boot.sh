@@ -3,11 +3,12 @@ clear
 
 build_args=()
 build_args+=(--hide-conflicts)
-build_args+=(source/kernel target/kernel target/image)
+build_args+=(source/kernel target/kernel target/root target/image)
 
 ACCEL="kvm"
 DEBUG="no"
 DISPLAY="default"
+CORES="4"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -34,6 +35,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --vnc)
             DISPLAY="vnc"
+            ;;
+        --single-core)
+            CORES="1"
             ;;
         -*|--*)
             echo "Unknown option \"$1\""
@@ -63,7 +67,7 @@ qemu_args+=(-drive format=raw,file=$IMAGE_PATH)
 qemu_args+=(-m 512M)
 qemu_args+=(-machine q35)
 qemu_args+=(-cpu qemu64,pdpe1gb)
-qemu_args+=(-smp cores=4)
+qemu_args+=(-smp cores=$CORES)
 qemu_args+=(-vga virtio)
 [[ "$DISPLAY" = "default" ]] && qemu_args+=(-display gtk,zoom-to-fit=on,show-tabs=on,gl=on)
 [[ "$DISPLAY" = "vnc" ]] && qemu_args+=(-vnc :0,websocket=on)
