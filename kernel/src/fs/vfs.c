@@ -1,5 +1,6 @@
 #include "vfs.h"
 
+#include "common/log.h"
 #include "lib/list.h"
 #include "lib/mem.h"
 #include "memory/heap.h"
@@ -50,7 +51,7 @@ vfs_result_t vfs_lookup_ext(vfs_path_t *path, vfs_lookup_create_t create_mode, b
     int comp_start = 0, comp_end = 0;
 
     vfs_node_t *current_node = path->root;
-    if(path->relative_path[comp_end] == '/') {
+    if(path->relative_path[comp_end] == '/' || current_node == NULL) {
         vfs_result_t res = vfs_root(&current_node);
         if(res != VFS_RESULT_OK) return res;
         comp_start++, comp_end++;
