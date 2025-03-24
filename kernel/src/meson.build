@@ -24,6 +24,7 @@ sources += files(
     'sys/time.c',
     'syscall/syscall.c',
     'syscall/syscall_mem.c',
+    'ring_buffer.c',
     'terminal.c',
     'ubsan.c'
 )

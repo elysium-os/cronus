@@ -23,6 +23,7 @@
 #include "memory/pmm.h"
 #include "memory/slab.h"
 #include "memory/vm.h"
+#include "ring_buffer.h"
 #include "sched/process.h"
 #include "sched/sched.h"
 #include "sys/time.h"
@@ -199,7 +200,9 @@ static void thread_init() {
     log_sink_add(&g_x86_64_qemu_debug_sink);
 #endif
 
+    log_sink_add(&g_ring_buffer_sink);
     log_sink_add(&g_terminal_sink);
+
     draw_rect(&g_framebuffer, 0, 0, g_framebuffer.width, g_framebuffer.height, draw_color(14, 14, 15));
     log(LOG_LEVEL_INFO, "INIT", "Elysium alpha.6 (" __DATE__ " " __TIME__ ")");
 
@@ -462,6 +465,19 @@ static void thread_init() {
     if(res != VFS_RESULT_OK) panic("failed to mount /tmp (%i)", res);
 
     x86_64_init_flag_set(X86_64_INIT_FLAG_VFS);
+
+    // Flush ring buffer
+    vfs_node_t *log_node;
+    res = vfs_mkfile(&VFS_ABSOLUTE_PATH("/tmp"), "kernel.log", &log_node);
+    if(res != VFS_RESULT_OK) panic("failed to make log file (%i)", res);
+
+    size_t count;
+    res = log_node->ops->rw(log_node, &(vfs_rw_t) {.rw = VFS_RW_WRITE, .size = g_ring_buffer.size - g_ring_buffer.index, .offset = 0, .buffer = &g_ring_buffer.buffer[g_ring_buffer.index]}, &count);
+    if(res != VFS_RESULT_OK || count != g_ring_buffer.size - g_ring_buffer.index) panic("failed to flush ring buffer");
+    if(g_ring_buffer.full) {
+        res = log_node->ops->rw(log_node, &(vfs_rw_t) {.rw = VFS_RW_WRITE, .size = g_ring_buffer.index, .offset = g_ring_buffer.size - g_ring_buffer.index, .buffer = &g_ring_buffer.buffer}, &count);
+        if(res != VFS_RESULT_OK || count != g_ring_buffer.index) panic("failed to flush ring buffer");
+    }
 
     // Schedule init threads
     sched_thread_schedule(arch_sched_thread_create_kernel(thread_init));
