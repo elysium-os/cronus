@@ -1,5 +1,6 @@
 #include "terminal.h"
 
+#include "common/log.h"
 #include "graphics/draw.h"
 #include "graphics/font.h"
 #include "graphics/framebuffer.h"
@@ -57,6 +58,6 @@ static void log_fb(log_level_t level, const char *tag, const char *fmt, va_list 
 
 log_sink_t g_terminal_sink = {
     .name = "FB_TERM",
-    .filter = {.level = LOG_LEVEL_DEBUG, .tags_as_include = false, .tags = NULL, .tag_count = 0},
+    .filter = {.level = LOG_LEVEL_INFO, .tags_as_include = false, .tags = NULL, .tag_count = 0},
     .log = log_fb
 };
