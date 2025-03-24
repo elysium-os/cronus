@@ -143,14 +143,7 @@ static int g_prof_active = 0;
                 g_records[i].calls,
                 (g_records[i].total + (g_records[i].calls / 2)) / g_records[i].calls);
         } else {
-            log(LOG_LEVEL_DEBUG,
-                "PROFILE",
-                "%lu. %#lx: %lu (calls: %lu, average: %lu)",
-                i + 1,
-                (uintptr_t) g_records[i].function,
-                g_records[i].total,
-                g_records[i].calls,
-                (g_records[i].total + (g_records[i].calls / 2)) / g_records[i].calls);
+            log(LOG_LEVEL_DEBUG, "PROFILE", "%lu. %#lx: %lu (calls: %lu, average: %lu)", i + 1, (uintptr_t) g_records[i].function, g_records[i].total, g_records[i].calls, (g_records[i].total + (g_records[i].calls / 2)) / g_records[i].calls);
         }
     }
 

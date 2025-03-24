@@ -2,12 +2,14 @@
 
 #include "arch/page.h"
 #include "arch/ptm.h"
+#include "arch/sched.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "lib/math.h"
 #include "lib/mem.h"
 #include "memory/hhdm.h"
 #include "memory/pmm.h"
+#include "sched/process.h"
 
 #define ADDRESS_IN_BOUNDS(ADDRESS, START, END) ((ADDRESS) >= (START) && (ADDRESS) < (END))
 #define SEGMENT_IN_BOUNDS(BASE, LENGTH, START, END) (ADDRESS_IN_BOUNDS((BASE), (START), (END)) && ((END) - (BASE)) >= (LENGTH))
@@ -44,8 +46,6 @@ static void region_map(vm_region_t *region, uintptr_t address, uintptr_t length)
     ASSERT(address < region->base || address + length >= region->base);
 
     bool is_global = region->address_space == g_vm_global_address_space;
-    vm_privilege_t privilege = is_global ? VM_PRIVILEGE_KERNEL : VM_PRIVILEGE_USER;
-
     for(size_t i = 0; i < length; i += ARCH_PAGE_GRANULARITY) {
         uintptr_t virtual_address = address + i;
         uintptr_t physical_address = 0;
@@ -53,7 +53,7 @@ static void region_map(vm_region_t *region, uintptr_t address, uintptr_t length)
             case VM_REGION_TYPE_ANON:   physical_address = pmm_alloc_page(region->type_data.anon.back_zeroed ? PMM_FLAG_ZERO : PMM_FLAG_NONE)->paddr; break;
             case VM_REGION_TYPE_DIRECT: physical_address = region->type_data.direct.physical_address + (virtual_address - region->base); break;
         }
-        arch_ptm_map(region->address_space, virtual_address, physical_address, region->protection, region->cache_behavior, privilege, is_global);
+        arch_ptm_map(region->address_space, virtual_address, physical_address, region->protection, region->cache_behavior, is_global ? VM_PRIVILEGE_KERNEL : VM_PRIVILEGE_USER, is_global);
     }
 }
 
@@ -144,27 +144,8 @@ restart:
     return false;
 }
 
-static void *map_common(
-    vm_address_space_t *address_space,
-    void *hint,
-    size_t length,
-    vm_protection_t prot,
-    vm_cache_t cache,
-    vm_flags_t flags,
-    vm_region_type_t type,
-    uintptr_t direct_physical_address
-) {
-    log(LOG_LEVEL_DEBUG,
-        "VM",
-        "map(hint: %#lx, length: %#lx, prot: %c%c%c, flags: %lu, cache: %u, type: %u)",
-        (uintptr_t) hint,
-        length,
-        prot.read ? 'R' : '-',
-        prot.write ? 'W' : '-',
-        prot.exec ? 'E' : '-',
-        flags,
-        cache,
-        type);
+static void *map_common(vm_address_space_t *address_space, void *hint, size_t length, vm_protection_t prot, vm_cache_t cache, vm_flags_t flags, vm_region_type_t type, uintptr_t direct_physical_address) {
+    log(LOG_LEVEL_DEBUG, "VM", "map(hint: %#lx, length: %#lx, prot: %c%c%c, flags: %lu, cache: %u, type: %u)", (uintptr_t) hint, length, prot.read ? 'R' : '-', prot.write ? 'W' : '-', prot.exec ? 'E' : '-', flags, cache, type);
 
     uintptr_t address = (uintptr_t) hint;
     if(length == 0 || length % ARCH_PAGE_GRANULARITY != 0) return NULL;
@@ -227,9 +208,7 @@ void vm_unmap(vm_address_space_t *address_space, void *address, size_t length) {
         vm_region_t *split_region = addr_to_region(address_space, split_base);
         if(split_region == NULL) continue;
 
-        while(ADDRESS_IN_SEGMENT(split_base + split_length, split_region->base, split_region->length) &&
-              ADDRESS_IN_SEGMENT(split_base + split_length, (uintptr_t) address, length))
-            split_length += ARCH_PAGE_GRANULARITY;
+        while(ADDRESS_IN_SEGMENT(split_base + split_length, split_region->base, split_region->length) && ADDRESS_IN_SEGMENT(split_base + split_length, (uintptr_t) address, length)) split_length += ARCH_PAGE_GRANULARITY;
 
         ASSERT(SEGMENT_IN_BOUNDS(split_base, split_length, address_space->start, address_space->end));
         ASSERT(split_base % ARCH_PAGE_GRANULARITY == 0 && split_length % ARCH_PAGE_GRANULARITY == 0);

@@ -181,16 +181,8 @@ void __ubsan_handle_divrem_overflow(data_location_type_t *data, uintptr_t lhs, u
 }
 
 void __ubsan_handle_negate_overflow(data_location_type_t *data, uintptr_t old) {
-    log(LOG_LEVEL_WARN,
-        "UBSAN",
-        "negate_overflow @ %s:%u:%u {old: %#lx, type: %u-bit %s %s}",
-        data->location.filename,
-        data->location.line,
-        data->location.column,
-        old,
-        info_to_bits(data->type->info),
-        kind_to_type(data->type->kind),
-        data->type->name);
+    log(LOG_LEVEL_WARN, "UBSAN", "negate_overflow @ %s:%u:%u {old: %#lx, type: %u-bit %s %s}", data->location.filename, data->location.line, data->location.column, old, info_to_bits(data->type->info), kind_to_type(data->type->kind), data->type->name
+    );
 }
 
 void __ubsan_handle_shift_out_of_bounds(data_shift_out_of_bounds_t *data, uintptr_t lhs, uintptr_t rhs) {
@@ -227,40 +219,13 @@ void __ubsan_handle_out_of_bounds(data_out_of_bounds_t *data, uint64_t index) {
 }
 
 void __ubsan_handle_type_mismatch_v1(data_type_mismatch_t *data, void *pointer) {
-    static const char *kind_strs[] = {
-        "load of",
-        "store to",
-        "reference binding to",
-        "member access within",
-        "member call on",
-        "constructor call on",
-        "downcast of",
-        "downcast of",
-        "upcast of",
-        "cast to virtual base of",
-        "nonnull binding to",
-        "dynamic operation on"
-    };
+    static const char *kind_strs[] =
+        {"load of", "store to", "reference binding to", "member access within", "member call on", "constructor call on", "downcast of", "downcast of", "upcast of", "cast to virtual base of", "nonnull binding to", "dynamic operation on"};
 
     if(pointer == NULL) {
-        log(LOG_LEVEL_WARN,
-            "UBSAN",
-            "type_mismatch @ %s:%u:%u (%s NULL pointer of type %s)",
-            data->location.filename,
-            data->location.line,
-            data->location.column,
-            kind_strs[data->type_check_kind],
-            data->type->name);
+        log(LOG_LEVEL_WARN, "UBSAN", "type_mismatch @ %s:%u:%u (%s NULL pointer of type %s)", data->location.filename, data->location.line, data->location.column, kind_strs[data->type_check_kind], data->type->name);
     } else if((1 << data->alignment) - 1) {
-        log(LOG_LEVEL_WARN,
-            "UBSAN",
-            "type_mismatch @ %s:%u:%u (%s misaligned address %#lx of type %s)",
-            data->location.filename,
-            data->location.line,
-            data->location.column,
-            kind_strs[data->type_check_kind],
-            (uintptr_t) pointer,
-            data->type->name);
+        log(LOG_LEVEL_WARN, "UBSAN", "type_mismatch @ %s:%u:%u (%s misaligned address %#lx of type %s)", data->location.filename, data->location.line, data->location.column, kind_strs[data->type_check_kind], (uintptr_t) pointer, data->type->name);
     } else {
         log(LOG_LEVEL_WARN,
             "UBSAN",

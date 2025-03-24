@@ -96,7 +96,7 @@ SpacesInSquareBrackets: false
 LineEnding: LF
 ExperimentalAutoDetectBinPacking: false
 DerivePointerAlignment: false
-ColumnLimit: 175
+ColumnLimit: 250
 UseTab: Never
 IndentWidth: 4
 ContinuationIndentWidth: 4

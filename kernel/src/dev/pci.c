@@ -183,10 +183,7 @@ static void pci_write(pci_device_t *device, uint8_t offset, uint8_t size, uint32
             break;
         default: ASSERT_UNREACHABLE("invalid pci write size");
     }
-    x86_64_port_outd(
-        PORT_CONFIG_ADDRESS,
-        ((uint32_t) device->bus << 16) | ((uint32_t) (device->slot & 0x1F) << 11) | ((uint32_t) (device->func & 0x7) << 8) | (offset & 0xFC) | (1 << 31)
-    );
+    x86_64_port_outd(PORT_CONFIG_ADDRESS, ((uint32_t) device->bus << 16) | ((uint32_t) (device->slot & 0x1F) << 11) | ((uint32_t) (device->func & 0x7) << 8) | (offset & 0xFC) | (1 << 31));
     x86_64_port_outd(PORT_CONFIG_DATA, original);
 }
 #endif
@@ -232,8 +229,7 @@ static void check_bus(uint16_t segment, uint8_t bus) {
     for(uint8_t slot = 0; slot < 32; slot++) {
         pci_device_t device = {.segment = segment, .bus = bus, .slot = slot};
         if(readw(&device, offsetof(pci_device_header_t, vendor_id)) == VENDOR_INVALID) continue;
-        for(uint8_t func = 0; func < ((readb(&device, offsetof(pci_device_header_t, header_type)) & HEADER_TYPE_MULTIFUNC) ? 8 : 1); func++)
-            check_function(segment, bus, slot, func);
+        for(uint8_t func = 0; func < ((readb(&device, offsetof(pci_device_header_t, header_type)) & HEADER_TYPE_MULTIFUNC) ? 8 : 1); func++) check_function(segment, bus, slot, func);
     }
 }
 

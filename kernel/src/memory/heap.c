@@ -51,8 +51,7 @@ void heap_initialize() {
 
 void *heap_alloc(size_t size) {
     if(size == 0) return NULL;
-    if(EXPECT_UNLIKELY(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1]))
-        return (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(size, ARCH_PAGE_GRANULARITY), PMM_FLAG_NONE)->paddr);
+    if(EXPECT_UNLIKELY(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1])) return (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(size, ARCH_PAGE_GRANULARITY), PMM_FLAG_NONE)->paddr);
     return slab_allocate(find_cache(size));
 }
 

@@ -7,17 +7,8 @@
 #include "memory/hhdm.h"
 #include "memory/page.h"
 
-pmm_zone_t g_pmm_zone_low =
-    {.name = "LOW", .start = 0, .end = ARCH_MEM_LOW_SIZE, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = {[0 ... PMM_MAX_ORDER] = LIST_INIT}};
-pmm_zone_t g_pmm_zone_normal = {
-    .name = "NORMAL",
-    .start = ARCH_MEM_LOW_SIZE,
-    .end = UINTPTR_MAX,
-    .total_page_count = 0,
-    .free_page_count = 0,
-    .lock = SPINLOCK_INIT,
-    .lists = {[0 ... PMM_MAX_ORDER] = LIST_INIT}
-};
+pmm_zone_t g_pmm_zone_low = {.name = "LOW", .start = 0, .end = ARCH_MEM_LOW_SIZE, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = {[0 ... PMM_MAX_ORDER] = LIST_INIT}};
+pmm_zone_t g_pmm_zone_normal = {.name = "NORMAL", .start = ARCH_MEM_LOW_SIZE, .end = UINTPTR_MAX, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = {[0 ... PMM_MAX_ORDER] = LIST_INIT}};
 
 static inline uint8_t pagecount_to_order(size_t pages) {
     if(pages == 1) return 0;
@@ -55,9 +46,7 @@ void pmm_region_add(uintptr_t base, size_t size, size_t used) {
         for(size_t j = used; j < page_count;) {
             pmm_order_t order = pagecount_to_order(page_count - j);
             if(order > PMM_MAX_ORDER) order = PMM_MAX_ORDER;
-            while(PMM_ORDER_TO_PAGECOUNT(order) > (page_count - j) ||
-                  ((local_base + j * ARCH_PAGE_GRANULARITY) & (PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY - 1)) != 0)
-            {
+            while(PMM_ORDER_TO_PAGECOUNT(order) > (page_count - j) || ((local_base + j * ARCH_PAGE_GRANULARITY) & (PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY - 1)) != 0) {
                 ASSERT(order != 0);
                 order--;
             }

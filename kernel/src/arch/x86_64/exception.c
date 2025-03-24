@@ -50,16 +50,7 @@ static char *g_exception_messages[] = {
 
     if(frame->int_no == 14) log(LOG_LEVEL_DEBUG, "EXCEPTION", "CR2: %#lx", x86_64_cr2_read());
 
-    log(LOG_LEVEL_DEBUG,
-        "EXCEPTION",
-        "Interrupt Frame:\nint_no: %#lx\nerror_code: %#lx\nrip: %#lx\ncs: %#lx\nrflags: %#lx\nrsp: %#lx\nss: %#lx",
-        frame->int_no,
-        frame->err_code,
-        frame->rip,
-        frame->cs,
-        frame->rflags,
-        frame->rsp,
-        frame->ss);
+    log(LOG_LEVEL_DEBUG, "EXCEPTION", "Interrupt Frame:\nint_no: %#lx\nerror_code: %#lx\nrip: %#lx\ncs: %#lx\nrflags: %#lx\nrsp: %#lx\nss: %#lx", frame->int_no, frame->err_code, frame->rip, frame->cs, frame->rflags, frame->rsp, frame->ss);
     log(LOG_LEVEL_DEBUG,
         "EXCEPTION",
         "General Purpose Registers:\nr15: %#lx\nr14: %#lx\nr13: %#lx\nr12: %#lx\nr11: %#lx\nr10: %#lx\nr9: %#lx\nr8: %#lx\n" "rdi: %#lx\nrsi: %#lx\nrbp: %#lx\nrdx: %#lx\nrcx: %#lx\nrbx: %#lx\nrax: %#lx",

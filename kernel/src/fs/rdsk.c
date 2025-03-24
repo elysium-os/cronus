@@ -255,8 +255,6 @@ static vfs_result_t rdsk_root(vfs_t *vfs, PARAM_OUT(vfs_node_t **) root_node) {
     return VFS_RESULT_OK;
 }
 
-static vfs_node_ops_t g_node_ops =
-    {.attr = rdsk_attr, .name = rdsk_name, .lookup = rdsk_lookup, .rw = rdsk_rw, .mkdir = rdsk_mkdir, .readdir = rdsk_readdir, .mkfile = rdsk_mkfile, .truncate = rdsk_truncate
-};
+static vfs_node_ops_t g_node_ops = {.attr = rdsk_attr, .name = rdsk_name, .lookup = rdsk_lookup, .rw = rdsk_rw, .mkdir = rdsk_mkdir, .readdir = rdsk_readdir, .mkfile = rdsk_mkfile, .truncate = rdsk_truncate};
 
 vfs_ops_t g_rdsk_ops = {.mount = rdsk_mount, .root_node = rdsk_root};
