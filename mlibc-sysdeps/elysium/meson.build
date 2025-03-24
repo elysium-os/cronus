@@ -1,16 +1,19 @@
 sysdep_supported_options = {
-	'posix': false,
-	'linux': false,
-	'glibc': false,
-	'bsd': false,
+	'posix': true,
+	'linux': true,
+	'glibc': true,
+	'bsd': true,
 }
 
 rtld_sources += files(
-	'generic/elysium.cpp',
+	'generic/generic.cpp',
+	'generic/memory.cpp',
 )
 
 libc_sources += files(
-	'generic/elysium.cpp',
+	'generic/generic.cpp',
+	'generic/memory.cpp',
+	'generic/uname.cpp',
 	'generic/entry.cpp',
 )
 

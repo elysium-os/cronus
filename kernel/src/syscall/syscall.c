@@ -7,6 +7,9 @@
 
 #include <elysium/syscall.h>
 #include <stddef.h>
+#include <stdint.h>
+
+#define MAX_DEBUG_LENGTH 512
 
 int syscall_buffer_out(void *dest, void *src, size_t count) {
     ASSERT(arch_sched_thread_current()->proc != NULL);
@@ -40,10 +43,6 @@ char *syscall_string_in(char *src, size_t length) {
     return str;
 }
 
-void syscall_string_free(char *str, size_t length) {
-    heap_free(str, length + 1);
-}
-
 [[noreturn]] void syscall_exit(int code, bool panic) {
     log(LOG_LEVEL_DEBUG, "SYSCALL", "exit(code: %i, is_panic: %s, tid: %li)", code, panic ? "true" : "false", arch_sched_thread_current()->id);
     arch_sched_thread_current()->state = THREAD_STATE_DESTROY;
@@ -54,15 +53,30 @@ void syscall_string_free(char *str, size_t length) {
 syscall_return_t syscall_debug(size_t length, char *str) {
     syscall_return_t ret = {};
 
+    if(length > MAX_DEBUG_LENGTH) {
+        log(LOG_LEVEL_WARN, "SYSCALL_DEBUG", "exceeded maximum length (%lu)", length);
+        length = MAX_DEBUG_LENGTH;
+    }
+
     str = syscall_string_in(str, length);
     if(str == NULL) {
-        syscall_string_free(str, length);
         ret.error = SYSCALL_ERROR_INVALID_VALUE;
         return ret;
     }
 
-    log(LOG_LEVEL_INFO, "SYSCALL", "debug(%s)", str);
+    log(LOG_LEVEL_INFO, "SYSCALL_DEBUG", "%s", str);
 
-    syscall_string_free(str, length);
+    heap_free(str, length + 1);
+    return ret;
+}
+
+syscall_return_t syscall_system_info(syscall_system_info_t *buffer) {
+    syscall_return_t ret = {};
+
+    log(LOG_LEVEL_DEBUG, "SYSCALL", "system_info(buffer: %#lx)", (uintptr_t) buffer);
+
+    syscall_string_out(buffer->release, "pre-alpha", sizeof(buffer->release));
+    syscall_string_out(buffer->version, "(" __DATE__ " " __TIME__ ")", sizeof(buffer->release));
+
     return ret;
 }
