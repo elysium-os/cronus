@@ -19,9 +19,11 @@ sources += files(
     'memory/pmm.c',
     'memory/slab.c',
     'memory/vm.c',
+    'sched/process.c',
     'sched/sched.c',
     'sys/time.c',
     'syscall/syscall.c',
+    'syscall/syscall_mem.c',
     'terminal.c',
     'ubsan.c'
 )
