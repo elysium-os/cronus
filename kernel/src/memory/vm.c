@@ -266,11 +266,8 @@ bool vm_fault(uintptr_t address, vm_fault_t fault) {
 
     vm_address_space_t *as = g_vm_global_address_space;
     if(!ADDRESS_IN_BOUNDS(address, g_vm_global_address_space->start, g_vm_global_address_space->end)) {
-        // TODO
-        // if(x86_64_init_stage() >= X86_64_INIT_STAGE_SCHED) {
-        //     process_t *proc = arch_sched_thread_current()->proc;
-        //     if(proc) as = proc->address_space;
-        // }
+        process_t *proc = arch_sched_thread_current()->proc;
+        if(proc != NULL) as = proc->address_space;
     }
 
     return address_space_fix_page(as, address);
