@@ -1,6 +1,6 @@
 #pragma once
 
-#include <sys/cpu.h>
+#include "sys/cpu.h"
 
 /**
  * @brief Get the current CPU local.

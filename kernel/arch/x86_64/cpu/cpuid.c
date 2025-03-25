@@ -1,7 +1,5 @@
 #include "cpuid.h"
 
-#include <cpuid.h>
-
 bool x86_64_cpuid_feature(x86_64_cpuid_feature_t feature) {
     uint32_t value = 0;
     if(x86_64_cpuid_register(feature.leaf, feature.reg, &value)) return false;
