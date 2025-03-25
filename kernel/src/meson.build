@@ -20,6 +20,7 @@ sources += files(
     'memory/slab.c',
     'memory/vm.c',
     'sched/process.c',
+    'sched/reaper.c',
     'sched/sched.c',
     'sys/time.c',
     'syscall/syscall.c',

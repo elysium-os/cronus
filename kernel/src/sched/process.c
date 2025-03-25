@@ -1,5 +1,6 @@
 #include "process.h"
 
+#include "common/log.h"
 #include "memory/heap.h"
 
 static long g_next_pid = 1;
@@ -18,5 +19,11 @@ process_t *process_create(vm_address_space_t *address_space) {
     list_append(&g_sched_processes, &proc->list_sched);
     spinlock_release(&g_sched_processes_lock, previous_state);
 
+    log(LOG_LEVEL_DEBUG, "PROCESS", "created pid %lu", proc->id);
+
     return proc;
+}
+
+void process_destroy(process_t *process) {
+    log(LOG_LEVEL_DEBUG, "PROCESS", "destroyed pid %lu", process->id);
 }

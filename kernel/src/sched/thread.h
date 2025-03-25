@@ -16,7 +16,7 @@ typedef struct thread {
     thread_state_t state;
     process_t *proc;
 
-    list_element_t list_sched; /* list used by scheduler */
+    list_element_t list_sched; /* list used by scheduler/reaper */
     list_element_t list_proc; /* list used by process */
     list_element_t list_wait; /* list used by waitable */
 } thread_t;

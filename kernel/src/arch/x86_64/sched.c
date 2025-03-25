@@ -70,8 +70,7 @@ static int g_sched_vector = 0;
 }
 
 [[gnu::no_instrument_function]] static void kernel_thread_exit() {
-    arch_sched_thread_current()->state = THREAD_STATE_DESTROY;
-    arch_sched_yield();
+    arch_sched_yield(THREAD_STATE_DESTROY);
 }
 
 [[noreturn]] static void sched_idle() {
@@ -123,22 +122,32 @@ static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t ker
     thread->prof_current_call_frame = 0;
 #endif
 
-    interrupt_state_t previous_state = interrupt_state_mask();
-    x86_64_thread_t *current_thread = X86_64_CPU_LOCAL_MEMBER(current_thread);
-    if(current_thread != NULL && current_thread->state.fpu_area != NULL) g_x86_64_fpu_save(current_thread->state.fpu_area);
-    g_x86_64_fpu_restore(thread->state.fpu_area);
-    uint16_t x87cw = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (0b11 << 8);
-    asm volatile("fldcw %0" : : "m"(x87cw) : "memory");
-    uint32_t mxcsr = (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12);
-    asm volatile("ldmxcsr %0" : : "m"(mxcsr) : "memory");
-    g_x86_64_fpu_save(thread->state.fpu_area);
-    if(current_thread != NULL && current_thread->state.fpu_area != NULL) g_x86_64_fpu_restore(current_thread->state.fpu_area);
-    interrupt_state_restore(previous_state);
+    {
+        interrupt_state_t previous_state = interrupt_state_mask();
+        x86_64_thread_t *current_thread = X86_64_CPU_LOCAL_MEMBER(current_thread);
+        if(current_thread != NULL && current_thread->state.fpu_area != NULL) g_x86_64_fpu_save(current_thread->state.fpu_area);
+        g_x86_64_fpu_restore(thread->state.fpu_area);
+        uint16_t x87cw = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (0b11 << 8);
+        asm volatile("fldcw %0" : : "m"(x87cw) : "memory");
+        uint32_t mxcsr = (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12);
+        asm volatile("ldmxcsr %0" : : "m"(mxcsr) : "memory");
+        g_x86_64_fpu_save(thread->state.fpu_area);
+        if(current_thread != NULL && current_thread->state.fpu_area != NULL) g_x86_64_fpu_restore(current_thread->state.fpu_area);
+        interrupt_state_restore(previous_state);
+    }
+
+    if(proc != NULL) {
+        interrupt_state_t previous_state = spinlock_acquire(&proc->lock);
+        list_append(&proc->threads, &thread->common.list_proc);
+        spinlock_release(&proc->lock, previous_state);
+    }
 
     return thread;
 }
 
-[[gnu::no_instrument_function]] void arch_sched_yield() {
+[[gnu::no_instrument_function]] void arch_sched_yield(thread_state_t yield_state) {
+    ASSERT(yield_state != THREAD_STATE_ACTIVE);
+
     interrupt_state_t previous_state = interrupt_state_mask();
     thread_t *current = arch_sched_thread_current();
 
@@ -149,6 +158,8 @@ static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t ker
     }
     ASSERT(current != next);
 
+    current->state = yield_state;
+
     sched_switch(X86_64_THREAD(current), X86_64_THREAD(next));
 
 oneshot:
@@ -157,22 +168,8 @@ oneshot:
     interrupt_state_restore(previous_state);
 }
 
-void arch_sched_thread_destroy(thread_t *thread) {
-    if(thread->proc != NULL) {
-        interrupt_state_t previous_state = spinlock_acquire(&thread->proc->lock);
-        list_delete(&thread->list_proc);
-        if(list_is_empty(&thread->proc->threads)) {
-            // TODO: reap process
-            interrupt_state_restore(previous_state);
-        } else {
-            spinlock_release(&thread->proc->lock, previous_state);
-        }
-    }
-    heap_free(X86_64_THREAD(thread), sizeof(x86_64_thread_t));
-}
-
 [[gnu::no_instrument_function]] static void sched_entry([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
-    arch_sched_yield();
+    arch_sched_yield(THREAD_STATE_READY);
 }
 
 thread_t *arch_sched_thread_create_kernel(void (*func)()) {
@@ -199,9 +196,6 @@ thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t
     init_stack->user_stack = sp;
 
     x86_64_thread_t *thread = create_thread(proc, kernel_stack, (uintptr_t) init_stack);
-    interrupt_state_t previous_state = spinlock_acquire(&proc->lock);
-    list_append(&proc->threads, &thread->common.list_proc);
-    spinlock_release(&proc->lock, previous_state);
     return &thread->common;
 }
 
