@@ -58,6 +58,9 @@
 #define PIT_TIMER_FREQ 1'000
 #define LAPIC_CALIBRATION_TICKS 0x1'0000
 
+#define STRINGIFY_(X) #X
+#define STRINGIFY(X) STRINGIFY_(X)
+
 #define ADJUST_STACK(OFFSET) asm volatile("mov %%rsp, %%rax\nadd %0, %%rax\nmov %%rax, %%rsp\nmov %%rbp, %%rax\nadd %0, %%rax\nmov %%rax, %%rbp" : : "rm"(OFFSET) : "rax", "memory")
 
 uintptr_t g_hhdm_offset;
@@ -205,7 +208,7 @@ static void thread_init() {
     log_sink_add(&g_terminal_sink);
 
     draw_rect(&g_framebuffer, 0, 0, g_framebuffer.width, g_framebuffer.height, draw_color(14, 14, 15));
-    log(LOG_LEVEL_INFO, "INIT", "Elysium alpha.6 (" __DATE__ " " __TIME__ ")");
+    log(LOG_LEVEL_INFO, "INIT", "Elysium " STRINGIFY(__ARCH) " " STRINGIFY(__VERSION) " (" __DATE__ " " __TIME__ ")");
 
     char brand1[12];
     x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_EBX, (uint32_t *) &brand1);

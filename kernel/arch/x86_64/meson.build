@@ -38,7 +38,8 @@ cflags += [
     '-mno-red-zone',
     '-mgeneral-regs-only',
     '-mabi=sysv',
-    '-D__ARCH_X86_64'
+    '-D__ARCH_X86_64',
+    '-D__ARCH=x86_64'
 ]
 
 if get_option('buildtype') == 'debug'

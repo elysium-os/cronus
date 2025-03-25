@@ -5,16 +5,17 @@
 # kernel config
 KERN_DEFINES[0]=__ARCH_X86_64
 KERN_DEFINES[1]=__ENV_DEVELOPMENT
-KERN_DEFINES[2]=UACPI_NATIVE_ALLOC_ZEROED
-KERN_DEFINES[3]=UACPI_FORMATTED_LOGGING
-KERN_DEFINES[4]=UACPI_SIZED_FREES
+KERN_DEFINES[3]=__VERSION=meson_defined
+KERN_DEFINES[4]=__ARCH=meson_defined
+KERN_DEFINES[5]=UACPI_NATIVE_ALLOC_ZEROED
+KERN_DEFINES[6]=UACPI_FORMATTED_LOGGING
+KERN_DEFINES[7]=UACPI_SIZED_FREES
 
 KERN_INCLUDES[0]=kernel
-KERN_INCLUDES[1]=kernel/subsystem/*/include
-KERN_INCLUDES[2]=.chariot-cache/source/tartarus/src
-KERN_INCLUDES[3]=.chariot-cache/source/uacpi/src/include
-KERN_INCLUDES[4]=.chariot-cache/source/mlibc-sysdeps/src/elysium/include
-KERN_INCLUDES[5]=.chariot-cache/source/freestanding_headers/src
+KERN_INCLUDES[1]=.chariot-cache/source/tartarus/src
+KERN_INCLUDES[2]=.chariot-cache/source/uacpi/src/include
+KERN_INCLUDES[3]=.chariot-cache/source/mlibc-sysdeps/src/elysium/include
+KERN_INCLUDES[4]=.chariot-cache/source/freestanding_headers/src
 
 KERN_FLAGS[0]=-std=gnu2x
 KERN_FLAGS[1]=-ffreestanding
@@ -146,7 +147,7 @@ EOF
 }
 
 # build
-chariot target/tartarus source/uacpi target/mlibc_headers target/freestanding_headers
+chariot target/tartarus source/uacpi target/mlibc_headers source/freestanding_headers
 
 # generate config
 case $1 in

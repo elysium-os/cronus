@@ -1,4 +1,4 @@
-project('Elysium', 'c')
+project('Elysium', 'c', version : 'alpha.6')
 
 sources = []
 objects = []
@@ -20,7 +20,9 @@ cflags = [
 
     '-DUACPI_NATIVE_ALLOC_ZEROED',
     '-DUACPI_FORMATTED_LOGGING',
-    '-DUACPI_SIZED_FREES'
+    '-DUACPI_SIZED_FREES',
+
+    '-D__VERSION=' + meson.project_version()
 ]
 
 ldflags = [
@@ -37,7 +39,11 @@ if get_option('freestanding_headers') != ''
 endif
 
 if get_option('buildtype') == 'release'
-    cflags += [ '-O3', '-flto', '-D__ENV_PRODUCTION' ]
+    cflags += [
+        '-O3',
+        '-flto',
+        '-D__ENV_PRODUCTION'
+    ]
 endif
 
 if get_option('buildtype') == 'debug'
