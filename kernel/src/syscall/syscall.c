@@ -43,8 +43,8 @@ char *syscall_string_in(char *src, size_t length) {
     return str;
 }
 
-[[noreturn]] void syscall_exit(int code, bool panic) {
-    log(LOG_LEVEL_DEBUG, "SYSCALL", "exit(code: %i, is_panic: %s, tid: %li)", code, panic ? "true" : "false", arch_sched_thread_current()->id);
+[[noreturn]] void syscall_exit(int code, bool is_panic) {
+    log(LOG_LEVEL_DEBUG, "SYSCALL", "exit(code: %i, is_panic: %s, tid: %li)", code, is_panic ? "true" : "false", arch_sched_thread_current()->id);
     arch_sched_thread_current()->state = THREAD_STATE_DESTROY;
     arch_sched_yield();
     ASSERT_UNREACHABLE();
