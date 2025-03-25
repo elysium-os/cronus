@@ -16,6 +16,7 @@
 #include "sched/process.h"
 #include "sched/sched.h"
 #include "sched/thread.h"
+#include "sys/interrupt.h"
 
 #include "arch/x86_64/cpu/fpu.h"
 #include "arch/x86_64/cpu/lapic.h"
@@ -100,7 +101,7 @@ static int g_sched_vector = 0;
     x86_64_msr_write(X86_64_MSR_KERNEL_GS_BASE, next->state.gs);
     x86_64_msr_write(X86_64_MSR_FS_BASE, next->state.fs);
 
-    if(this->state.fpu_area) g_x86_64_fpu_save(this->state.fpu_area);
+    if(this->state.fpu_area != NULL) g_x86_64_fpu_save(this->state.fpu_area);
     g_x86_64_fpu_restore(next->state.fpu_area);
 
     x86_64_thread_t *prev = x86_64_sched_context_switch(this, next);
@@ -122,12 +123,17 @@ static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t ker
     thread->prof_current_call_frame = 0;
 #endif
 
+    interrupt_state_t previous_state = interrupt_state_mask();
+    x86_64_thread_t *current_thread = X86_64_CPU_LOCAL_MEMBER(current_thread);
+    if(current_thread != NULL && current_thread->state.fpu_area != NULL) g_x86_64_fpu_save(current_thread->state.fpu_area);
     g_x86_64_fpu_restore(thread->state.fpu_area);
     uint16_t x87cw = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (0b11 << 8);
     asm volatile("fldcw %0" : : "m"(x87cw) : "memory");
     uint32_t mxcsr = (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12);
     asm volatile("ldmxcsr %0" : : "m"(mxcsr) : "memory");
     g_x86_64_fpu_save(thread->state.fpu_area);
+    if(current_thread != NULL && current_thread->state.fpu_area != NULL) g_x86_64_fpu_restore(current_thread->state.fpu_area);
+    interrupt_state_restore(previous_state);
 
     return thread;
 }
