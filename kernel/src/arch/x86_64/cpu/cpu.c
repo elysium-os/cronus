@@ -23,5 +23,5 @@ void arch_cpu_relax() {
         __builtin_ia32_pause();
         asm volatile("hlt");
     }
-    __builtin_unreachable();
+    ASSERT_UNREACHABLE();
 }

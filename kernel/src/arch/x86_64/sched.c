@@ -227,7 +227,7 @@ thread_t *arch_sched_thread_current() {
     }
 
     sched_switch(bootstrap_thread, idle_thread);
-    __builtin_unreachable();
+    ASSERT_UNREACHABLE();
 }
 
 void x86_64_sched_init() {

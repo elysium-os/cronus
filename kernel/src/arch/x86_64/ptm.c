@@ -83,7 +83,7 @@ static uint64_t privilege_to_x86_flags(vm_privilege_t privilege) {
         case VM_PRIVILEGE_KERNEL: return 0;
         case VM_PRIVILEGE_USER:   return PTE_FLAG_USER;
     }
-    __builtin_unreachable();
+    ASSERT_UNREACHABLE();
 }
 
 static uint64_t cache_to_x86_flags(vm_cache_t cache) {

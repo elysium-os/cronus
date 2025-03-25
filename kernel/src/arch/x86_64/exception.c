@@ -1,6 +1,7 @@
 #include "exception.h"
 
 #include "arch/cpu.h"
+#include "common/assert.h"
 #include "common/log.h"
 
 #include "arch/x86_64/cpu/cr.h"
@@ -70,5 +71,5 @@ static char *g_exception_messages[] = {
         frame->rbx,
         frame->rax);
     arch_cpu_halt();
-    __builtin_unreachable();
+    ASSERT_UNREACHABLE();
 }

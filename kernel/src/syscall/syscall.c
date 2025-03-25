@@ -47,7 +47,7 @@ char *syscall_string_in(char *src, size_t length) {
     log(LOG_LEVEL_DEBUG, "SYSCALL", "exit(code: %i, is_panic: %s, tid: %li)", code, panic ? "true" : "false", arch_sched_thread_current()->id);
     arch_sched_thread_current()->state = THREAD_STATE_DESTROY;
     arch_sched_yield();
-    __builtin_unreachable();
+    ASSERT_UNREACHABLE();
 }
 
 syscall_return_t syscall_debug(size_t length, char *str) {

@@ -170,7 +170,7 @@ static void thread_init() {
     __atomic_add_fetch(&g_init_cpu_id_counter, 1, __ATOMIC_SEQ_CST);
 
     x86_64_sched_init_cpu(cpu, false);
-    __builtin_unreachable();
+    ASSERT_UNREACHABLE();
 }
 
 [[noreturn]] void init(tartarus_boot_info_t *boot_info) {
@@ -524,7 +524,7 @@ static void thread_init() {
     // Scheduler handoff
     log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye for now!");
     x86_64_sched_init_cpu(cpu, true);
-    __builtin_unreachable();
+    ASSERT_UNREACHABLE();
 }
 
 bool x86_64_init_flag_check(size_t flags) {

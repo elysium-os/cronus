@@ -133,7 +133,7 @@ static uint32_t pcie_read(pci_device_t *device, uint8_t offset, uint8_t size) {
         case 2: return *(volatile uint16_t *) address;
         case 1: return *(volatile uint8_t *) address;
     }
-    ASSERT_UNREACHABLE("invalid pcie read size");
+    ASSERT_UNREACHABLE_COMMENT("invalid pcie read size");
 }
 
 static void pcie_write(pci_device_t *device, uint8_t offset, uint8_t size, uint32_t value) {
@@ -148,7 +148,7 @@ static void pcie_write(pci_device_t *device, uint8_t offset, uint8_t size, uint3
         case 2: *(volatile uint16_t *) address = (uint16_t) value; return;
         case 1: *(volatile uint8_t *) address = (uint8_t) value; return;
     }
-    ASSERT_UNREACHABLE("invalid pcie write size");
+    ASSERT_UNREACHABLE_COMMENT("invalid pcie write size");
 }
 
 #ifdef __ARCH_X86_64
@@ -165,7 +165,7 @@ static uint32_t pci_read(pci_device_t *device, uint8_t offset, uint8_t size) {
         case 2: return (uint16_t) (value >> ((offset & 2) * 8));
         case 1: return (uint8_t) (value >> ((offset & 3) * 8));
     }
-    ASSERT_UNREACHABLE("invalid pci read size");
+    ASSERT_UNREACHABLE_COMMENT("invalid pci read size");
 }
 
 static void pci_write(pci_device_t *device, uint8_t offset, uint8_t size, uint32_t value) {
@@ -181,7 +181,7 @@ static void pci_write(pci_device_t *device, uint8_t offset, uint8_t size, uint32
             original &= ~(0xFF >> ((offset & 3) * 8));
             original |= (uint8_t) value >> ((offset & 3) * 8);
             break;
-        default: ASSERT_UNREACHABLE("invalid pci write size");
+        default: ASSERT_UNREACHABLE_COMMENT("invalid pci write size");
     }
     x86_64_port_outd(PORT_CONFIG_ADDRESS, ((uint32_t) device->bus << 16) | ((uint32_t) (device->slot & 0x1F) << 11) | ((uint32_t) (device->func & 0x7) << 8) | (offset & 0xFC) | (1 << 31));
     x86_64_port_outd(PORT_CONFIG_DATA, original);
