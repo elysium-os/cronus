@@ -125,6 +125,13 @@ target/uacpi {
     }
 }
 
+// freestanding headers
+source/freestanding_headers {
+    url: https://github.com/osdev0/freestnd-c-hdrs-0bsd
+    commit: a87c192f3eb66b0806740dc67325f9ad23fc2d0b
+    type: git
+}
+
 // kernel
 source/kernel {
     url: kernel
@@ -133,11 +140,12 @@ source/kernel {
 
 target/kernel {
     source: kernel
-    dependencies [ target/tartarus target/uacpi target/mlibc_headers image/nasm image/clang image/lld image/meson ]
+    dependencies [ source/freestanding_headers target/tartarus target/uacpi target/mlibc_headers image/nasm image/clang image/lld image/meson ]
     configure {
         CC=clang CC_LD=lld meson setup \
             --prefix=@(prefix) \
             --buildtype=@(build_type) \
+            -Dfreestanding_headers=@(sources_dir)/freestanding_headers \
             -Dexternal_headers=@(sysroot_dir)@(prefix)/include \
             -Duacpi_path=@(sysroot_dir)@(prefix)/share/uacpi.a \
             @(source_dir)

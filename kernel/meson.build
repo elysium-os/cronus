@@ -7,6 +7,7 @@ includes = []
 cflags = [
     '-std=gnu23',
     '-ffreestanding',
+    '-nostdinc',
 
     '-Wall',
     '-Wextra',
@@ -30,6 +31,9 @@ ldflags = [
 includes += include_directories('.')
 if get_option('external_headers') != ''
     includes += include_directories(get_option('external_headers'))
+endif
+if get_option('freestanding_headers') != ''
+    includes += include_directories(get_option('freestanding_headers'))
 endif
 
 if get_option('buildtype') == 'release'

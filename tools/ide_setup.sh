@@ -10,27 +10,30 @@ KERN_DEFINES[3]=UACPI_FORMATTED_LOGGING
 KERN_DEFINES[4]=UACPI_SIZED_FREES
 
 KERN_INCLUDES[0]=kernel
-KERN_INCLUDES[1]=.chariot-cache/source/tartarus/src
-KERN_INCLUDES[2]=.chariot-cache/source/uacpi/src/include
-KERN_INCLUDES[3]=.chariot-cache/source/mlibc-sysdeps/src/elysium/include
+KERN_INCLUDES[1]=kernel/subsystem/*/include
+KERN_INCLUDES[2]=.chariot-cache/source/tartarus/src
+KERN_INCLUDES[3]=.chariot-cache/source/uacpi/src/include
+KERN_INCLUDES[4]=.chariot-cache/source/mlibc-sysdeps/src/elysium/include
+KERN_INCLUDES[5]=.chariot-cache/source/freestanding_headers/src
 
 KERN_FLAGS[0]=-std=gnu2x
 KERN_FLAGS[1]=-ffreestanding
-KERN_FLAGS[2]=-mcmodel=kernel
-KERN_FLAGS[3]=-mno-red-zone
-KERN_FLAGS[4]=-mgeneral-regs-only
-KERN_FLAGS[5]=-mabi=sysv
+KERN_FLAGS[2]=-nostdinc
+KERN_FLAGS[3]=-mcmodel=kernel
+KERN_FLAGS[4]=-mno-red-zone
+KERN_FLAGS[5]=-mgeneral-regs-only
+KERN_FLAGS[6]=-mabi=sysv
 
-KERN_FLAGS[6]=-Wall
-KERN_FLAGS[7]=-Wextra
-KERN_FLAGS[8]=-Wvla
-KERN_FLAGS[9]=-Wshadow
+KERN_FLAGS[7]=-Wall
+KERN_FLAGS[8]=-Wextra
+KERN_FLAGS[9]=-Wvla
+KERN_FLAGS[10]=-Wshadow
 
-KERN_FLAGS[10]=-fno-stack-protector
-KERN_FLAGS[11]=-fno-stack-check
-KERN_FLAGS[12]=-fno-omit-frame-pointer
-KERN_FLAGS[13]=-fno-strict-aliasing
-KERN_FLAGS[14]=-fno-lto
+KERN_FLAGS[11]=-fno-stack-protector
+KERN_FLAGS[12]=-fno-stack-check
+KERN_FLAGS[13]=-fno-omit-frame-pointer
+KERN_FLAGS[14]=-fno-strict-aliasing
+KERN_FLAGS[15]=-fno-lto
 
 # mlibc sysdep config
 SYSDEP_INCLUDES[0]=.chariot-cache/target/mlibc/build/ld.a.p
@@ -143,7 +146,7 @@ EOF
 }
 
 # build
-chariot target/tartarus source/uacpi target/mlibc_headers
+chariot target/tartarus source/uacpi target/mlibc_headers target/freestanding_headers
 
 # generate config
 case $1 in
