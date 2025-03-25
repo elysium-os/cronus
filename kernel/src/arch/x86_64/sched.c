@@ -79,7 +79,7 @@ static int g_sched_vector = 0;
         __builtin_ia32_pause();
         asm volatile("hlt");
     }
-    __builtin_unreachable();
+    ASSERT_UNREACHABLE();
 }
 
 [[gnu::no_instrument_function]] static void sched_switch(x86_64_thread_t *this, x86_64_thread_t *next) {
@@ -144,8 +144,8 @@ static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t ker
 
     thread_t *next = sched_thread_next();
     if(next == NULL) {
-        if(current == X86_64_CPU_LOCAL_MEMBER(self)->common.idle_thread) goto oneshot;
-        next = X86_64_CPU_LOCAL_MEMBER(self)->common.idle_thread;
+        if(current == X86_64_CPU_LOCAL_COMMON_MEMBER(idle_thread)) goto oneshot;
+        next = X86_64_CPU_LOCAL_COMMON_MEMBER(idle_thread);
     }
     ASSERT(current != next);
 
