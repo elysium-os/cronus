@@ -1,7 +1,6 @@
 #include "sched.h"
 
 #include "arch/cpu.h"
-#include "arch/sched.h"
 #include "common/assert.h"
 #include "common/lock/spinlock.h"
 #include "lib/list.h"
@@ -20,7 +19,7 @@ void sched_thread_schedule(thread_t *thread) {
     spinlock_release(&g_scheduler_lock, previous_state);
 }
 
-thread_t *sched_thread_next() {
+thread_t *internal_sched_thread_next() {
     interrupt_state_t previous_state = spinlock_acquire(&g_scheduler_lock);
     if(list_is_empty(&g_sched_threads_queued)) {
         spinlock_release(&g_scheduler_lock, previous_state);
@@ -33,7 +32,7 @@ thread_t *sched_thread_next() {
     return thread;
 }
 
-void sched_thread_drop(thread_t *thread) {
+void internal_sched_thread_drop(thread_t *thread) {
     if(thread == arch_cpu_current()->idle_thread) return;
 
     switch(thread->state) {

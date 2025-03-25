@@ -62,7 +62,7 @@ static int g_sched_vector = 0;
     be present upon entry here
 */
 [[gnu::no_instrument_function]] static void common_thread_init(x86_64_thread_t *prev) {
-    sched_thread_drop(&prev->common);
+    internal_sched_thread_drop(&prev->common);
 
     arch_interrupt_enable();
 
@@ -104,7 +104,7 @@ static int g_sched_vector = 0;
     g_x86_64_fpu_restore(next->state.fpu_area);
 
     x86_64_thread_t *prev = x86_64_sched_context_switch(this, next);
-    sched_thread_drop(&prev->common);
+    internal_sched_thread_drop(&prev->common);
 }
 
 static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t kernel_stack, uintptr_t rsp) {
@@ -151,7 +151,7 @@ static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t ker
     interrupt_state_t previous_state = interrupt_state_mask();
     thread_t *current = arch_sched_thread_current();
 
-    thread_t *next = sched_thread_next();
+    thread_t *next = internal_sched_thread_next();
     if(next == NULL) {
         if(current == X86_64_CPU_LOCAL_COMMON_MEMBER(idle_thread)) goto oneshot;
         next = X86_64_CPU_LOCAL_COMMON_MEMBER(idle_thread);
