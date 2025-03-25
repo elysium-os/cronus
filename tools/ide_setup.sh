@@ -9,7 +9,7 @@ KERN_DEFINES[2]=UACPI_NATIVE_ALLOC_ZEROED
 KERN_DEFINES[3]=UACPI_FORMATTED_LOGGING
 KERN_DEFINES[4]=UACPI_SIZED_FREES
 
-KERN_INCLUDES[0]=kernel/src
+KERN_INCLUDES[0]=kernel
 KERN_INCLUDES[1]=.chariot-cache/source/tartarus/src
 KERN_INCLUDES[2]=.chariot-cache/source/uacpi/src/include
 KERN_INCLUDES[3]=.chariot-cache/source/mlibc-sysdeps/src/elysium/include
