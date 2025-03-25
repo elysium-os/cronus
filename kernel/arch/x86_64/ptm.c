@@ -1,6 +1,5 @@
 #include "ptm.h"
 
-#include "arch/cpu.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
 #include "common/assert.h"
@@ -228,7 +227,7 @@ void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr) {
     spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
 }
 
-bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t *out) {
+bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, PARAM_OUT(uintptr_t *) paddr) {
     interrupt_state_t previous_state = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
     uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
     for(int i = 4; i > 1; i--) {
@@ -242,7 +241,7 @@ bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, uintp
     uint64_t entry = current_table[VADDR_TO_INDEX(vaddr, 1)];
     spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
     if((entry & PTE_FLAG_PRESENT) == 0) return false;
-    *out = (entry & ADDRESS_MASK);
+    *paddr = (entry & ADDRESS_MASK);
     return true;
 }
 

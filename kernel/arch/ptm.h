@@ -1,5 +1,6 @@
 #pragma once
 
+#include "lib/param.h"
 #include "memory/vm.h"
 
 #include <stdint.h>
@@ -27,7 +28,6 @@ void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr);
 
 /**
  * @brief Translate a virtual address to a physical address.
- * @param out physical address
  * @returns true on success
  */
-bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t *out);
+bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, PARAM_OUT(uintptr_t *) paddr);
