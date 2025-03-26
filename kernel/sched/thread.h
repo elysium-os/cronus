@@ -2,7 +2,6 @@
 
 #include "lib/list.h"
 #include "sched/process.h"
-#include "sys/cpu.h"
 
 typedef enum {
     THREAD_STATE_READY,

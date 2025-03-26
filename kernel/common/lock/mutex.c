@@ -1,6 +1,5 @@
 #include "mutex.h"
 
-#include "arch/cpu.h"
 #include "arch/sched.h"
 #include "common/assert.h"
 #include "lib/expect.h"
