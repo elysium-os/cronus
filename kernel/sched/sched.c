@@ -41,7 +41,7 @@ void internal_sched_thread_drop(thread_t *thread) {
                 interrupt_state_t previous_state = spinlock_acquire(&thread->proc->lock);
                 list_delete(&thread->list_proc);
                 if(list_is_empty(&thread->proc->threads)) {
-                    process_destroy(thread->proc);
+                    reaper_queue_process(thread->proc);
                     interrupt_state_restore(previous_state);
                 } else {
                     spinlock_release(&thread->proc->lock, previous_state);
