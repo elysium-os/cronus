@@ -153,8 +153,8 @@ static x86_64_thread_t *create_thread(process_t *proc, x86_64_thread_stack_t ker
 
     thread_t *next = internal_sched_thread_next();
     if(next == NULL) {
-        if(current == X86_64_CPU_LOCAL_COMMON_MEMBER(idle_thread)) goto oneshot;
-        next = X86_64_CPU_LOCAL_COMMON_MEMBER(idle_thread);
+        if(current == X86_64_CPU_LOCAL_MEMBER(common.idle_thread)) goto oneshot;
+        next = X86_64_CPU_LOCAL_MEMBER(common.idle_thread);
     }
     ASSERT(current != next);
 

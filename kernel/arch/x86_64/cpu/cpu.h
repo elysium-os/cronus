@@ -18,13 +18,6 @@
         _value;                                                                                 \
     })
 
-#define X86_64_CPU_LOCAL_COMMON_MEMBER(MEMBER)                                                                            \
-    ({                                                                                                                    \
-        typeof((cpu_t) {}.MEMBER) _value;                                                                                 \
-        asm volatile("mov %%gs:(%1), %0" : "=r"(_value) : "r"(offsetof(x86_64_cpu_t, common) + offsetof(cpu_t, MEMBER))); \
-        _value;                                                                                                           \
-    })
-
 #define X86_64_CPU_LOCAL_MEMBER_SET(MEMBER, VALUE) asm volatile("mov %0, %%gs:(%1)" : : "r"(VALUE), "r"((offsetof(x86_64_cpu_t, MEMBER))))
 
 typedef struct x86_64_cpu {
