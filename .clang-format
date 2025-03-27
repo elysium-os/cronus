@@ -104,6 +104,8 @@ PPIndentWidth: 0
 Language: Cpp # For C in reality.
 MaxEmptyLinesToKeep: 2
 
+Cpp11BracedListStyle: false
+
 # Includes
 SortIncludes: CaseInsensitive
 IncludeBlocks: Regroup
