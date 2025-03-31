@@ -1,39 +1,66 @@
 #include "sched.h"
 
 #include "arch/cpu.h"
+#include "arch/interrupt.h"
+#include "arch/sched.h"
 #include "common/assert.h"
 #include "common/lock/spinlock.h"
+#include "common/log.h"
+#include "common/panic.h"
 #include "lib/list.h"
 #include "reaper.h"
 #include "sched/thread.h"
 #include "sys/cpu.h"
-
-static spinlock_t g_scheduler_lock = SPINLOCK_INIT;
-
-static list_t g_sched_threads_queued = LIST_INIT_CIRCULAR(g_sched_threads_queued);
+#include "sys/interrupt.h"
 
 void sched_thread_schedule(thread_t *thread) {
     thread->state = THREAD_STATE_READY;
-    interrupt_state_t previous_state = spinlock_acquire(&g_scheduler_lock);
-    list_prepend(&g_sched_threads_queued, &thread->list_sched);
-    spinlock_release(&g_scheduler_lock, previous_state);
+
+    interrupt_state_t previous_state = spinlock_acquire(&thread->scheduler->lock);
+    list_prepend(&thread->scheduler->thread_queue, &thread->list_sched);
+    spinlock_release(&thread->scheduler->lock, previous_state);
 }
 
-thread_t *internal_sched_thread_next() {
-    interrupt_state_t previous_state = spinlock_acquire(&g_scheduler_lock);
-    if(list_is_empty(&g_sched_threads_queued)) {
-        spinlock_release(&g_scheduler_lock, previous_state);
+thread_t *sched_thread_next(sched_t *sched) {
+    interrupt_state_t previous_state = spinlock_acquire(&sched->lock);
+    if(list_is_empty(&sched->thread_queue)) {
+        spinlock_release(&sched->lock, previous_state);
         return NULL;
     }
-    thread_t *thread = LIST_CONTAINER_GET(LIST_NEXT(&g_sched_threads_queued), thread_t, list_sched);
+
+    thread_t *thread = LIST_CONTAINER_GET(LIST_NEXT(&sched->thread_queue), thread_t, list_sched);
     list_delete(&thread->list_sched);
-    spinlock_release(&g_scheduler_lock, previous_state);
-    thread->state = THREAD_STATE_ACTIVE;
+    spinlock_release(&sched->lock, previous_state);
+    thread->state = THREAD_STATE_ACTIVE; // TODO: move this?
     return thread;
 }
 
+void sched_yield(enum thread_state yield_state) {
+    ASSERT(yield_state != THREAD_STATE_ACTIVE);
+
+    interrupt_state_t previous_state = interrupt_state_mask();
+    thread_t *current = arch_sched_thread_current();
+
+    thread_t *next = sched_thread_next(&arch_cpu_current()->sched);
+    if(next == NULL && current != current->scheduler->idle_thread) next = current->scheduler->idle_thread;
+    if(next != NULL) {
+        ASSERT(current != next);
+        current->state = yield_state;
+        arch_sched_context_switch(current, next);
+    } else {
+        ASSERT(current->state == yield_state);
+    }
+
+    arch_sched_preempt();
+
+    interrupt_state_restore(previous_state);
+}
+
 void internal_sched_thread_drop(thread_t *thread) {
-    if(thread == arch_cpu_current()->idle_thread) return;
+    ASSERT(!arch_interrupt_state());
+    ASSERT(thread->scheduler == &arch_cpu_current()->sched)
+
+    if(thread == thread->scheduler->idle_thread) return;
 
     switch(thread->state) {
         case THREAD_STATE_DESTROY:

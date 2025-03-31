@@ -1,7 +1,7 @@
 #pragma once
 
-#include "sched/thread.h"
+#include "sched/sched.h"
 
 typedef struct cpu {
-    struct thread *idle_thread;
+    sched_t sched;
 } cpu_t;

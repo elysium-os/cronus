@@ -3,6 +3,11 @@
 #include "sched/process.h"
 #include "sched/thread.h"
 
+/**
+ * @brief Create reaper thread.
+ */
+thread_t *reaper_create();
+
 /*
  * @brief Queue a thread onto the reaper.
  */

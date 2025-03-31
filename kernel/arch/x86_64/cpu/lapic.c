@@ -1,6 +1,7 @@
 #include "lapic.h"
 
 #include "memory/hhdm.h"
+#include "sys/time.h"
 
 #include "arch/x86_64/cpu/cpu.h"
 #include "arch/x86_64/cpu/msr.h"
@@ -56,7 +57,7 @@ void x86_64_lapic_timer_oneshot(uint8_t vector, uint64_t us) {
     x86_64_lapic_timer_stop();
     lapic_write(REG_LVT_TIMER, vector);
     lapic_write(REG_TIMER_DIV, 0);
-    lapic_write(REG_TIMER_INITIAL_COUNT, us * (X86_64_CPU_LOCAL_MEMBER(lapic_timer_frequency) / 1000000));
+    lapic_write(REG_TIMER_INITIAL_COUNT, us * (X86_64_CPU_CURRENT.lapic_timer_frequency / 1000000));
 }
 
 void x86_64_lapic_timer_stop() {

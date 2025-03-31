@@ -18,15 +18,15 @@ void mutex_acquire(mutex_t *mutex) {
 
     for(int i = 0; i < SPIN_COUNT; i++) {
         if(EXPECT_LIKELY(try_lock(mutex, true))) return;
-        arch_sched_yield(THREAD_STATE_READY);
+        sched_yield(THREAD_STATE_READY);
     }
 
     interrupt_state_t previous_state = spinlock_acquire(&mutex->lock);
     if(EXPECT_LIKELY(__atomic_exchange_n(&mutex->state, MUTEX_STATE_CONTESTED, __ATOMIC_ACQ_REL) != MUTEX_STATE_UNLOCKED)) {
         list_append(&mutex->wait_queue, &arch_sched_thread_current()->list_wait);
 
-        spinlock_primitive_release(&mutex->lock);
-        arch_sched_yield(THREAD_STATE_BLOCK);
+        spinlock_primitive_release(&mutex->lock); // TODO: race condition here ?
+        sched_yield(THREAD_STATE_BLOCK);
         spinlock_primitive_acquire(&mutex->lock);
     } else {
         __atomic_store_n(&mutex->state, MUTEX_STATE_LOCKED, __ATOMIC_RELEASE);

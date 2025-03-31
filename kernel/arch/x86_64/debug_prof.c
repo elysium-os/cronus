@@ -154,7 +154,7 @@ static int g_prof_active = 0;
     uint64_t start = __builtin_ia32_rdtsc();
     if(!__atomic_load_n(&g_prof_active, __ATOMIC_ACQUIRE)) return;
 
-    x86_64_thread_t *thread = X86_64_CPU_LOCAL_MEMBER(current_thread);
+    x86_64_thread_t *thread = X86_64_CPU_CURRENT.current_thread;
 
     size_t idx = thread->prof_current_call_frame++;
     if(idx >= X86_64_DEBUG_PROF_MAX_FRAMES) profiler_panic("too many frames", function, call_site);
@@ -180,7 +180,7 @@ static int g_prof_active = 0;
 
     unsigned state = sdi();
 
-    x86_64_thread_t *thread = X86_64_CPU_LOCAL_MEMBER(current_thread);
+    x86_64_thread_t *thread = X86_64_CPU_CURRENT.current_thread;
 
     size_t idx = --thread->prof_current_call_frame;
     x86_64_debug_prof_call_frame_t *frame = &thread->prof_call_frames[idx];

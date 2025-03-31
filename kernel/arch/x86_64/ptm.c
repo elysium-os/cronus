@@ -106,7 +106,7 @@ static void tlb_shootdown(uintptr_t addr) {
 
     for(size_t i = 0; i < g_x86_64_cpu_count; i++) {
         x86_64_cpu_t *cpu = &g_x86_64_cpus[i];
-        if(cpu == X86_64_CPU_LOCAL_MEMBER(self)) {
+        if(cpu == X86_64_CPU_CURRENT.self) {
             invlpg(addr);
             __atomic_add_fetch(&g_tlb_shootdown_complete, 1, __ATOMIC_RELEASE);
             continue;
