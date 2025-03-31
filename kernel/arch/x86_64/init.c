@@ -25,6 +25,7 @@
 #include "memory/vm.h"
 #include "ring_buffer.h"
 #include "sched/process.h"
+#include "sched/reaper.h"
 #include "sched/sched.h"
 #include "sys/time.h"
 #include "sysv/auxv.h"
@@ -485,6 +486,7 @@ static void thread_init() {
     }
 
     // Schedule init threads
+    sched_thread_schedule(reaper_create());
     sched_thread_schedule(arch_sched_thread_create_kernel(thread_init));
 
     {
