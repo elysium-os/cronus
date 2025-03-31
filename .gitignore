@@ -1,6 +1,7 @@
 .chariot-cache/*
 !.chariot-cache/patches
 
+.zed
 .vscode
 .clangd
 

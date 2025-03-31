@@ -88,6 +88,19 @@ CompileFlags:
 $(for FLAG in ${INIT_FLAGS[@]}; do echo -e "    - \"$FLAG\""; done)
 $(for INC in ${INIT_INCLUDES[@]}; do echo -e "    - \"-I$(readlink -f $INC)\""; done)
 EOF
+
+mkdir -p .zed
+cat > .zed/settings.json <<EOF
+{
+    "lsp": {
+        "clangd": {
+            "binary": {
+                "path": "$(which clangd)"
+            }
+        }
+    }
+}
+EOF
 }
 
 # vscode setup
