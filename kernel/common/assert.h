@@ -14,17 +14,6 @@
 
 
 #ifdef __ENV_PRODUCTION
-#define ASSERT_COMMENT(ASSERTION, COMMENT)
-#else
-/**
- * @brief Make an assertion and panic with a comment on failure.
- */
-#define ASSERT_COMMENT(ASSERTION, COMMENT)                                     \
-    if(!(ASSERTION)) panic("Assertion \"%s\" failed: %s", #ASSERTION, COMMENT)
-#endif
-
-
-#ifdef __ENV_PRODUCTION
 #define ASSERT_UNREACHABLE() __builtin_unreachable()
 #else
 /**

@@ -75,7 +75,7 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
     interrupt_state_t previous_state = spinlock_acquire(&zone->lock);
     while(list_is_empty(&zone->lists[avl_order])) {
         avl_order++;
-        ASSERT_COMMENT(avl_order <= PMM_MAX_ORDER, "Out of memory");
+        if(avl_order > PMM_MAX_ORDER) panic("out of memory");
     }
 
     pmm_block_t *block = LIST_CONTAINER_GET(LIST_NEXT(&zone->lists[avl_order]), pmm_block_t, list_elem);
