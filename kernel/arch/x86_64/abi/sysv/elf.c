@@ -2,7 +2,7 @@
 
 #include "arch/page.h"
 #include "auxv.h"
-#include "common/abi/elf64.h"
+#include "common/abi/sysv/elf64.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "fs/vfs.h"
