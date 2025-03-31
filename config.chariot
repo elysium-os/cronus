@@ -8,9 +8,9 @@ source/support {
 
 // mkimg
 source/mkimg {
-    url: https://git.thenest.dev/wux/mkimg/-/archive/main/mkimg-main.tar.gz
-    b2sum: f6b2eafa35b329323179fecce635cf37b190a5990974bca545c70a9624d6ed181e9df6209f264bcb059002a7d252cf2e54eaaea3144bbcaad1a6b254a50f621b
-    type: tar.gz
+    url: https://github.com/imwux/mkimg
+    commit: 3ee31fc7dd370fb68a9da52e271ef78a97de5012
+    type: git
 }
 
 host/mkimg {
@@ -42,9 +42,9 @@ host/rdsk {
 
 // Tartarus (Bootloader)
 source/tartarus {
-    url: https://git.thenest.dev/wux/tartarus-bootloader/-/archive/b26e9095468e247e8be5efd737dcffeea63cf0a5/tartarus-bootloader-b26e9095468e247e8be5efd737dcffeea63cf0a5.tar.gz
-    b2sum: 2eb6f030b0a7a188b1bdd11648a7ecb9a4b73ef4a51e9dda5d1f6ef178eb0e87987f8164e588ae0c96a3deac6c45207a4d224316d0cb7c8e70bc947761020c0f
-    type: tar.gz
+    url: https://github.com/imwux/tartarus-bootloader.git
+    commit: b26e9095468e247e8be5efd737dcffeea63cf0a5
+    type: git
 }
 
 source/vendor_libgcc {
