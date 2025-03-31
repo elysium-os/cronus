@@ -2,7 +2,7 @@
 
 #include "memory/vm.h"
 
-#include "arch/x86_64/sysv/auxv.h"
+#include "arch/x86_64/abi/sysv/auxv.h"
 
 /**
  * @brief Setup stack according to SysV ABI.
