@@ -42,7 +42,7 @@ static char *g_exception_messages[] = {
 };
 
 [[noreturn]] void x86_64_exception_unhandled(x86_64_interrupt_frame_t *frame) {
-    log(LOG_LEVEL_ERROR, "EXCEPTION", "Unhandled Exception (%s)", g_exception_messages[frame->int_no]);
+    log(LOG_LEVEL_ERROR, "EXCEPTION", "Unhandled Exception `%s` [CPU SEQID: %lu]", g_exception_messages[frame->int_no], arch_cpu_id());
 
     x86_64_debug_stack_frame_t initial_stack_frame;
     initial_stack_frame.rbp = (x86_64_debug_stack_frame_t *) frame->rbp;
