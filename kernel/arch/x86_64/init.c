@@ -289,7 +289,7 @@ static void thread_init() {
     g_hhdm_region.address_space = g_vm_global_address_space;
     g_hhdm_region.base = MATH_FLOOR(g_hhdm_offset, ARCH_PAGE_GRANULARITY);
     g_hhdm_region.length = MATH_CEIL(g_hhdm_size, ARCH_PAGE_GRANULARITY);
-    g_hhdm_region.protection = (vm_protection_t) {.read = true, .write = true};
+    g_hhdm_region.protection = (vm_protection_t) { .read = true, .write = true };
     g_hhdm_region.cache_behavior = VM_CACHE_STANDARD;
     g_hhdm_region.type = VM_REGION_TYPE_DIRECT;
     g_hhdm_region.type_data.direct.physical_address = 0;
@@ -298,7 +298,7 @@ static void thread_init() {
     g_kernel_region.address_space = g_vm_global_address_space;
     g_kernel_region.base = MATH_FLOOR(boot_info->kernel.vaddr, ARCH_PAGE_GRANULARITY);
     g_kernel_region.length = MATH_CEIL(boot_info->kernel.size, ARCH_PAGE_GRANULARITY);
-    g_kernel_region.protection = (vm_protection_t) {.read = true, .write = true};
+    g_kernel_region.protection = (vm_protection_t) { .read = true, .write = true };
     g_kernel_region.cache_behavior = VM_CACHE_STANDARD;
     g_kernel_region.type = VM_REGION_TYPE_ANON;
     list_append(&g_vm_global_address_space->regions, &g_kernel_region.list_elem);
@@ -326,7 +326,7 @@ static void thread_init() {
         uintptr_t end = pagecache_start + MATH_CEIL(((entry.base + entry.length) / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
         if(start > pagecache_end) pagecache_end = start;
         for(; pagecache_end < end; pagecache_end += ARCH_PAGE_GRANULARITY) {
-            arch_ptm_map(g_vm_global_address_space, pagecache_end, bootmem_alloc(), (vm_protection_t) {.read = true, .write = true}, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
+            arch_ptm_map(g_vm_global_address_space, pagecache_end, bootmem_alloc(), (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
         }
 
         pmm_region_add(entry.base, entry.length, (g_bootmem_base / ARCH_PAGE_GRANULARITY) - (entry.base / ARCH_PAGE_GRANULARITY));
@@ -337,7 +337,7 @@ static void thread_init() {
     x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_PHYS);
 
     log(LOG_LEVEL_DEBUG, "INIT", "Physical Memory Map");
-    pmm_zone_t *zones[] = {&g_pmm_zone_low, &g_pmm_zone_normal};
+    pmm_zone_t *zones[] = { &g_pmm_zone_low, &g_pmm_zone_normal };
     for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
         pmm_zone_t *zone = zones[i];
         log(LOG_LEVEL_DEBUG, "INIT", "» %-6s %#-18lx -> %#-18lx %lu/%lu pages", zone->name, zone->start, zone->end, zone->free_page_count, zone->total_page_count);
@@ -478,10 +478,10 @@ static void thread_init() {
     if(res != VFS_RESULT_OK) panic("failed to make log file (%i)", res);
 
     size_t count;
-    res = log_node->ops->rw(log_node, &(vfs_rw_t) {.rw = VFS_RW_WRITE, .size = g_ring_buffer.size - g_ring_buffer.index, .offset = 0, .buffer = &g_ring_buffer.buffer[g_ring_buffer.index]}, &count);
+    res = log_node->ops->rw(log_node, &(vfs_rw_t) { .rw = VFS_RW_WRITE, .size = g_ring_buffer.size - g_ring_buffer.index, .offset = 0, .buffer = &g_ring_buffer.buffer[g_ring_buffer.index] }, &count);
     if(res != VFS_RESULT_OK || count != g_ring_buffer.size - g_ring_buffer.index) panic("failed to flush ring buffer");
     if(g_ring_buffer.full) {
-        res = log_node->ops->rw(log_node, &(vfs_rw_t) {.rw = VFS_RW_WRITE, .size = g_ring_buffer.index, .offset = g_ring_buffer.size - g_ring_buffer.index, .buffer = &g_ring_buffer.buffer}, &count);
+        res = log_node->ops->rw(log_node, &(vfs_rw_t) { .rw = VFS_RW_WRITE, .size = g_ring_buffer.index, .offset = g_ring_buffer.size - g_ring_buffer.index, .buffer = &g_ring_buffer.buffer }, &count);
         if(res != VFS_RESULT_OK || count != g_ring_buffer.index) panic("failed to flush ring buffer");
     }
 
@@ -515,8 +515,8 @@ static void thread_init() {
 
         log(LOG_LEVEL_DEBUG, "INIT", "entry: %#lx; phdr: %#lx; phent: %#lx; phnum: %#lx;", auxv.entry, auxv.phdr, auxv.phent, auxv.phnum);
 
-        char *argv[] = {"/usr/bin/init", NULL};
-        char *envp[] = {NULL};
+        char *argv[] = { "/usr/bin/init", NULL };
+        char *envp[] = { NULL };
 
         process_t *proc = process_create(as);
         uintptr_t thread_stack = x86_64_sysv_stack_setup(proc->address_space, ARCH_PAGE_GRANULARITY * 8, argv, envp, &auxv);

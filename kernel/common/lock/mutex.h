@@ -3,7 +3,7 @@
 #include "common/lock/spinlock.h"
 #include "lib/list.h"
 
-#define MUTEX_INIT ((mutex_t) {.state = MUTEX_STATE_UNLOCKED, .lock = 0, .wait_queue = LIST_INIT})
+#define MUTEX_INIT ((mutex_t) { .state = MUTEX_STATE_UNLOCKED, .lock = 0, .wait_queue = LIST_INIT })
 
 typedef enum {
     MUTEX_STATE_UNLOCKED,

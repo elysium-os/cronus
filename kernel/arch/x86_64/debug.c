@@ -16,7 +16,7 @@ void arch_debug_stack_trace() {
 }
 
 x86_64_debug_symbol_t x86_64_debug_symbol(uintptr_t lookup_address) {
-    if(g_arch_debug_symbols == NULL) return (x86_64_debug_symbol_t) {.found = false};
+    if(g_arch_debug_symbols == NULL) return (x86_64_debug_symbol_t) { .found = false };
 
     enum {
         ADDRESS,
@@ -72,11 +72,11 @@ x86_64_debug_symbol_t x86_64_debug_symbol(uintptr_t lookup_address) {
             case UNKNOWN: break;
         }
     }
-    if(name_offset == 0 || name_offset >= g_arch_debug_symbols_length) return (x86_64_debug_symbol_t) {.found = false};
+    if(name_offset == 0 || name_offset >= g_arch_debug_symbols_length) return (x86_64_debug_symbol_t) { .found = false };
 
     size_t length = 0;
     while(g_arch_debug_symbols[name_offset + length] != '\n' && name_offset + length < g_arch_debug_symbols_length) length++;
-    return (x86_64_debug_symbol_t) {.found = true, .name = &g_arch_debug_symbols[name_offset], .length = length, .address = address};
+    return (x86_64_debug_symbol_t) { .found = true, .name = &g_arch_debug_symbols[name_offset], .length = length, .address = address };
 }
 
 void x86_64_debug_stack_trace_from(x86_64_debug_stack_frame_t *stack_frame) {

@@ -12,7 +12,7 @@ void time_source_register(time_source_t *source) {
 
 time_t time_monotonic() {
     if(g_main_source == NULL) {
-        log(LOG_LEVEL_WARN, "TIME", "time requested while no available source");
+        log(LOG_LEVEL_WARN, "TIME", "time requested. no available source");
         return 0;
     }
     return g_main_source->current();

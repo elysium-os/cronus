@@ -77,14 +77,14 @@ static vm_region_t *region_alloc(bool global_lock_acquired) {
         pmm_block_t *page = pmm_alloc_page(PMM_FLAG_ZERO);
         if(!global_lock_acquired) spinlock_primitive_acquire(&g_vm_global_address_space->lock);
         uintptr_t address = find_space(g_vm_global_address_space, 0, ARCH_PAGE_GRANULARITY);
-        arch_ptm_map(g_vm_global_address_space, address, page->paddr, (vm_protection_t) {.read = true, .write = true}, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
+        arch_ptm_map(g_vm_global_address_space, address, page->paddr, (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
 
         vm_region_t *region = (vm_region_t *) address;
         region[0].address_space = g_vm_global_address_space;
         region[0].type = VM_REGION_TYPE_ANON;
         region[0].base = address;
         region[0].length = ARCH_PAGE_GRANULARITY;
-        region[0].protection = (vm_protection_t) {.read = true, .write = true};
+        region[0].protection = (vm_protection_t) { .read = true, .write = true };
         region[0].cache_behavior = VM_CACHE_STANDARD;
 
         list_append(&g_vm_global_address_space->regions, &region[0].list_elem);

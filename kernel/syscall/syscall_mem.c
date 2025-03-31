@@ -15,7 +15,7 @@ syscall_return_t syscall_mem_anon_allocate(size_t size) {
         return ret;
     }
 
-    void *ptr = vm_map_anon(arch_sched_thread_current()->proc->address_space, NULL, size, (vm_protection_t) {.read = true, .write = true}, VM_CACHE_STANDARD, VM_FLAG_ZERO);
+    void *ptr = vm_map_anon(arch_sched_thread_current()->proc->address_space, NULL, size, (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_FLAG_ZERO);
     ret.value = (uintptr_t) ptr;
     log(LOG_LEVEL_DEBUG, "SYSCALL", "anon_allocate(size: %#lx) -> %#lx", size, ret.value);
     return ret;

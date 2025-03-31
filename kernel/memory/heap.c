@@ -14,16 +14,16 @@
 #define SLAB_128X_COUNT (sizeof(g_slab_128x_sizes) / sizeof(*g_slab_128x_sizes))
 #define SLAB_OTHER_COUNT (sizeof(g_slab_other_sizes) / sizeof(*g_slab_other_sizes))
 
-static const char *g_slab_8x_names[] = {"heap-8", "heap-16", "heap-24", "heap-32", "heap-40", "heap-48", "heap-56", "heap-64", "heap-72"};
-static size_t g_slab_8x_sizes[] = {8, 16, 24, 32, 40, 48, 56, 64, 72};
+static const char *g_slab_8x_names[] = { "heap-8", "heap-16", "heap-24", "heap-32", "heap-40", "heap-48", "heap-56", "heap-64", "heap-72" };
+static size_t g_slab_8x_sizes[] = { 8, 16, 24, 32, 40, 48, 56, 64, 72 };
 static slab_cache_t *g_8x_slabs[SLAB_8X_COUNT];
 
-static const char *g_slab_128x_names[] = {"heap-128", "heap-256", "heap-384", "heap-512"};
-static size_t g_slab_128x_sizes[] = {128, 256, 384, 512};
+static const char *g_slab_128x_names[] = { "heap-128", "heap-256", "heap-384", "heap-512" };
+static size_t g_slab_128x_sizes[] = { 128, 256, 384, 512 };
 static slab_cache_t *g_128x_slabs[SLAB_128X_COUNT];
 
-static const char *g_slab_other_names[] = {"heap-1024", "heap-2048"};
-static size_t g_slab_other_sizes[] = {1024, 2048};
+static const char *g_slab_other_names[] = { "heap-1024", "heap-2048" };
+static size_t g_slab_other_sizes[] = { 1024, 2048 };
 static slab_cache_t *g_other_slabs[SLAB_OTHER_COUNT];
 
 static slab_cache_t *find_cache(size_t size) {

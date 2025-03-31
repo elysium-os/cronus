@@ -7,8 +7,8 @@
 #include "memory/hhdm.h"
 #include "memory/page.h"
 
-pmm_zone_t g_pmm_zone_low = {.name = "LOW", .start = 0, .end = ARCH_MEM_LOW_SIZE, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = {[0 ... PMM_MAX_ORDER] = LIST_INIT}};
-pmm_zone_t g_pmm_zone_normal = {.name = "NORMAL", .start = ARCH_MEM_LOW_SIZE, .end = UINTPTR_MAX, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = {[0 ... PMM_MAX_ORDER] = LIST_INIT}};
+pmm_zone_t g_pmm_zone_low = { .name = "LOW", .start = 0, .end = ARCH_MEM_LOW_SIZE, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
+pmm_zone_t g_pmm_zone_normal = { .name = "NORMAL", .start = ARCH_MEM_LOW_SIZE, .end = UINTPTR_MAX, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
 
 static inline uint8_t pagecount_to_order(size_t pages) {
     if(pages == 1) return 0;
@@ -16,7 +16,7 @@ static inline uint8_t pagecount_to_order(size_t pages) {
 }
 
 void pmm_region_add(uintptr_t base, size_t size, size_t used) {
-    pmm_zone_t *zones[] = {&g_pmm_zone_low, &g_pmm_zone_normal};
+    pmm_zone_t *zones[] = { &g_pmm_zone_low, &g_pmm_zone_normal };
     for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
         pmm_zone_t *zone = zones[i];
 
@@ -36,7 +36,7 @@ void pmm_region_add(uintptr_t base, size_t size, size_t used) {
         zone->free_page_count += page_count - used;
 
         for(size_t j = 0; j < page_count; j++) {
-            g_page_cache[index_offset + j].block = (pmm_block_t) {.free = true, .paddr = local_base + j * ARCH_PAGE_GRANULARITY, .order = 0};
+            g_page_cache[index_offset + j].block = (pmm_block_t) { .free = true, .paddr = local_base + j * ARCH_PAGE_GRANULARITY, .order = 0 };
         }
 
         for(size_t j = 0; j < used; j++) {

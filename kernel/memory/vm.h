@@ -11,8 +11,8 @@
 #define VM_FLAG_NO_DEMAND (1 << 2)
 #define VM_FLAG_ZERO (1 << 10) /* only applies to anonymous mappings */
 
-#define VM_PROT_RW ((vm_protection_t) {.read = true, .write = true})
-#define VM_PROT_RWX ((vm_protection_t) {.read = true, .write = true, .exec = true})
+#define VM_PROT_RW ((vm_protection_t) { .read = true, .write = true })
+#define VM_PROT_RWX ((vm_protection_t) { .read = true, .write = true, .exec = true })
 
 typedef struct {
     bool read  : 1;

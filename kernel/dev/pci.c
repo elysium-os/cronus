@@ -227,17 +227,17 @@ static void check_function(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t 
 
 static void check_bus(uint16_t segment, uint8_t bus) {
     for(uint8_t slot = 0; slot < 32; slot++) {
-        pci_device_t device = {.segment = segment, .bus = bus, .slot = slot};
+        pci_device_t device = { .segment = segment, .bus = bus, .slot = slot };
         if(readw(&device, offsetof(pci_device_header_t, vendor_id)) == VENDOR_INVALID) continue;
         for(uint8_t func = 0; func < ((readb(&device, offsetof(pci_device_header_t, header_type)) & HEADER_TYPE_MULTIFUNC) ? 8 : 1); func++) check_function(segment, bus, slot, func);
     }
 }
 
 static void check_segment(uint16_t segment) {
-    pci_device_t root_controller = {.segment = segment};
+    pci_device_t root_controller = { .segment = segment };
     if(readb(&root_controller, offsetof(pci_device_header_t, header_type)) & HEADER_TYPE_MULTIFUNC) {
         for(uint8_t func = 0; func < 8; func++) {
-            pci_device_t controller = {.segment = segment, .func = func};
+            pci_device_t controller = { .segment = segment, .func = func };
             if(readw(&controller, offsetof(pci_device_header_t, vendor_id)) == VENDOR_INVALID) break;
             check_bus(segment, func);
         }

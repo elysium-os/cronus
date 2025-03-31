@@ -103,7 +103,7 @@ elf_result_t elf_load(vfs_node_t *file, vm_address_space_t *as, PARAM_OUT(char *
     [[gnu::cleanup(auto_free_header)]] elf_header_t *header = heap_alloc(sizeof(elf_header_t));
 
     size_t read_count;
-    res = file->ops->rw(file, &(vfs_rw_t) {.rw = VFS_RW_READ, .size = sizeof(elf_header_t), .buffer = (void *) header}, &read_count);
+    res = file->ops->rw(file, &(vfs_rw_t) { .rw = VFS_RW_READ, .size = sizeof(elf_header_t), .buffer = (void *) header }, &read_count);
     if(res != VFS_RESULT_OK || read_count != sizeof(elf_header_t)) return ELF_RESULT_ERR_FS;
 
     if(header->ident.magic[0] != ID0 || header->ident.magic[1] != ID1 || header->ident.magic[2] != ID2 || header->ident.magic[3] != ID3) return ELF_RESULT_ERR_NOT_ELF;
@@ -118,7 +118,7 @@ elf_result_t elf_load(vfs_node_t *file, vm_address_space_t *as, PARAM_OUT(char *
 
     [[gnu::cleanup(auto_free_phdr)]] elf_phdr_t *phdr = heap_alloc(header->phentsize);
     for(int i = 0; i < header->phnum; i++) {
-        res = file->ops->rw(file, &(vfs_rw_t) {.rw = VFS_RW_READ, .size = header->phentsize, .offset = header->phoff + (i * header->phentsize), .buffer = (void *) phdr}, &read_count);
+        res = file->ops->rw(file, &(vfs_rw_t) { .rw = VFS_RW_READ, .size = header->phentsize, .offset = header->phoff + (i * header->phentsize), .buffer = (void *) phdr }, &read_count);
         if(res != VFS_RESULT_OK || read_count != header->phentsize) {
             heap_free(interpreter, interpreter_size);
             return ELF_RESULT_ERR_FS;
@@ -132,7 +132,7 @@ elf_result_t elf_load(vfs_node_t *file, vm_address_space_t *as, PARAM_OUT(char *
                     return ELF_RESULT_ERR_INVALID_PHDR;
                 }
 
-                vm_protection_t prot = {.read = true};
+                vm_protection_t prot = { .read = true };
                 if(phdr->flags & PF_W) prot.write = true;
                 if(phdr->flags & PF_X) prot.exec = true;
 
@@ -146,7 +146,7 @@ elf_result_t elf_load(vfs_node_t *file, vm_address_space_t *as, PARAM_OUT(char *
                     void *buffer = vm_map_anon(g_vm_global_address_space, NULL, buffer_size, VM_PROT_RW, VM_CACHE_STANDARD, VM_FLAG_NO_DEMAND);
                     ASSERT(buffer != NULL);
 
-                    res = file->ops->rw(file, &(vfs_rw_t) {.rw = VFS_RW_READ, .size = phdr->filesz, .offset = phdr->offset, .buffer = buffer}, &read_count);
+                    res = file->ops->rw(file, &(vfs_rw_t) { .rw = VFS_RW_READ, .size = phdr->filesz, .offset = phdr->offset, .buffer = buffer }, &read_count);
                     if(res != VFS_RESULT_OK || read_count != phdr->filesz) {
                         vm_unmap(g_vm_global_address_space, buffer, buffer_size);
                         heap_free(interpreter, interpreter_size);
@@ -163,7 +163,7 @@ elf_result_t elf_load(vfs_node_t *file, vm_address_space_t *as, PARAM_OUT(char *
                 interpreter_size = phdr->filesz + 1;
                 char *interp = heap_alloc(interpreter_size);
                 memset(interp, 0, phdr->filesz + 1);
-                res = file->ops->rw(file, &(vfs_rw_t) {.rw = VFS_RW_READ, .buffer = interp, .offset = phdr->offset, .size = phdr->filesz}, &read_count);
+                res = file->ops->rw(file, &(vfs_rw_t) { .rw = VFS_RW_READ, .buffer = interp, .offset = phdr->offset, .size = phdr->filesz }, &read_count);
                 if(res != VFS_RESULT_OK) {
                     heap_free(interp, interpreter_size);
                     return ELF_RESULT_ERR_FS;

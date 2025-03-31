@@ -23,7 +23,7 @@ typedef struct {
     x86_64_interrupt_handler_t handler;
 } interrupt_entry_t;
 
-static uint64_t g_priority_map[] = {[INTERRUPT_PRIORITY_LOW] = 0x2, [INTERRUPT_PRIORITY_NORMAL] = 0x5, [INTERRUPT_PRIORITY_CRITICAL] = 0xF};
+static uint64_t g_priority_map[] = { [INTERRUPT_PRIORITY_LOW] = 0x2, [INTERRUPT_PRIORITY_NORMAL] = 0x5, [INTERRUPT_PRIORITY_CRITICAL] = 0xF };
 
 extern uint64_t g_x86_64_isr_stubs[IDT_SIZE];
 
@@ -73,7 +73,7 @@ void x86_64_interrupt_load_idt() {
     struct [[gnu::packed]] {
         uint16_t limit;
         uint64_t base;
-    } idtr = {.base = (uint64_t) &g_idt, .limit = sizeof(g_idt) - 1};
+    } idtr = { .base = (uint64_t) &g_idt, .limit = sizeof(g_idt) - 1 };
     asm volatile("lidt %0" : : "m"(idtr));
 }
 

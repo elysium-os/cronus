@@ -5,7 +5,7 @@
 
 #include <stddef.h>
 
-#define VFS_ABSOLUTE_PATH(PATH) ((vfs_path_t) {.root = NULL, .relative_path = (PATH)})
+#define VFS_ABSOLUTE_PATH(PATH) ((vfs_path_t) { .root = NULL, .relative_path = (PATH) })
 
 typedef struct vfs vfs_t;
 typedef struct vfs_ops vfs_ops_t;

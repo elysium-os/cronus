@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#define X86_64_CPUID_DEFINE_FEATURE(LEAF, REGISTER, BIT) ((x86_64_cpuid_feature_t) {.leaf = (LEAF), .reg = (REGISTER), .bit = (BIT)})
+#define X86_64_CPUID_DEFINE_FEATURE(LEAF, REGISTER, BIT) ((x86_64_cpuid_feature_t) { .leaf = (LEAF), .reg = (REGISTER), .bit = (BIT) })
 
 #define X86_64_CPUID_FEATURE_SSE3 X86_64_CPUID_DEFINE_FEATURE(1, X86_64_CPUID_REGISTER_ECX, 0)
 #define X86_64_CPUID_FEATURE_PCLMUL X86_64_CPUID_DEFINE_FEATURE(1, X86_64_CPUID_REGISTER_ECX, 1)

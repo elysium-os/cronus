@@ -71,26 +71,26 @@ static void slab_direct_free(slab_cache_t *cache, void *obj) {
 }
 
 void slab_init() {
-    g_alloc_cache = (slab_cache_t) {.name = "slab-cache",
-                                    .object_size = sizeof(slab_cache_t) + arch_cpu_count() * sizeof(slab_cache_cpu_t),
-                                    .block_order = 3,
-                                    .slabs_lock = SPINLOCK_INIT,
-                                    .slabs_full = LIST_INIT,
-                                    .slabs_partial = LIST_INIT,
-                                    .magazines_lock = SPINLOCK_INIT,
-                                    .magazines_full = LIST_INIT,
-                                    .magazines_empty = LIST_INIT,
-                                    .cpu_cache_enabled = false};
-    g_alloc_magazine = (slab_cache_t) {.name = "slab-magazine",
-                                       .object_size = sizeof(slab_magazine_t) + MAGAZINE_SIZE * sizeof(void *),
-                                       .block_order = 2,
-                                       .slabs_lock = SPINLOCK_INIT,
-                                       .slabs_full = LIST_INIT,
-                                       .slabs_partial = LIST_INIT,
-                                       .magazines_lock = SPINLOCK_INIT,
-                                       .magazines_full = LIST_INIT,
-                                       .magazines_empty = LIST_INIT,
-                                       .cpu_cache_enabled = false};
+    g_alloc_cache = (slab_cache_t) { .name = "slab-cache",
+                                     .object_size = sizeof(slab_cache_t) + arch_cpu_count() * sizeof(slab_cache_cpu_t),
+                                     .block_order = 3,
+                                     .slabs_lock = SPINLOCK_INIT,
+                                     .slabs_full = LIST_INIT,
+                                     .slabs_partial = LIST_INIT,
+                                     .magazines_lock = SPINLOCK_INIT,
+                                     .magazines_full = LIST_INIT,
+                                     .magazines_empty = LIST_INIT,
+                                     .cpu_cache_enabled = false };
+    g_alloc_magazine = (slab_cache_t) { .name = "slab-magazine",
+                                        .object_size = sizeof(slab_magazine_t) + MAGAZINE_SIZE * sizeof(void *),
+                                        .block_order = 2,
+                                        .slabs_lock = SPINLOCK_INIT,
+                                        .slabs_full = LIST_INIT,
+                                        .slabs_partial = LIST_INIT,
+                                        .magazines_lock = SPINLOCK_INIT,
+                                        .magazines_full = LIST_INIT,
+                                        .magazines_empty = LIST_INIT,
+                                        .cpu_cache_enabled = false };
     list_append(&g_slab_caches, &g_alloc_cache.list_elem);
     list_append(&g_slab_caches, &g_alloc_magazine.list_elem);
 }

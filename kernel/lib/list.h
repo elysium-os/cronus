@@ -2,8 +2,8 @@
 
 #include <stdint.h>
 
-#define LIST_INIT ((list_t) {.next = NULL, .prev = NULL})
-#define LIST_INIT_CIRCULAR(NAME) ((list_t) {.next = &(NAME), .prev = &(NAME)})
+#define LIST_INIT ((list_t) { .next = NULL, .prev = NULL })
+#define LIST_INIT_CIRCULAR(NAME) ((list_t) { .next = &(NAME), .prev = &(NAME) })
 
 typedef struct list_element list_element_t;
 typedef struct list_element list_t;
