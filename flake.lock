@@ -6,17 +6,17 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1742566277,
-        "narHash": "sha256-fY/lcpPK16mVvDy0VybSRye67mtcvtwtE3IaxiZm7/E=",
-        "ref": "refs/heads/v2",
-        "rev": "0db3af1781946e18a2548afcec018e4ef8f973a2",
-        "revCount": 79,
-        "type": "git",
-        "url": "https://git.thenest.dev/wux/chariot"
+        "lastModified": 1743273044,
+        "narHash": "sha256-xdkM9lPxaqvGvR2EZvEySnUaqaiI01ykmZ+5bqfbXKU=",
+        "owner": "imwux",
+        "repo": "chariot",
+        "rev": "b95d2d42b4e6305318808faf9601a69bf5ff1118",
+        "type": "github"
       },
       "original": {
-        "type": "git",
-        "url": "https://git.thenest.dev/wux/chariot"
+        "owner": "imwux",
+        "repo": "chariot",
+        "type": "github"
       }
     },
     "flake-utils": {
@@ -73,11 +73,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1742512142,
-        "narHash": "sha256-8XfURTDxOm6+33swQJu/hx6xw1Tznl8vJJN5HwVqckg=",
+        "lastModified": 1742937945,
+        "narHash": "sha256-lWc+79eZRyvHp/SqMhHTMzZVhpxkRvthsP1Qx6UCq0E=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "7105ae3957700a9646cc4b766f5815b23ed0c682",
+        "rev": "d02d88f8de5b882ccdde0465d8fa2db3aa1169f7",
         "type": "github"
       },
       "original": {
