@@ -4,6 +4,7 @@
 #include "arch/page.h"
 #include "arch/ptm.h"
 #include "arch/sched.h"
+#include "common/abi/sysv//elf.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "common/panic.h"
@@ -31,7 +32,6 @@
 #include "terminal.h"
 
 #include "arch/x86_64/abi/sysv/auxv.h"
-#include "arch/x86_64/abi/sysv/elf.h"
 #include "arch/x86_64/abi/sysv/sysv.h"
 #include "arch/x86_64/cpu/cpu.h"
 #include "arch/x86_64/cpu/cpuid.h"
@@ -170,10 +170,13 @@ static void thread_init() {
     // Initialize syscalls
     x86_64_syscall_init_cpu();
 
+    // Initialize scheduler
+    x86_64_sched_init_cpu(cpu);
+
     log(LOG_LEVEL_DEBUG, "INIT", "AP %lu:%i init exit", g_init_cpu_id_counter, x86_64_lapic_id());
     __atomic_add_fetch(&g_init_cpu_id_counter, 1, __ATOMIC_SEQ_CST);
 
-    x86_64_sched_init_cpu(cpu, false);
+    x86_64_sched_handoff_cpu(cpu, false);
     ASSERT_UNREACHABLE();
 }
 
@@ -363,9 +366,6 @@ static void thread_init() {
     acpi_sdt_header_t *mcfg = acpi_find_table((uint8_t *) "MCFG");
     pci_enumerate(mcfg);
 
-    // Initialize sched
-    x86_64_sched_init();
-
     // SMP init
     g_x86_64_cpus = heap_alloc(sizeof(x86_64_cpu_t) * boot_info->cpu_count);
     memclear(g_x86_64_cpus, sizeof(x86_64_cpu_t) * boot_info->cpu_count);
@@ -485,6 +485,10 @@ static void thread_init() {
         if(res != VFS_RESULT_OK || count != g_ring_buffer.index) panic("failed to flush ring buffer");
     }
 
+    // Initialize sched
+    x86_64_sched_init();
+    x86_64_sched_init_cpu(X86_64_CPU_CURRENT.self);
+
     // Schedule init threads
     sched_thread_schedule(reaper_create());
     sched_thread_schedule(arch_sched_thread_create_kernel(thread_init));
@@ -493,42 +497,70 @@ static void thread_init() {
         log(LOG_LEVEL_DEBUG, "INIT", "loading /usr/bin/init");
         vm_address_space_t *as = arch_ptm_address_space_create();
 
-        vfs_node_t *startup_exec;
-        res = vfs_lookup(&VFS_ABSOLUTE_PATH("/usr/bin/init"), &startup_exec);
-        if(res != VFS_RESULT_OK) panic("Could not lookup test executable (%i)", res);
+        vfs_node_t *init_exec;
+        res = vfs_lookup(&VFS_ABSOLUTE_PATH("/usr/bin/init"), &init_exec);
+        if(res != VFS_RESULT_OK) panic("could not lookup test executable (%i)", res);
 
-        x86_64_auxv_t auxv = {};
-        char *interpreter = 0;
-        bool elf_r = elf_load(startup_exec, as, &interpreter, &auxv);
-        if(elf_r) panic("Could not load test executable");
+        elf_file_t *init_elf;
+        elf_result_t elf_res = elf_read(init_exec, &init_elf);
+        if(elf_res != ELF_RESULT_OK) panic("could not read init (%i)", elf_res);
 
-        x86_64_auxv_t interp_auxv = {};
-        if(interpreter) {
-            log(LOG_LEVEL_DEBUG, "INIT", "Found init interpreter: %s", interpreter);
-            vfs_node_t *interp_exec;
-            res = vfs_lookup(&VFS_ABSOLUTE_PATH(interpreter), &interp_exec);
-            if(res != VFS_RESULT_OK) panic("Could not lookup the interpreter for startup (%i)", res);
+        elf_res = elf_load(init_elf, as);
+        if(elf_res != ELF_RESULT_OK) panic("could not load init (%i)", elf_res);
 
-            elf_r = elf_load(interp_exec, as, 0, &interp_auxv);
-            if(elf_r) panic("Could not load the interpreter for startup");
+        uintptr_t entry;
+        char *interpreter;
+        elf_res = elf_lookup_interpreter(init_elf, &interpreter);
+        switch(elf_res) {
+            case ELF_RESULT_OK:
+                log(LOG_LEVEL_DEBUG, "INIT", "found init interpreter `%s`", interpreter);
+
+                vfs_node_t *interpreter_exec;
+                res = vfs_lookup(&VFS_ABSOLUTE_PATH(interpreter), &interpreter_exec);
+                if(res != VFS_RESULT_OK) panic("could not lookup interpreter for init (%i)", res);
+
+                elf_file_t *interpreter_elf;
+                elf_res = elf_read(interpreter_exec, &interpreter_elf);
+                if(elf_res != ELF_RESULT_OK) panic("could not read interpreter for init (%i)", elf_res);
+
+                elf_res = elf_load(interpreter_elf, as);
+                if(elf_res != ELF_RESULT_OK) panic("could not load interpreter for init (%i)", elf_res);
+
+                entry = interpreter_elf->entry;
+                heap_free(interpreter_elf, sizeof(elf_file_t));
+                break;
+            case ELF_RESULT_ERR_NOT_FOUND: entry = init_elf->entry; break;
+            default:                       panic("elf interpreter lookup failed (%i)", elf_res);
         }
 
-        log(LOG_LEVEL_DEBUG, "INIT", "entry: %#lx; phdr: %#lx; phent: %#lx; phnum: %#lx;", auxv.entry, auxv.phdr, auxv.phent, auxv.phnum);
+        x86_64_auxv_t auxv = { .entry = init_elf->entry };
+
+        uintptr_t phdr_addr;
+        elf_res = elf_lookup_phdr_address(init_elf, &phdr_addr);
+        if(elf_res == ELF_RESULT_OK) {
+            auxv.phdr = phdr_addr;
+            auxv.phnum = init_elf->program_headers.count;
+            auxv.phent = init_elf->program_headers.entry_size;
+        }
+
+        heap_free(init_elf, sizeof(elf_file_t));
+
+        log(LOG_LEVEL_DEBUG, "INIT", "auxv { entry: %#lx; phdr: %#lx; phent: %#lx; phnum: %#lx; }", auxv.entry, auxv.phdr, auxv.phent, auxv.phnum);
 
         char *argv[] = { "/usr/bin/init", NULL };
         char *envp[] = { NULL };
 
         process_t *proc = process_create(as);
         uintptr_t thread_stack = x86_64_sysv_stack_setup(proc->address_space, ARCH_PAGE_GRANULARITY * 8, argv, envp, &auxv);
-        thread_t *thread = arch_sched_thread_create_user(proc, interpreter ? interp_auxv.entry : auxv.entry, thread_stack);
+        thread_t *thread = arch_sched_thread_create_user(proc, entry, thread_stack);
 
-        log(LOG_LEVEL_DEBUG, "INIT", "init thread >> entry: %#lx, stack: %#lx", interpreter ? interp_auxv.entry : auxv.entry, thread_stack);
+        log(LOG_LEVEL_DEBUG, "INIT", "init thread >> entry: %#lx, stack: %#lx", entry, thread_stack);
         sched_thread_schedule(thread);
     }
 
     // Scheduler handoff
     log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye for now!");
-    x86_64_sched_init_cpu(cpu, true);
+    x86_64_sched_handoff_cpu(cpu, true);
     ASSERT_UNREACHABLE();
 }
 

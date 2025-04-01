@@ -12,8 +12,6 @@
 #define ARCH_PAGE_SIZES ((size_t[]) { ARCH_PAGE_SIZE_4KB, ARCH_PAGE_SIZE_2MB, ARCH_PAGE_SIZE_1GB })
 #define ARCH_PAGE_SIZES_COUNT (sizeof(ARCH_PAGE_SIZES) / sizeof(size_t))
 
-#else
-#error Unimplemented
 #endif
 
 #if !defined(ARCH_PAGE_SIZES) || !defined(ARCH_PAGE_SIZES_COUNT) || !defined(ARCH_PAGE_GRANULARITY)

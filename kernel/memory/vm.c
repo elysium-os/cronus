@@ -242,14 +242,12 @@ void vm_unmap(vm_address_space_t *address_space, void *address, size_t length) {
 
 bool vm_fault(uintptr_t address, vm_fault_t fault) {
     if(fault != VM_FAULT_NOT_PRESENT) return false;
+    if(ADDRESS_IN_BOUNDS(address, g_vm_global_address_space->start, g_vm_global_address_space->end)) return false;
 
-    vm_address_space_t *as = g_vm_global_address_space;
-    if(!ADDRESS_IN_BOUNDS(address, g_vm_global_address_space->start, g_vm_global_address_space->end)) {
-        process_t *proc = arch_sched_thread_current()->proc;
-        if(proc != NULL) as = proc->address_space;
-    }
+    process_t *proc = arch_sched_thread_current()->proc;
+    if(proc == NULL) return false;
 
-    return address_space_fix_page(as, address);
+    return address_space_fix_page(proc->address_space, address);
 }
 
 size_t vm_copy_to(vm_address_space_t *dest_as, uintptr_t dest_addr, void *src, size_t count) {

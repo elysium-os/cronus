@@ -63,6 +63,8 @@ if get_option('uacpi_path') != ''
 endif
 
 sources += files(
+    'common/abi/sysv/elf.c',
+    'common/abi/sysv/elf64.c',
     'common/lock/mutex.c',
     'common/lock/spinlock.c',
     'common/log.c',

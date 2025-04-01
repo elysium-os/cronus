@@ -1,6 +1,7 @@
 add_languages('nasm')
 
 sources += files(
+    'abi/sysv/sysv.c',
     'cpu/cpu.c',
     'cpu/cpuid.c',
     'cpu/fpu.c',
@@ -12,8 +13,6 @@ sources += files(
     'dev/pic8259.c',
     'dev/pit.c',
     'dev/qemu_debug.c',
-    'sysv/sysv.c',
-    'sysv/elf.c',
     'debug.c',
     'debug_prof.c',
     'exception.c',

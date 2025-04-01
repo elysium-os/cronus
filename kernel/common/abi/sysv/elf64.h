@@ -2,6 +2,12 @@
 
 #include <stdint.h>
 
+#define ELF64_ID0 0x7F
+#define ELF64_ID1 'E'
+#define ELF64_ID2 'L'
+#define ELF64_ID3 'F'
+#define ELF64_ID_VALIDATE(ID) ((ID)[0] == ELF64_ID0 && (ID)[1] == ELF64_ID1 && (ID)[2] == ELF64_ID2 && (ID)[3] == ELF64_ID3)
+
 #define ELF64_CLASS32 1
 #define ELF64_CLASS64 2
 
