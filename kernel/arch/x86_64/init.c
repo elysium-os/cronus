@@ -4,7 +4,7 @@
 #include "arch/page.h"
 #include "arch/ptm.h"
 #include "arch/sched.h"
-#include "common/abi/sysv//elf.h"
+#include "common/abi/sysv/elf.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "common/panic.h"
@@ -28,6 +28,7 @@
 #include "sched/process.h"
 #include "sched/reaper.h"
 #include "sched/sched.h"
+#include "sys/kernel_symbol.h"
 #include "sys/time.h"
 #include "terminal.h"
 
@@ -233,9 +234,8 @@ static void thread_init() {
         tartarus_module_t *module = &boot_info->modules[i];
         log(LOG_LEVEL_DEBUG, "INIT", "| Module found: `%s`", module->name);
 
-        if(!string_eq("kernel_symbols.txt", module->name)) continue;
-        g_arch_debug_symbols = (char *) HHDM(module->paddr);
-        g_arch_debug_symbols_length = module->size;
+        if(!string_eq("kernel.ksym", module->name)) continue;
+        kernel_symbols_load((void *) HHDM(module->paddr));
         log(LOG_LEVEL_DEBUG, "INIT", "| -> Kernel symbols loaded");
     }
 

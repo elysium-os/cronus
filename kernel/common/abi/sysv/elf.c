@@ -1,7 +1,7 @@
 #include "elf.h"
 
+#include "arch/elf.h"
 #include "arch/page.h"
-#include "arch/types.h"
 #include "common/abi/sysv/elf64.h"
 #include "common/assert.h"
 #include "common/log.h"
@@ -14,21 +14,18 @@
 #include <stddef.h>
 #include <stdint.h>
 
-static bool read_phdr(elf_file_t *elf_file, size_t index, PARAM_FILL(elf64_phdr_t *) phdr) {
+static bool read_phdr(elf_file_t *elf_file, size_t index, PARAM_FILL(elf64_program_header_t *) phdr) {
     size_t read_count;
-    vfs_result_t res = elf_file->file->ops->rw(
-        elf_file->file,
-        &(vfs_rw_t) { .rw = VFS_RW_READ, .size = elf_file->program_headers.entry_size, .offset = elf_file->program_headers.offset + (index * elf_file->program_headers.entry_size), .buffer = phdr },
-        &read_count
-    );
-    return res != VFS_RESULT_OK || read_count != elf_file->program_headers.entry_size;
+    vfs_result_t res =
+        elf_file->file->ops->rw(elf_file->file, &(vfs_rw_t) { .rw = VFS_RW_READ, .size = sizeof(elf64_program_header_t), .offset = elf_file->program_headers.offset + (index * elf_file->program_headers.entry_size), .buffer = phdr }, &read_count);
+    return res != VFS_RESULT_OK || read_count != sizeof(elf64_program_header_t);
 }
 
 static void auto_free_header(elf64_file_header_t **header) {
     heap_free(*header, sizeof(header));
 }
 
-static void auto_free_phdr(elf64_phdr_t **phdr) {
+static void auto_free_phdr(elf64_program_header_t **phdr) {
     heap_free(*phdr, sizeof(phdr));
 }
 
@@ -47,11 +44,12 @@ elf_result_t elf_read(vfs_node_t *file, PARAM_OUT(elf_file_t **) elf_file) {
     if(res != VFS_RESULT_OK || read_count != sizeof(elf64_file_header_t)) return ELF_RESULT_ERR_FS;
 
     if(!ELF64_ID_VALIDATE(header->ident.magic)) return ELF_RESULT_ERR_NOT_ELF;
-    if(header->ident.class != ELF64_CLASS64) return ELF_RESULT_ERR_INVALID_CLASS;
-    if(header->ident.encoding != ELF64_DATA2LSB) return ELF_RESULT_ERR_INVALID_ENDIAN;
+    if(header->ident.class != ARCH_ELF_CLASS) return ELF_RESULT_ERR_INVALID_CLASS;
+    if(header->ident.encoding != ARCH_ELF_ENCODING) return ELF_RESULT_ERR_INVALID_ENDIAN;
     if(header->version > 1) return ELF_RESULT_ERR_UNSUPPORTED;
-    if(header->machine != ARCH_TYPES_ELF_MACHINE) return ELF_RESULT_ERR_INVALID_MACHINE;
-    if(header->phentsize < sizeof(elf64_phdr_t)) return ELF_RESULT_ERR_UNSUPPORTED;
+    if(header->type != ELF64_ET_EXEC) return ELF_RESULT_ERR_INVALID_TYPE;
+    if(header->machine != ARCH_ELF_MACHINE) return ELF_RESULT_ERR_INVALID_MACHINE;
+    if(header->phnum == 0 || header->phentsize < sizeof(elf64_program_header_t)) return ELF_RESULT_ERR_UNSUPPORTED;
 
     *elf_file = heap_alloc(sizeof(elf_file_t));
     **elf_file = (elf_file_t) {
@@ -63,7 +61,7 @@ elf_result_t elf_read(vfs_node_t *file, PARAM_OUT(elf_file_t **) elf_file) {
 }
 
 elf_result_t elf_lookup_interpreter(elf_file_t *elf_file, PARAM_OUT(char **) interpreter) {
-    [[gnu::cleanup(auto_free_phdr)]] elf64_phdr_t *phdr = heap_alloc(elf_file->program_headers.entry_size);
+    [[gnu::cleanup(auto_free_phdr)]] elf64_program_header_t *phdr = heap_alloc(elf_file->program_headers.entry_size);
     for(size_t i = 0; i < elf_file->program_headers.count; i++) {
         if(read_phdr(elf_file, i, phdr)) return ELF_RESULT_ERR_FS;
 
@@ -87,7 +85,7 @@ elf_result_t elf_lookup_interpreter(elf_file_t *elf_file, PARAM_OUT(char **) int
 }
 
 elf_result_t elf_lookup_phdr_address(elf_file_t *elf_file, PARAM_OUT(uintptr_t *) phdr_address) {
-    [[gnu::cleanup(auto_free_phdr)]] elf64_phdr_t *phdr = heap_alloc(elf_file->program_headers.entry_size);
+    [[gnu::cleanup(auto_free_phdr)]] elf64_program_header_t *phdr = heap_alloc(elf_file->program_headers.entry_size);
     for(size_t i = 0; i < elf_file->program_headers.count; i++) {
         if(read_phdr(elf_file, i, phdr)) return ELF_RESULT_ERR_FS;
 
@@ -100,7 +98,7 @@ elf_result_t elf_lookup_phdr_address(elf_file_t *elf_file, PARAM_OUT(uintptr_t *
 }
 
 elf_result_t elf_load(elf_file_t *elf_file, vm_address_space_t *as) {
-    [[gnu::cleanup(auto_free_phdr)]] elf64_phdr_t *phdr = heap_alloc(elf_file->program_headers.entry_size);
+    [[gnu::cleanup(auto_free_phdr)]] elf64_program_header_t *phdr = heap_alloc(elf_file->program_headers.entry_size);
     for(size_t i = 0; i < elf_file->program_headers.count; i++) {
         if(read_phdr(elf_file, i, phdr)) return ELF_RESULT_ERR_FS;
 

@@ -12,6 +12,7 @@ typedef enum {
     ELF_RESULT_ERR_NOT_ELF,
     ELF_RESULT_ERR_MALFORMED,
     ELF_RESULT_ERR_UNSUPPORTED,
+    ELF_RESULT_ERR_INVALID_TYPE,
     ELF_RESULT_ERR_INVALID_CLASS,
     ELF_RESULT_ERR_INVALID_ENDIAN,
     ELF_RESULT_ERR_INVALID_MACHINE,
@@ -44,5 +45,6 @@ elf_result_t elf_lookup_phdr_address(elf_file_t *elf_file, PARAM_OUT(uintptr_t *
 
 /**
  * @brief Load ELF file into address space.
+ * @todo Error here does not discard the allocated space.
  */
 elf_result_t elf_load(elf_file_t *elf_file, vm_address_space_t *as);

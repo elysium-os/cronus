@@ -2,6 +2,7 @@ add_languages('nasm')
 
 sources += files(
     'abi/sysv/sysv.c',
+    'abi/sysv/elf.c',
     'cpu/cpu.c',
     'cpu/cpuid.c',
     'cpu/fpu.c',

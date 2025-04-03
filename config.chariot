@@ -40,6 +40,30 @@ host/rdsk {
     }
 }
 
+// ksym
+source/ksym {
+    url: tools/ksym
+    type: local
+}
+
+host/ksym {
+    source: ksym
+    dependencies [ image/clang ]
+    build { clang @(source_dir)/ksym.c -o ksym }
+    install {
+        install -d @(install_dir)@(prefix)/bin
+        install ksym @(install_dir)@(prefix)/bin
+    }
+}
+
+target/ksym {
+    source: ksym
+    install {
+        install -d @(install_dir)@(prefix)/include
+        install @(source_dir)/ksym.h @(install_dir)@(prefix)/include
+    }
+}
+
 // Tartarus (Bootloader)
 source/tartarus {
     url: https://github.com/imwux/tartarus-bootloader.git
@@ -140,7 +164,7 @@ source/kernel {
 
 target/kernel {
     source: kernel
-    dependencies [ source/freestanding_headers target/tartarus target/uacpi target/mlibc_headers image/nasm image/clang image/lld image/meson ]
+    dependencies [ source/freestanding_headers target/ksym target/tartarus target/uacpi target/mlibc_headers image/nasm image/clang image/lld image/meson ]
     configure {
         CC=clang CC_LD=lld meson setup \
             --prefix=@(prefix) \
@@ -191,7 +215,7 @@ target/root {
 }
 
 target/image {
-    dependencies [ host/mkimg source/support target/tartarus target/tartarus_efi target/kernel target/root image/llvm image/qemu-img ]
+    dependencies [ host/mkimg host/ksym source/support target/tartarus target/tartarus_efi target/kernel target/root image/llvm image/qemu-img ]
     build {
         cp @(sysroot_dir)@(prefix)/share/tartarus/tartarus.sys .
         cp @(sysroot_dir)@(prefix)/share/tartarus/x86_64-bios.bin .
@@ -200,7 +224,8 @@ target/image {
         cp @(sources_dir)/support/tartarus.cfg ./image_root
         cp @(sysroot_dir)@(prefix)/share/root.rdk ./image_root
         cp @(sysroot_dir)@(prefix)/bin/kernel.elf ./image_root
-        llvm-nm @(sysroot_dir)@(prefix)/bin/kernel.elf -n > ./image_root/kernel_symbols.txt
+        llvm-nm -S @(sysroot_dir)@(prefix)/bin/kernel.elf -n > ./kernel_symbols.txt
+        ksym ./kernel_symbols.txt ./image_root/kernel.ksym
 
         mkimg --config=@(sources_dir)/support/mkimg_bios.toml
 

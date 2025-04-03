@@ -129,6 +129,10 @@
 #define ELF64_DT_LOPROC 0x70000000 /* processor specific use */
 #define ELF64_DT_HIPROC 0x7FFFFFFF
 
+#define ELF64_R_SYM(I) ((I) >> 32)
+#define ELF64_R_TYPE(I) ((I) & 0xFFFFFFFFL)
+#define ELF64_R_INFO(S, T) (((S) << 32) + ((T) & 0xFFFFFFFFL))
+
 static_assert(sizeof(unsigned char) == 1);
 
 typedef uint64_t elf64_addr_t;
@@ -178,7 +182,7 @@ typedef struct [[gnu::packed]] {
     elf64_word_t info;
     elf64_xword_t addralign;
     elf64_xword_t entsize;
-} elf64_section_header;
+} elf64_section_header_t;
 
 typedef struct [[gnu::packed]] {
     elf64_word_t name;
@@ -209,7 +213,7 @@ typedef struct [[gnu::packed]] {
     elf64_xword_t filesz; /* file size */
     elf64_xword_t memsz; /* memory size */
     elf64_xword_t align; /* alignment */
-} elf64_phdr_t;
+} elf64_program_header_t;
 
 typedef struct [[gnu::packed]] {
     elf64_sxword_t tag;

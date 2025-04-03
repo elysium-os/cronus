@@ -1,16 +1,8 @@
 #pragma once
 
-#include <stddef.h>
 #include <stdint.h>
 
 #define X86_64_DEBUG_PROF_MAX_FRAMES 128
-
-typedef struct {
-    bool found;
-    const char *name;
-    size_t length;
-    uintptr_t address;
-} x86_64_debug_symbol_t;
 
 typedef struct [[gnu::packed]] x86_64_debug_stack_frame {
     struct x86_64_debug_stack_frame *rbp;
@@ -23,11 +15,6 @@ typedef struct {
     uint64_t start;
     uint64_t ptime;
 } x86_64_debug_prof_call_frame_t;
-
-/**
- * @brief Lookup a debug symbol by address.
- */
-x86_64_debug_symbol_t x86_64_debug_symbol(uintptr_t lookup_address);
 
 /**
  * @brief Log a stack trace starting at the provided stack frame.
