@@ -1,6 +1,6 @@
 struct String {
-    char value[100];
-} [[sealed]];
+    char value[];
+};
 
 fn nametable_format(auto e) {
     if(!e.used) return "";
