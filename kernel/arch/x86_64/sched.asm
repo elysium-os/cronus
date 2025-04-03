@@ -2,7 +2,6 @@
 
 global x86_64_sched_context_switch
 x86_64_sched_context_switch:
-    pushfq
     push rbx
     push rbp
     push r15
@@ -23,7 +22,6 @@ x86_64_sched_context_switch:
     pop r15
     pop rbp
     pop rbx
-    popfq
 
     mov rax, rdi
     ret

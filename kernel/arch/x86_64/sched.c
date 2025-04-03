@@ -32,13 +32,12 @@
 
 #define INTERVAL 100000
 #define KERNEL_STACK_SIZE_PG 16
-#define INITIAL_RFLAGS (1 << 1)
 
 #define IDLE_TID 0
 #define BOOTSTRAP_TID 1
 
 typedef struct [[gnu::packed]] {
-    uint64_t r12, r13, r14, r15, rbp, rbx, flags;
+    uint64_t r12, r13, r14, r15, rbp, rbx;
     void (*thread_init)(x86_64_thread_t *prev);
     void (*entry)();
     void (*thread_exit_kernel)();
@@ -50,7 +49,7 @@ typedef struct [[gnu::packed]] {
 } init_stack_kernel_t;
 
 typedef struct [[gnu::packed]] {
-    uint64_t r12, r13, r14, r15, rbp, rbx, flags;
+    uint64_t r12, r13, r14, r15, rbp, rbx;
     void (*thread_init)(x86_64_thread_t *prev);
     void (*thread_init_user)();
     void (*entry)();
@@ -169,7 +168,6 @@ thread_t *arch_sched_thread_create_kernel(void (*func)()) {
     x86_64_thread_stack_t kernel_stack = { .base = HHDM(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO)->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));
-    init_stack->flags = INITIAL_RFLAGS;
     init_stack->entry = func;
     init_stack->thread_init = common_thread_init;
     init_stack->thread_exit_kernel = kernel_thread_exit;
@@ -181,7 +179,6 @@ thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t
     x86_64_thread_stack_t kernel_stack = { .base = HHDM(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO)->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_user_t *init_stack = (init_stack_user_t *) (kernel_stack.base - sizeof(init_stack_user_t));
-    init_stack->flags = INITIAL_RFLAGS;
     init_stack->entry = (void (*)()) ip;
     init_stack->thread_init = common_thread_init;
     init_stack->thread_init_user = x86_64_sched_userspace_init;
@@ -208,7 +205,6 @@ void x86_64_sched_init_cpu(x86_64_cpu_t *cpu) {
     x86_64_thread_stack_t kernel_stack = { .base = HHDM(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO)->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));
-    init_stack->flags = INITIAL_RFLAGS;
     init_stack->entry = sched_idle;
     init_stack->thread_init = common_thread_init;
     init_stack->thread_exit_kernel = kernel_thread_exit;
