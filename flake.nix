@@ -2,29 +2,18 @@
     inputs = {
         nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
         flake-utils.url = "github:numtide/flake-utils";
-        chariot.url = "github:imwux/chariot";
     };
 
-    outputs = { nixpkgs, flake-utils, ... } @ inputs: flake-utils.lib.eachDefaultSystem (system:
+    outputs = { nixpkgs, flake-utils, ... }: flake-utils.lib.eachDefaultSystem (system:
         let pkgs = import nixpkgs { inherit system; }; in {
             devShells.default = pkgs.mkShell {
-                shellHook = "export NIX_SHELL_NAME='elysium-os'";
+                shellHook = "export NIX_SHELL_NAME='cronus'";
                 nativeBuildInputs = with pkgs; [
-                    inputs.chariot.defaultPackage.${system}
-                    wget # Required by Chariot
-
-                    clang_19
+                    meson
+                    ninja
+                    llvmPackages_19.clangUseLLVM
                     llvmPackages_19.clang-tools
-                    bear
-
-                    gdb
-                    bochs
-                    qemu_full
-                    (pkgs.writeShellScriptBin "qemu-ovmf-x86-64" ''
-                        ${pkgs.qemu_full}/bin/qemu-system-x86_64 \
-                            -drive if=pflash,unit=0,format=raw,file=${pkgs.OVMF.fd}/FV/OVMF.fd,readonly=on \
-                            "$@"
-                    '')
+                    nasm
                 ];
             };
         }

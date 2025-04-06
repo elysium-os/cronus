@@ -1,70 +1,6 @@
-project('Elysium', 'c', version : 'alpha.6')
-
-sources = []
-objects = []
-includes = []
-
-cflags = [
-    '-std=gnu23',
-    '-ffreestanding',
-    '-nostdinc',
-
-    '-Wall',
-    '-Wextra',
-    '-Wvla',
-    '-Wshadow',
-
-    '-fno-stack-protector',
-    '-fno-stack-check',
-    '-fno-strict-aliasing',
-
-    '-DUACPI_NATIVE_ALLOC_ZEROED',
-    '-DUACPI_FORMATTED_LOGGING',
-    '-DUACPI_SIZED_FREES',
-
-    '-D__VERSION=' + meson.project_version()
-]
-
-ldflags = [
-    '-nostdlib',
-    '-static'
-]
-
-includes += include_directories('.')
-if get_option('external_headers') != ''
-    includes += include_directories(get_option('external_headers'))
-endif
-if get_option('freestanding_headers') != ''
-    includes += include_directories(get_option('freestanding_headers'))
-endif
-
-if get_option('buildtype') == 'release'
-    cflags += [
-        '-O3',
-        '-flto',
-        '-D__ENV_PRODUCTION'
-    ]
-endif
-
-if get_option('buildtype') == 'debug'
-    cflags += [
-        '-O0',
-        '-g',
-        '-fsanitize=undefined',
-        '-finstrument-functions',
-        '-fno-lto',
-        '-fno-omit-frame-pointer',
-        '-D__ENV_DEVELOPMENT'
-    ]
-endif
-
-if get_option('uacpi_path') != ''
-    objects += files(get_option('uacpi_path'))
-endif
-
 sources += files(
-    'common/abi/sysv/elf.c',
-    'common/abi/sysv/elf64.c',
+    'abi/sysv/elf.c',
+    'abi/sysv/elf64.c',
     'common/lock/mutex.c',
     'common/lock/spinlock.c',
     'common/buffer.c',
@@ -99,4 +35,6 @@ sources += files(
     'ubsan.c'
 )
 
-subdir('arch/' / get_option('arch'))
+includes += include_directories('.')
+
+subdir('arch' / get_option('arch'))

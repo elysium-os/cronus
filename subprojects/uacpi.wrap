@@ -1,0 +1,4 @@
+[wrap-git]
+directory = uacpi
+url = https://github.com/uACPI/uACPI.git
+revision = 2.1.1

@@ -1,9 +1,10 @@
+#include "syscall.h"
+
+#include "abi/syscall/syscall.h"
 #include "common/log.h"
 
 #include "arch/x86_64/cpu/gdt.h"
 #include "arch/x86_64/cpu/msr.h"
-
-#include <elysium/syscall.h>
 
 #define MSR_EFER_SCE (1 << 0)
 

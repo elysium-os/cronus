@@ -12,9 +12,9 @@ typedef struct {
 } kernel_symbol_t;
 
 /**
- * @brief Load and validata ksym file as kernel symbols.
+ * @brief Load and validate symbol file as kernel symbols.
  */
-void kernel_symbols_load(void *ksym_data);
+void kernel_symbols_load(void *symbol_data);
 
 /**
  * @brief Are kernel symbols loaded.

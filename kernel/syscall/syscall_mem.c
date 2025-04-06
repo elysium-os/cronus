@@ -1,9 +1,9 @@
+#include "abi/syscall/syscall.h"
 #include "arch/page.h"
 #include "arch/sched.h"
 #include "common/log.h"
 #include "memory/vm.h"
 
-#include <elysium/syscall.h>
 #include <stddef.h>
 #include <stdint.h>
 

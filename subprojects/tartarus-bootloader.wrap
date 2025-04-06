@@ -1,0 +1,4 @@
+[wrap-git]
+directory = tartarus
+url = https://github.com/elysium-os/tartarus-bootloader.git
+revision = main

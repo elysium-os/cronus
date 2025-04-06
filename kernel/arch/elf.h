@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/abi/sysv/elf64.h"
+#include "abi/sysv/elf64.h"
 
 #include <stdint.h>
 

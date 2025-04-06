@@ -1,9 +1,0 @@
-name = "elysium_efi.img"
-protective-mbr = true
-
-[[partitions]]
-gpt-type = "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
-type = "fs"
-fs-type = "fat32"
-size = 256
-files = ["image_root"]

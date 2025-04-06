@@ -1,0 +1,8 @@
+[wrap-git]
+directory = cc-runtime
+url = https://codeberg.org/osdev/cc-runtime.git
+revision = d5425655388977fa12ff9b903e554a20b20c426e
+
+patch_url = https://files.elysium-os.org/meson-patches/cc-runtime.zip
+patch_filename = cc-runtime.zip
+patch_hash = 2eeac7c2601118cdb0eca329364ef2bd8f2ca46635b3833b836c2f71208795f6

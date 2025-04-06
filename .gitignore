@@ -1,8 +1,12 @@
 /subprojects/*
 !/subprojects/*.wrap
 
+build/
+
 .zed
 .vscode
+
+.cache
 .clangd
 
 log.txt

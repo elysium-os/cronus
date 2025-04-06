@@ -1,3 +1,6 @@
+#include "syscall.h"
+
+#include "abi/syscall/syscall.h"
 #include "arch/sched.h"
 #include "common/assert.h"
 #include "common/log.h"
@@ -5,7 +8,6 @@
 #include "memory/heap.h"
 #include "memory/vm.h"
 
-#include <elysium/syscall.h>
 #include <stddef.h>
 #include <stdint.h>
 

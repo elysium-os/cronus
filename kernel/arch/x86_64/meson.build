@@ -1,4 +1,4 @@
-add_languages('nasm')
+add_languages('nasm', native : false)
 
 sources += files(
     'abi/sysv/sysv.c',
@@ -32,29 +32,33 @@ sources += files(
     'syscall.asm'
 )
 
-cflags += [
+kernel_cflags += [
     '--target=x86_64-none-elf',
     '-mcmodel=kernel',
     '-mno-red-zone',
     '-mgeneral-regs-only',
-    '-mabi=sysv',
-    '-D__ARCH_X86_64',
-    '-D__ARCH=x86_64'
+    '-mabi=sysv'
 ]
 
 if get_option('buildtype') == 'debug'
-    cflags += [ '-fno-sanitize=alignment' ]
+    kernel_cflags += [
+        '-fno-sanitize=alignment'
+    ]
 endif
 
-ldflags += ['-Wl,-T' + meson.source_root() / 'support/link.x86_64.ld']
+kernel_ldflags += [
+    '-Wl,-T' + meson.project_source_root() / 'kernel/support/link.x86_64.ld',
+    '-Wl,-znoexecstack'
+]
 
 executable(
     'kernel.elf',
+    dependencies : deps,
     sources : sources,
     objects : objects,
     include_directories : includes,
-    c_args : cflags,
+    c_args : kernel_cflags,
     nasm_args : [ '-f elf64', '-Werror' ],
-    link_args : ldflags,
+    link_args : kernel_ldflags,
     install : true
 )
