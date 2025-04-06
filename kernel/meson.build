@@ -1,6 +1,5 @@
 sources += files(
     'abi/sysv/elf.c',
-    'abi/sysv/elf64.c',
     'common/lock/mutex.c',
     'common/lock/spinlock.c',
     'common/buffer.c',

@@ -1,10 +1,10 @@
 #include "init.h"
 
+#include "abi/sysv/elf.h"
 #include "arch/debug.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
 #include "arch/sched.h"
-#include "common/abi/sysv/elf.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "common/panic.h"

@@ -1,6 +1,6 @@
 #include "arch/elf.h"
 
-#include "common/abi/sysv/elf64.h"
+#include "abi/sysv/elf64.h"
 #include "common/log.h"
 #include "lib/mem.h"
 
