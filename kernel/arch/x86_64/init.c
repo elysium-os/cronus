@@ -80,7 +80,7 @@ static volatile size_t g_init_cpu_id_counter = 0;
 
 static size_t g_init_flags = 0;
 
-static vm_region_t g_hhdm_region, g_kernel_region;
+static vm_region_t g_hhdm_region, g_kernel_region, g_page_cache_region;
 
 static x86_64_cpu_t g_early_bsp;
 
@@ -194,15 +194,17 @@ static void thread_init() {
     g_framebuffer.pitch = framebuffer->pitch;
     // TODO handle pixel format
 
-    memclear(&g_early_bsp, sizeof(g_early_bsp));
-    g_early_bsp.self = &g_early_bsp;
-    g_early_bsp.sequential_id = boot_info->bsp_index;
-    x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
-
+    size_t bsp_seq_id = 0;
     for(size_t i = 0; i < boot_info->cpu_count; i++) {
         if(boot_info->cpus[i].initialization_failed) continue;
+        if(i == boot_info->bsp_index) bsp_seq_id = g_x86_64_cpu_count;
         g_x86_64_cpu_count++;
     }
+
+    memclear(&g_early_bsp, sizeof(g_early_bsp));
+    g_early_bsp.self = &g_early_bsp;
+    g_early_bsp.sequential_id = bsp_seq_id;
+    x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
 
 #ifdef __ENV_DEVELOPMENT
     x86_64_qemu_debug_putc('\n');
@@ -211,6 +213,9 @@ static void thread_init() {
 
     log_sink_add(&g_ring_buffer_sink);
     log_sink_add(&g_terminal_sink);
+
+    log(LOG_LEVEL_DEBUG, "INIT", "Counted %lu working CPUs", g_x86_64_cpu_count);
+    ASSERT(g_x86_64_cpu_count > 0);
 
     draw_rect(&g_framebuffer, 0, 0, g_framebuffer.width, g_framebuffer.height, draw_color(14, 14, 15));
     log(LOG_LEVEL_INFO, "INIT", "Elysium " STRINGIFY(__ARCH) " " STRINGIFY(__VERSION) " (" __DATE__ " " __TIME__ ")");
@@ -334,7 +339,19 @@ static void thread_init() {
 
         pmm_region_add(entry.base, entry.length, (g_bootmem_base / ARCH_PAGE_GRANULARITY) - (entry.base / ARCH_PAGE_GRANULARITY));
     }
-    g_page_cache_size = pagecache_start - pagecache_end;
+    g_page_cache_size = pagecache_end - pagecache_start;
+
+    ASSERT(pagecache_start % ARCH_PAGE_GRANULARITY == 0);
+    ASSERT(g_page_cache_size % ARCH_PAGE_GRANULARITY == 0);
+    g_page_cache_region.address_space = g_vm_global_address_space;
+    g_page_cache_region.base = pagecache_start;
+    g_page_cache_region.length = g_page_cache_size;
+    g_page_cache_region.protection = (vm_protection_t) { .read = true, .write = true };
+    g_page_cache_region.cache_behavior = VM_CACHE_STANDARD;
+    g_page_cache_region.type = VM_REGION_TYPE_ANON; // TODO: this is a lie
+    g_page_cache_region.type_data.anon.back_zeroed = false;
+    list_append(&g_vm_global_address_space->regions, &g_page_cache_region.list_elem);
+    log(LOG_LEVEL_DEBUG, "INIT", "Page Cache (base: %#lx, size: %#lx)", pagecache_start, g_page_cache_size);
 
     g_x86_64_ptm_phys_allocator = proper_alloc;
     x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_PHYS);
@@ -389,6 +406,7 @@ static void thread_init() {
             *cpu = g_early_bsp;
             cpu->self = cpu;
             cpu->sequential_id = g_init_cpu_id_counter;
+            ASSERT(g_init_cpu_id_counter == bsp_seq_id);
             cpu->lapic_id = x86_64_lapic_id();
             cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * X86_64_PIT_BASE_FREQ;
             cpu->tss = tss;
@@ -399,13 +417,14 @@ static void thread_init() {
         }
 
         size_t previous_count = g_init_cpu_id_counter;
-        *boot_info->cpus[i].wake_on_write = (uint64_t) init_ap;
+        __atomic_store_n(boot_info->cpus[i].wake_on_write, (uintptr_t) init_ap, __ATOMIC_RELEASE);
         while(previous_count >= g_init_cpu_id_counter);
     }
     ASSERT(cpu != NULL);
     ASSERT(g_init_cpu_id_counter == g_x86_64_cpu_count);
 
     log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%lu/%i cpus initialized)", g_init_cpu_id_counter, boot_info->cpu_count);
+    log(LOG_LEVEL_DEBUG, "INIT", "BSP seqid is %lu", X86_64_CPU_CURRENT.sequential_id);
     x86_64_init_flag_set(X86_64_INIT_FLAG_SMP);
 
     // Initialize ISTs

@@ -1,9 +1,8 @@
-.chariot-cache/*
-!.chariot-cache/patches
+/subprojects/*
+!/subprojects/*.wrap
 
 .zed
 .vscode
 .clangd
 
-build/
 log.txt

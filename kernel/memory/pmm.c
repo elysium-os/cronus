@@ -3,12 +3,16 @@
 #include "arch/mem.h"
 #include "arch/page.h"
 #include "common/assert.h"
+#include "lib/math.h"
 #include "lib/mem.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"
 
-pmm_zone_t g_pmm_zone_low = { .name = "LOW", .start = 0, .end = ARCH_MEM_LOW_SIZE, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
-pmm_zone_t g_pmm_zone_normal = { .name = "NORMAL", .start = ARCH_MEM_LOW_SIZE, .end = UINTPTR_MAX, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
+#include <stdint.h>
+
+pmm_zone_t g_pmm_zone_low = { .name = "LOW", .start = ARCH_PAGE_GRANULARITY, .end = ARCH_MEM_LOW_SIZE, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
+pmm_zone_t
+    g_pmm_zone_normal = { .name = "NORMAL", .start = ARCH_MEM_LOW_SIZE, .end = MATH_FLOOR(UINTPTR_MAX, ARCH_PAGE_GRANULARITY), .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
 
 static inline uint8_t pagecount_to_order(size_t pages) {
     if(pages == 1) return 0;
@@ -16,6 +20,7 @@ static inline uint8_t pagecount_to_order(size_t pages) {
 }
 
 void pmm_region_add(uintptr_t base, size_t size, size_t used) {
+    ASSERT(base >= ARCH_PAGE_GRANULARITY);
     pmm_zone_t *zones[] = { &g_pmm_zone_low, &g_pmm_zone_normal };
     for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
         pmm_zone_t *zone = zones[i];
@@ -79,6 +84,8 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
     }
 
     pmm_block_t *block = LIST_CONTAINER_GET(LIST_NEXT(&zone->lists[avl_order]), pmm_block_t, list_elem);
+    ASSERT(block->paddr != 0);
+
     list_delete(&block->list_elem);
     for(; avl_order > order; avl_order--) {
         pmm_block_t *buddy = &PAGE(block->paddr + (PMM_ORDER_TO_PAGECOUNT(avl_order - 1) * ARCH_PAGE_GRANULARITY))->block;
@@ -88,7 +95,6 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
     }
     spinlock_release(&zone->lock, previous_state);
 
-    ASSERT(block->paddr != 0);
     block->order = order;
     block->free = false;
     zone->free_page_count -= PMM_ORDER_TO_PAGECOUNT(order);
