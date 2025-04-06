@@ -223,4 +223,12 @@ typedef struct [[gnu::packed]] {
     } un;
 } elf64_dynamic_t;
 
-unsigned long elf64_hash(const unsigned char *name);
+static inline unsigned long elf64_hash(const unsigned char *name) {
+    unsigned long h = 0, g;
+    while(*name != '\0') {
+        h = (h << 4) + *name++;
+        if((g = (h & 0xF0000000))) h ^= (g >> 24);
+        h &= 0x0FFFFFFF;
+    }
+    return h;
+}
