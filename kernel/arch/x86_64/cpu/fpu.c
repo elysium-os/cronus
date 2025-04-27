@@ -28,7 +28,8 @@ static inline void fxrstor(void *area) {
 void x86_64_fpu_init() {
     if(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_XSAVE)) {
         uint32_t area_size = 0;
-        ASSERT(!x86_64_cpuid_register(0xD, X86_64_CPUID_REGISTER_ECX, &area_size));
+        bool success = !x86_64_cpuid_register(0xD, X86_64_CPUID_REGISTER_ECX, &area_size));
+        ASSERT(success);
         ASSERT(area_size > 0);
         g_x86_64_fpu_area_size = area_size;
         g_x86_64_fpu_save = xsave;
