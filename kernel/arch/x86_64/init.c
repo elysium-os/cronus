@@ -272,11 +272,13 @@ static void thread_init() {
             if(entry.type != TARTARUS_MEMORY_MAP_TYPE_USABLE) continue;
             if(entry.length < largest_size) continue;
             largest_index = i;
+            largest_size = entry.length;
         }
         largest_index;
     });
     g_bootmem_base = boot_info->memory_map.entries[early_mem_index].base;
     g_bootmem_size = boot_info->memory_map.entries[early_mem_index].length;
+    log(LOG_LEVEL_DEBUG, "INIT", "bootmem region (base: %#lx, size: %#lx)", g_bootmem_base, g_bootmem_size);
 
     g_x86_64_ptm_phys_allocator = bootmem_alloc;
     x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_PHYS_EARLY);
