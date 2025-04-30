@@ -134,7 +134,7 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
     thread->kernel_stack = kernel_stack;
     thread->state.fs = 0;
     thread->state.gs = 0;
-    thread->state.fpu_area = (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(g_x86_64_fpu_area_size, ARCH_PAGE_GRANULARITY), PMM_FLAG_ZERO)->paddr);
+    thread->state.fpu_area = (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(g_x86_64_fpu_area_size, ARCH_PAGE_GRANULARITY), PMM_FLAG_ZERO)->paddr); // TODO: wasting a page here...
 #ifdef __ENV_DEVELOPMENT
     thread->prof_current_call_frame = 0;
 #endif
