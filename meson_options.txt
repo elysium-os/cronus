@@ -1,1 +1,3 @@
 option('arch', type: 'combo', choices: ['x86_64'])
+option('build_kernel', type: 'boolean', value: true)
+option('build_module', type: 'array')
