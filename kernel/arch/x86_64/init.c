@@ -29,6 +29,7 @@
 #include "sched/reaper.h"
 #include "sched/sched.h"
 #include "sys/kernel_symbol.h"
+#include "sys/module.h"
 #include "sys/time.h"
 #include "terminal.h"
 
@@ -486,8 +487,6 @@ static void thread_init() {
         log(LOG_LEVEL_DEBUG, "INIT", "| - %s", filename);
     }
 
-    res = vfs_mount(&g_tmpfs_ops, "/modules", NULL);
-    if(res != VFS_RESULT_OK) panic("failed to mount /modules (%i)", res);
     res = vfs_mount(&g_tmpfs_ops, "/tmp", NULL);
     if(res != VFS_RESULT_OK) panic("failed to mount /tmp (%i)", res);
 
@@ -510,6 +509,15 @@ static void thread_init() {
     x86_64_sched_init();
     x86_64_sched_init_cpu(X86_64_CPU_CURRENT.self);
 
+    // Load modules
+    vfs_node_t *test_module_file;
+    vfs_lookup(&VFS_ABSOLUTE_PATH("/sys/modules/test.cronmod"), &test_module_file);
+    if(res != VFS_RESULT_OK) panic("failed to lookup test module (%i)", res);
+
+    module_t *module;
+    module_result_t mres = module_load(test_module_file, &module);
+    if(mres != MODULE_RESULT_OK) panic("failed to load test module `%s`", module_result_stringify(mres));
+
     // Schedule init threads
     sched_thread_schedule(reaper_create());
     sched_thread_schedule(arch_sched_thread_create_kernel(thread_init));
@@ -520,7 +528,7 @@ static void thread_init() {
 
         vfs_node_t *init_exec;
         res = vfs_lookup(&VFS_ABSOLUTE_PATH("/usr/bin/init"), &init_exec);
-        if(res != VFS_RESULT_OK) panic("could not lookup test executable (%i)", res);
+        if(res != VFS_RESULT_OK) panic("could not lookup init executable (%i)", res);
 
         elf_file_t *init_elf;
         elf_result_t elf_res = elf_read(init_exec, &init_elf);
