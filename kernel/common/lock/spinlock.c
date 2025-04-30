@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-#define DEADLOCK_AT 100000000
+#define DEADLOCK_AT 100'000'000
 
 interrupt_state_t spinlock_acquire(volatile spinlock_t *lock) {
     interrupt_state_t previous_state = interrupt_state_mask();
@@ -20,13 +20,17 @@ void spinlock_release(volatile spinlock_t *lock, interrupt_state_t interrupt_sta
 }
 
 void spinlock_primitive_acquire(volatile spinlock_t *lock) {
+#ifdef __ENV_DEVELOPMENT
     uint64_t dead = 0;
-    for(;;) {
+#endif
+    while(true) {
         if(spinlock_primitive_try_acquire(lock)) return;
 
         while(__atomic_load_n(lock, __ATOMIC_RELAXED)) {
             arch_cpu_relax();
+#ifdef __ENV_DEVELOPMENT
             ASSERT(dead++ != DEADLOCK_AT);
+#endif
         }
     }
 }
