@@ -166,5 +166,5 @@ if opt_arch == "x86_64" then
     table.extend(objects, ASMC:build(asm_sources, { "-f", "elf64", "-Werror" }))
 
     -- Link
-    LD:link(objects, "kernel.elf", { "-T" .. path(fab.project_root(), "kernel/support/link.x86_64.ld"), "-znoexecstack" })
+    LD:link(objects, { "-T" .. path(fab.project_root(), "kernel/support/link.x86_64.ld"), "-znoexecstack" }, "kernel.elf")
 end
