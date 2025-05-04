@@ -17,6 +17,7 @@
                     ninja
                     llvmPackages_19.clangUseLLVM
                     llvmPackages_19.clang-tools
+                    llvmPackages_19.bintools
                     nasm
                 ];
             };
