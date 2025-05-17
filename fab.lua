@@ -1,14 +1,11 @@
+local version = "alpha.6"
+
 -- Options
-local opt_arch = fab.option("arch", "x86_64")
-local opt_build_type = fab.option("buildtype", "debug")
+local opt_arch = fab.option("arch", { "x86_64" }) or "x86_64"
+local opt_build_type = fab.option("buildtype", { "debug", "release" }) or "debug"
 
 -- Sources
-local kernel_sources = {}
-for _, path in ipairs(fab.glob("kernel/**/*.c")) do
-    if not path:starts_with("kernel/arch/") then
-        table.insert(kernel_sources, fab.source(path))
-    end
-end
+local kernel_sources = sources(fab.glob("kernel/**/*.c", "kernel/arch/**"))
 
 table.extend(kernel_sources, sources(fab.glob(path("kernel/arch", opt_arch, "**/*.c"))))
 
@@ -17,7 +14,7 @@ if opt_arch == "x86_64" then
 end
 
 -- Includes
-local include_dirs = includes("kernel")
+local include_dirs = { builtins.c.include_dir("kernel") }
 
 -- Flags
 local c_flags = {
@@ -34,7 +31,7 @@ local c_flags = {
     "-Wvla",
     "-Wshadow",
 
-    -- "-D__VERSION="" + meson.project_version(),
+    "-D__VERSION=" .. version,
     "-D__ARCH_" .. opt_arch:upper(),
     "-D__ARCH=" .. opt_arch,
 
@@ -94,58 +91,45 @@ local uacpi = fab.dependency(
     "2.1.1"
 )
 
-table.extend(include_dirs, includes(
-    path(uacpi.path, "include"),
-    tartarus_bootloader.path
-))
+table.extend(include_dirs, {
+    builtins.c.include_dir(path(uacpi.path, "include")),
+    builtins.c.include_dir(tartarus_bootloader.path),
+})
 
 table.extend(kernel_sources, sources(path(cc_runtime.path, "cc-runtime.c")))
 table.extend(kernel_sources, sources(uacpi:glob("source/*.c")))
 
+local cc = builtins.c.get_compiler()
+if cc == nil then
+    error("No viable C compiler found")
+end
+
+local linker = builtins.get_linker()
+if linker == nil then
+    error("No viable linker found")
+end
+
 if opt_arch == "x86_64" then
-    -- Find nasm
-    local nasm = fab.find_executable("nasm")
-    if nasm == nil then
-        panic("nasm not found")
-        return
+    local asmc = builtins.nasm.get_assembler()
+    if asmc == nil then
+        error("No NASM assembler found")
     end
-
-    local ASMC = fab.create_compiler {
-        name = "asmc",
-        executable = nasm,
-        command = "@EXEC@ @FLAGS@ @IN@ -o @OUT@",
-        description = "Assembling @OUT@"
-    }
-
-    -- Find LD
-    local ld = fab.find_executable("ld.lld")
-    if ld == nil then
-        panic("ld.lld not found")
-        return
-    end
-
-    local LD = fab.create_linker {
-        name = "ld",
-        executable = ld,
-        command = "@EXEC@ @FLAGS@ -o @OUT@ @IN@",
-        description = "Linking @OUT@"
-    }
 
     -- Separate sources
     local asm_sources = {}
     local c_sources = {}
 
     for _, source in ipairs(kernel_sources) do
-        if source.filename:ends_with(".asm") then
+        if source.name:ends_with(".asm") then
             table.insert(asm_sources, source)
         end
-        if source.filename:ends_with(".c") then
+        if source.name:ends_with(".c") then
             table.insert(c_sources, source)
         end
     end
 
     --- Includes
-    table.extend(include_dirs, includes(path(freestanding_c_headers.path, "x86_64/include")))
+    table.insert(include_dirs, builtins.c.include_dir(path(freestanding_c_headers.path, "x86_64/include")))
 
     -- Flags
     table.extend(c_flags, {
@@ -162,9 +146,11 @@ if opt_arch == "x86_64" then
 
     -- Build
     local objects = {}
-    table.extend(objects, CC:build(c_sources, c_flags, include_dirs))
-    table.extend(objects, ASMC:build(asm_sources, { "-f", "elf64", "-Werror" }))
+    table.extend(objects, cc:compile_objects(c_sources, include_dirs, c_flags))
+    table.extend(objects, asmc:assemble(asm_sources, { "-f", "elf64", "-Werror" }))
+    local kernel = linker:link("kernel.elf", objects, {
+        "-T" .. path(fab.project_root(), "kernel/support/link.x86_64.ld"), "-znoexecstack"
+    })
 
-    -- Link
-    LD:link(objects, { "-T" .. path(fab.project_root(), "kernel/support/link.x86_64.ld"), "-znoexecstack" }, "kernel.elf")
+    kernel:install("share/kernel.elf")
 end

@@ -8,11 +8,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1745794885,
-        "narHash": "sha256-YiH+PXoyRxzGR0ribOiTHOnRMWrN6ZDTWULmTVWmjQs=",
+        "lastModified": 1747471361,
+        "narHash": "sha256-wIPdPk2qr3zy/USj5QGqlBfMNO6sthhQ9IG7sH227mM=",
         "owner": "elysium-os",
         "repo": "fabricate",
-        "rev": "c780e525210fcae0fac062ff482ef9d3315b7d99",
+        "rev": "6e197304332afa4b9bbad2bd2d303d721e2dfa7f",
         "type": "github"
       },
       "original": {
@@ -59,11 +59,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1745487689,
-        "narHash": "sha256-FQoi3R0NjQeBAsEOo49b5tbDPcJSMWc3QhhaIi9eddw=",
+        "lastModified": 1747209494,
+        "narHash": "sha256-fLise+ys+bpyjuUUkbwqo5W/UyIELvRz9lPBPoB0fbM=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "5630cf13cceac06cefe9fc607e8dfa8fb342dde3",
+        "rev": "5d736263df906c5da72ab0f372427814de2f52f8",
         "type": "github"
       },
       "original": {

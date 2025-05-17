@@ -9,4 +9,6 @@ build/
 .cache
 .clangd
 
+.luarc.json
+
 log.txt
