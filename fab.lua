@@ -4,6 +4,9 @@ local version = "alpha.6"
 local opt_arch = fab.option("arch", { "x86_64" }) or "x86_64"
 local opt_build_type = fab.option("buildtype", { "debug", "release" }) or "debug"
 
+local opt_build_kernel = fab.option("build_kernel", { "yes", "no" }) or "yes"
+local opt_build_modules = fab.option("build_modules", "string") or ""
+
 -- Sources
 local kernel_sources = sources(fab.glob("kernel/**/*.c", "kernel/arch/**"))
 
@@ -110,7 +113,7 @@ if linker == nil then
 end
 
 -- Generator Helper
-function gen_objects(sources, mappings)
+local function gen_objects(sources, mappings)
     local mapped = {}
     for _, source in ipairs(sources) do
         for extension, generator in pairs(mappings) do
@@ -127,6 +130,12 @@ function gen_objects(sources, mappings)
     end
 
     return objects
+end
+
+-- Modules
+local modules = {}
+for _, module in ipairs(fab.string_split(opt_build_modules, " ")) do
+    modules[module] = fab.source(path("modules", module .. ".c"))
 end
 
 if opt_arch == "x86_64" then
@@ -151,16 +160,26 @@ if opt_arch == "x86_64" then
         table.insert(c_flags, "-fno-sanitize=alignment")
     end
 
-    -- Build
-    local objects = gen_objects(kernel_sources, {
-        c = function(sources) return cc:compile_objects(sources, include_dirs, c_flags) end,
-        asm = function(sources) return asmc:assemble(sources, { "-f", "elf64", "-Werror" }) end
-    })
+    local nasm_flags = { "-f", "elf64", "-Werror" }
 
-    local kernel = linker:link("kernel.elf", objects, {
-        "-T" .. fab.path_rel(path(fab.project_root(), "kernel/support/link.x86_64.ld")),
-        "-znoexecstack"
-    })
+    -- Build Kernel
+    if opt_build_kernel == "yes" then
+        local objects = gen_objects(kernel_sources, {
+            c = function(sources) return cc:compile_objects(sources, include_dirs, c_flags) end,
+            asm = function(sources) return asmc:assemble(sources, nasm_flags) end
+        })
 
-    kernel:install("share/kernel.elf")
+        local kernel = linker:link("kernel.elf", objects, {
+            "-T" .. fab.path_rel(path(fab.project_root(), "kernel/support/link.x86_64.ld")),
+            "-znoexecstack"
+        })
+
+        kernel:install("share/kernel.elf")
+    end
+
+    -- Build Modules
+    for name, source in pairs(modules) do
+        local objects = cc:compile_objects({ source }, include_dirs, c_flags)
+        objects[1]:install("share/modules/" .. name .. ".kmod")
+    end
 end
