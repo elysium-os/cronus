@@ -109,23 +109,30 @@ if linker == nil then
     error("No viable linker found")
 end
 
+-- Generator Helper
+function gen_objects(sources, mappings)
+    local mapped = {}
+    for _, source in ipairs(sources) do
+        for extension, generator in pairs(mappings) do
+            if source.name:ends_with("." .. extension) then
+                mapped[extension] = mapped[extension] or { generator = generator, sources = {} }
+                table.insert(mapped[extension].sources, source)
+            end
+        end
+    end
+
+    local objects = {}
+    for _, m in pairs(mapped) do
+        table.extend(objects, m.generator(m.sources))
+    end
+
+    return objects
+end
+
 if opt_arch == "x86_64" then
     local asmc = builtins.nasm.get_assembler()
     if asmc == nil then
         error("No NASM assembler found")
-    end
-
-    -- Separate sources
-    local asm_sources = {}
-    local c_sources = {}
-
-    for _, source in ipairs(kernel_sources) do
-        if source.name:ends_with(".asm") then
-            table.insert(asm_sources, source)
-        end
-        if source.name:ends_with(".c") then
-            table.insert(c_sources, source)
-        end
     end
 
     --- Includes
@@ -145,9 +152,11 @@ if opt_arch == "x86_64" then
     end
 
     -- Build
-    local objects = {}
-    table.extend(objects, cc:compile_objects(c_sources, include_dirs, c_flags))
-    table.extend(objects, asmc:assemble(asm_sources, { "-f", "elf64", "-Werror" }))
+    local objects = gen_objects(kernel_sources, {
+        c = function(sources) return cc:compile_objects(sources, include_dirs, c_flags) end,
+        asm = function(sources) return asmc:assemble(sources, { "-f", "elf64", "-Werror" }) end
+    })
+
     local kernel = linker:link("kernel.elf", objects, {
         "-T" .. fab.path_rel(path(fab.project_root(), "kernel/support/link.x86_64.ld")),
         "-znoexecstack"
