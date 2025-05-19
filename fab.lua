@@ -134,8 +134,10 @@ end
 
 -- Modules
 local modules = {}
-for _, module in ipairs(fab.string_split(opt_build_modules, " ")) do
-    modules[module] = fab.source(path("modules", module .. ".c"))
+if opt_build_modules ~= "" then
+    for _, module in ipairs(fab.string_split(opt_build_modules, " ")) do
+        modules[module] = fab.source(path("modules", module .. ".c"))
+    end
 end
 
 if opt_arch == "x86_64" then
