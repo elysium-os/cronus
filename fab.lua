@@ -149,7 +149,8 @@ if opt_arch == "x86_64" then
     table.extend(objects, cc:compile_objects(c_sources, include_dirs, c_flags))
     table.extend(objects, asmc:assemble(asm_sources, { "-f", "elf64", "-Werror" }))
     local kernel = linker:link("kernel.elf", objects, {
-        "-T" .. path(fab.project_root(), "kernel/support/link.x86_64.ld"), "-znoexecstack"
+        "-T" .. fab.path_rel(path(fab.project_root(), "kernel/support/link.x86_64.ld")),
+        "-znoexecstack"
     })
 
     kernel:install("share/kernel.elf")
