@@ -1,14 +1,10 @@
-/subprojects/*
-!/subprojects/*.wrap
-
 build/
-
-.zed
-.vscode
 
 .cache
 .clangd
-
 .luarc.json
+
+.zed
+.vscode
 
 log.txt
