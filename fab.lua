@@ -102,6 +102,7 @@ table.extend(include_dirs, {
 table.extend(kernel_sources, sources(path(cc_runtime.path, "cc-runtime.c")))
 table.extend(kernel_sources, sources(uacpi:glob("source/*.c")))
 
+-- Tools
 local cc = builtins.c.get_compiler("clang")
 if cc == nil then
     error("No viable C compiler found")
@@ -110,26 +111,6 @@ end
 local linker = builtins.get_linker()
 if linker == nil then
     error("No viable linker found")
-end
-
--- Generator Helper
-local function gen_objects(sources, mappings)
-    local mapped = {}
-    for _, source in ipairs(sources) do
-        for extension, generator in pairs(mappings) do
-            if source.name:ends_with("." .. extension) then
-                mapped[extension] = mapped[extension] or { generator = generator, sources = {} }
-                table.insert(mapped[extension].sources, source)
-            end
-        end
-    end
-
-    local objects = {}
-    for _, m in pairs(mapped) do
-        table.extend(objects, m.generator(m.sources))
-    end
-
-    return objects
 end
 
 -- Modules
@@ -141,8 +122,9 @@ if opt_build_modules ~= "" then
 end
 
 if opt_arch == "x86_64" then
-    local asmc = builtins.nasm.get_assembler()
-    if asmc == nil then
+    -- Tools
+    local nasm = builtins.nasm.get_assembler()
+    if nasm == nil then
         error("No NASM assembler found")
     end
 
@@ -172,9 +154,9 @@ if opt_arch == "x86_64" then
 
     -- Build Kernel
     if opt_build_kernel == "yes" then
-        local objects = gen_objects(kernel_sources, {
-            c = function(sources) return cc:compile_objects(sources, include_dirs, kernel_c_flags) end,
-            asm = function(sources) return asmc:assemble(sources, nasm_flags) end
+        local objects = builtins.generate(kernel_sources, {
+            c = function(sources) return cc:generate(sources, kernel_c_flags, include_dirs) end,
+            asm = function(sources) return nasm:generate(sources, nasm_flags) end
         })
 
         local kernel = linker:link("kernel.elf", objects, {
@@ -187,7 +169,6 @@ if opt_arch == "x86_64" then
 
     -- Build Modules
     for name, source in pairs(modules) do
-        local objects = cc:compile_objects({ source }, include_dirs, module_c_flags)
-        objects[1]:install("modules/" .. name .. ".cronmod")
+        cc:compile_object(name, source, include_dirs, module_c_flags):install("modules/" .. name .. ".cronmod")
     end
 end
