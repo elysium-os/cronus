@@ -71,7 +71,7 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
 
     // load sections
     [[gnu::cleanup(auto_free_shdr)]] elf64_section_header_t *shdrs = heap_alloc(sizeof(elf64_section_header_t) * header->shnum);
-    for(size_t i = 0; i < header->shnum; i++) {
+    for(size_t i = 1; i < header->shnum; i++) {
         res = module_file->ops->rw(module_file, &(vfs_rw_t) { .rw = VFS_RW_READ, .size = sizeof(elf64_section_header_t), .offset = header->shoff + (i * header->shentsize), .buffer = &shdrs[i] }, &read_count);
         if(res != VFS_RESULT_OK || read_count != sizeof(elf64_section_header_t)) return MODULE_RESULT_ERR_FS;
     }
@@ -91,7 +91,7 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
     temp_module->module_regions = LIST_INIT;
 
     size_t symtab_index = ELF64_SHN_UNDEF;
-    for(size_t i = 0; i < header->shnum; i++) {
+    for(size_t i = 1; i < header->shnum; i++) {
         switch(shdrs[i].type) {
             case ELF64_SHT_PROGBITS:
                 if(shdrs[i].size == 0) {
@@ -145,7 +145,6 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
                     log(LOG_LEVEL_WARN, "MODULE", "unknown undef symbol `%s`", &symbol_strtab->data[symbol->name]);
                     return MODULE_RESULT_ERR_UNRESOLVED_SYMBOL;
                 }
-
                 symbol->value = kernel_symbol.address;
                 break;
             case ELF64_SHN_ABS:    break;
@@ -159,8 +158,12 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
     }
 
     // relocations
-    for(int i = 0; i < header->shnum; i++) {
+    for(int i = 1; i < header->shnum; i++) {
         if(shdrs[i].type != ELF64_SHT_RELA) continue;
+
+        // Ignore non-allocated sections
+        if((shdrs[shdrs[i].info].flags & ELF64_SHF_ALLOC) == 0) continue;
+
         if(symtab_index != shdrs[i].link) {
             log(LOG_LEVEL_WARN, "MODULE", "relocations found for a non-symtab section");
             continue;
