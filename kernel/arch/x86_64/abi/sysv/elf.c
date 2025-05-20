@@ -18,14 +18,14 @@
 bool arch_elf_do_relocation_addend(elf64_rela_t *rela, elf64_symbol_t *symbol, uintptr_t section_address) {
     void *address = (void *) (section_address + rela->offset);
 
-    LOG_DEVELOPMENT("ELF", "relocation: [addr: %#lx] [sym_val: %#lx] [addend: %li]", address, symbol->value, rela->addend);
+    LOG_DEVELOPMENT("ELF", "relocation: [type: %#lx] [addr: %#lx] [sym_val: %#lx] [addend: %li]", ELF64_R_TYPE(rela->info), address, symbol->value, rela->addend);
 
     uint64_t value = symbol->value + rela->addend;
 
     size_t reloc_size;
     switch(ELF64_R_TYPE(rela->info)) {
         case R_X86_64_NONE: return true;
-        case R_X86_64_64:   reloc_size = 8; break;
+        case R_X86_64_64: reloc_size = 8; break;
         case R_X86_64_32:
             if(value != *(uint32_t *) &value) goto overflow;
             reloc_size = 4;
@@ -58,6 +58,6 @@ bool arch_elf_do_relocation_addend(elf64_rela_t *rela, elf64_symbol_t *symbol, u
     return true;
 
 overflow:
-    log(LOG_LEVEL_ERROR, "ELF", "relocation %lu overflows", ELF64_R_TYPE(rela->info));
+    log(LOG_LEVEL_ERROR, "ELF", "relocation %lu overflows (%#lx + %#lx = %#lx)", ELF64_R_TYPE(rela->info), symbol->value, rela->addend, value);
     return false;
 }
