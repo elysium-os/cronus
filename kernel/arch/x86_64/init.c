@@ -510,9 +510,10 @@ static void thread_init() {
     x86_64_sched_init_cpu(X86_64_CPU_CURRENT.self);
 
     // Load modules
-    vfs_node_t *test_module_file;
+    vfs_node_t *test_module_file = NULL;
     vfs_lookup(&VFS_ABSOLUTE_PATH("/sys/modules/test.cronmod"), &test_module_file);
     if(res != VFS_RESULT_OK) panic("failed to lookup test module (%i)", res);
+    if(test_module_file == NULL) panic("no test module found");
 
     module_t *module;
     module_result_t mres = module_load(test_module_file, &module);
@@ -528,7 +529,8 @@ static void thread_init() {
 
         vfs_node_t *init_exec;
         res = vfs_lookup(&VFS_ABSOLUTE_PATH("/usr/bin/init"), &init_exec);
-        if(res != VFS_RESULT_OK) panic("could not lookup init executable (%i)", res);
+        if(res != VFS_RESULT_OK) panic("failed to lookup init executable (%i)", res);
+        if(init_exec == NULL) panic("no init executable found");
 
         elf_file_t *init_elf;
         elf_result_t elf_res = elf_read(init_exec, &init_elf);
@@ -546,7 +548,8 @@ static void thread_init() {
 
                 vfs_node_t *interpreter_exec;
                 res = vfs_lookup(&VFS_ABSOLUTE_PATH(interpreter), &interpreter_exec);
-                if(res != VFS_RESULT_OK) panic("could not lookup interpreter for init (%i)", res);
+                if(res != VFS_RESULT_OK) panic("failed to lookup interpreter for init (%i)", res);
+                if(interpreter_exec == NULL) panic("no interpreter found for init executable");
 
                 elf_file_t *interpreter_elf;
                 elf_res = elf_read(interpreter_exec, &interpreter_elf);
