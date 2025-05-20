@@ -102,7 +102,7 @@ table.extend(include_dirs, {
 table.extend(kernel_sources, sources(path(cc_runtime.path, "cc-runtime.c")))
 table.extend(kernel_sources, sources(uacpi:glob("source/*.c")))
 
-local cc = builtins.c.get_compiler()
+local cc = builtins.c.get_compiler("clang")
 if cc == nil then
     error("No viable C compiler found")
 end
@@ -152,7 +152,6 @@ if opt_arch == "x86_64" then
     -- Flags
     table.extend(c_flags, {
         "--target=x86_64-none-elf",
-        "-mcmodel=kernel",
         "-mno-red-zone",
         "-mgeneral-regs-only",
         "-mabi=sysv"
@@ -162,26 +161,33 @@ if opt_arch == "x86_64" then
         table.insert(c_flags, "-fno-sanitize=alignment")
     end
 
+    local module_c_flags = {}
+    for k, v in pairs(c_flags) do module_c_flags[k] = v end
+    table.extend(module_c_flags, { "-mcmodel=large", "-fno-pic" })
+
+    local kernel_c_flags = c_flags
+    table.insert(kernel_c_flags, "-mcmodel=kernel")
+
     local nasm_flags = { "-f", "elf64", "-Werror" }
 
     -- Build Kernel
     if opt_build_kernel == "yes" then
         local objects = gen_objects(kernel_sources, {
-            c = function(sources) return cc:compile_objects(sources, include_dirs, c_flags) end,
+            c = function(sources) return cc:compile_objects(sources, include_dirs, kernel_c_flags) end,
             asm = function(sources) return asmc:assemble(sources, nasm_flags) end
         })
 
         local kernel = linker:link("kernel.elf", objects, {
-            "-T" .. fab.path_rel(path(fab.project_root(), "kernel/support/link.x86_64.ld")),
+            "-T" .. fab.path_rel("kernel/support/link.x86_64.ld"),
             "-znoexecstack"
         })
 
-        kernel:install("share/kernel.elf")
+        kernel:install("kernel.elf")
     end
 
     -- Build Modules
     for name, source in pairs(modules) do
-        local objects = cc:compile_objects({ source }, include_dirs, c_flags)
-        objects[1]:install("share/modules/" .. name .. ".kmod")
+        local objects = cc:compile_objects({ source }, include_dirs, module_c_flags)
+        objects[1]:install("modules/" .. name .. ".cronmod")
     end
 end
