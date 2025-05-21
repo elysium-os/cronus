@@ -400,6 +400,8 @@ static void thread_init() {
     x86_64_lapic_timer_poll(LAPIC_CALIBRATION_TICKS);
     uint16_t end_count = x86_64_pit_count();
 
+    log(LOG_LEVEL_DEBUG, "INIT", "> BSP(%u)", boot_info->bsp_index);
+
     x86_64_cpu_t *cpu = NULL;
     for(size_t i = 0; i < boot_info->cpu_count; i++) {
         if(boot_info->cpus[i].initialization_failed) continue;

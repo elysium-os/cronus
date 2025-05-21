@@ -207,7 +207,7 @@ static void check_function(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t 
 
     uint8_t class = readb(device, offsetof(pci_device_header_t, class));
     uint8_t sub_class = readb(device, offsetof(pci_device_header_t, sub_class));
-    uint8_t prog_if = readb(device, offsetof(pci_device_header_t, program_interface));
+    // uint8_t prog_if = readb(device, offsetof(pci_device_header_t, program_interface));
 
     if(class == 0x6 && sub_class == 0x4) {
         check_bus(segment, (uint8_t) (readb(device, offsetof(pci_header1_t, secondary_bus)) >> 8));

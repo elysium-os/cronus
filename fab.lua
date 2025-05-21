@@ -100,7 +100,8 @@ table.extend(include_dirs, {
 })
 
 table.extend(kernel_sources, sources(path(cc_runtime.path, "cc-runtime.c")))
-table.extend(kernel_sources, sources(uacpi:glob("source/*.c")))
+
+local uacpi_sources = sources(uacpi:glob("source/*.c"))
 
 -- Tools
 local cc = builtins.c.get_compiler("clang")
@@ -143,21 +144,23 @@ if opt_arch == "x86_64" then
         table.insert(c_flags, "-fno-sanitize=alignment")
     end
 
-    local module_c_flags = {}
-    for k, v in pairs(c_flags) do module_c_flags[k] = v end
-    table.extend(module_c_flags, { "-mcmodel=large", "-fno-pic" })
-
-    local kernel_c_flags = c_flags
-    table.insert(kernel_c_flags, "-mcmodel=kernel")
-
     local nasm_flags = { "-f", "elf64", "-Werror" }
+
+    local cflags_kernel = { "-mcmodel=kernel", table.unpack(c_flags) }
+    local cflags_uacpi = table.shallow_clone(cflags_kernel)
+    local cflags_module = { "-mcmodel=large", "-fno-pic", table.unpack(c_flags) }
+    if opt_build_type == "debug" then
+        table.insert(cflags_kernel, "-Werror")
+        table.insert(cflags_module, "-Werror")
+    end
 
     -- Build Kernel
     if opt_build_kernel == "yes" then
         local objects = builtins.generate(kernel_sources, {
-            c = function(sources) return cc:generate(sources, kernel_c_flags, include_dirs) end,
+            c = function(sources) return cc:generate(sources, cflags_kernel, include_dirs) end,
             asm = function(sources) return nasm:generate(sources, nasm_flags) end
         })
+        table.extend(objects, cc:generate(uacpi_sources, cflags_uacpi, include_dirs))
 
         local kernel = linker:link("kernel.elf", objects, {
             "-T" .. fab.path_rel("kernel/support/link.x86_64.ld"),
@@ -169,6 +172,6 @@ if opt_arch == "x86_64" then
 
     -- Build Modules
     for name, source in pairs(modules) do
-        cc:compile_object(name, source, include_dirs, module_c_flags):install("modules/" .. name .. ".cronmod")
+        cc:compile_object(name, source, include_dirs, cflags_module):install("modules/" .. name .. ".cronmod")
     end
 end
