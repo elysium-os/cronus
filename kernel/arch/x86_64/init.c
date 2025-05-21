@@ -158,7 +158,7 @@ static void thread_init() {
     cpu->lapic_id = x86_64_lapic_id();
     cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * X86_64_PIT_BASE_FREQ;
     cpu->tss = tss;
-    cpu->current_thread = NULL;
+    cpu->current_thread = nullptr;
 
     // Initialize FPU
     x86_64_fpu_init_cpu();
@@ -380,7 +380,7 @@ static void thread_init() {
 
     // Initialize IOAPIC
     acpi_sdt_header_t *madt = acpi_find_table((uint8_t *) "APIC");
-    if(madt != NULL) x86_64_ioapic_init(madt);
+    if(madt != nullptr) x86_64_ioapic_init(madt);
 
     // Initialize PCI
     acpi_sdt_header_t *mcfg = acpi_find_table((uint8_t *) "MCFG");
@@ -402,7 +402,7 @@ static void thread_init() {
 
     log(LOG_LEVEL_DEBUG, "INIT", "> BSP(%u)", boot_info->bsp_index);
 
-    x86_64_cpu_t *cpu = NULL;
+    x86_64_cpu_t *cpu = nullptr;
     for(size_t i = 0; i < boot_info->cpu_count; i++) {
         if(boot_info->cpus[i].initialization_failed) continue;
 
@@ -415,7 +415,7 @@ static void thread_init() {
             cpu->lapic_id = x86_64_lapic_id();
             cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * X86_64_PIT_BASE_FREQ;
             cpu->tss = tss;
-            cpu->current_thread = NULL;
+            cpu->current_thread = nullptr;
             x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
             g_init_cpu_id_counter++;
             continue;
@@ -425,7 +425,7 @@ static void thread_init() {
         __atomic_store_n(boot_info->cpus[i].wake_on_write, (uintptr_t) init_ap, __ATOMIC_RELEASE);
         while(previous_count >= g_init_cpu_id_counter);
     }
-    ASSERT(cpu != NULL);
+    ASSERT(cpu != nullptr);
     ASSERT(g_init_cpu_id_counter == g_x86_64_cpu_count);
 
     log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%lu/%i cpus initialized)", g_init_cpu_id_counter, boot_info->cpu_count);
@@ -440,7 +440,7 @@ static void thread_init() {
 
     // Initialize timer
     acpi_sdt_header_t *hpet_header = acpi_find_table((uint8_t *) "HPET");
-    if(hpet_header != NULL) {
+    if(hpet_header != nullptr) {
         x86_64_hpet_init(hpet_header);
         time_source_register(&g_hpet_time_source);
         //     int timer = x86_64_hpet_find_timer(true);
@@ -464,16 +464,16 @@ static void thread_init() {
     x86_64_syscall_init_cpu();
 
     // Initialize VFS
-    tartarus_module_t *sysroot_module = NULL;
+    tartarus_module_t *sysroot_module = nullptr;
     for(uint16_t i = 0; i < boot_info->module_count; i++) {
         tartarus_module_t *module = &boot_info->modules[i];
         if(!string_eq(module->name, "root.rdk")) continue;
         sysroot_module = module;
         break;
     }
-    if(sysroot_module == NULL) panic("could not locate root.rdk");
+    if(sysroot_module == nullptr) panic("could not locate root.rdk");
 
-    vfs_result_t res = vfs_mount(&g_rdsk_ops, NULL, (void *) HHDM(sysroot_module->paddr));
+    vfs_result_t res = vfs_mount(&g_rdsk_ops, nullptr, (void *) HHDM(sysroot_module->paddr));
     if(res != VFS_RESULT_OK) panic("failed to mount rdsk (%i)", res);
 
     vfs_node_t *root_node;
@@ -485,11 +485,11 @@ static void thread_init() {
         const char *filename;
         res = root_node->ops->readdir(root_node, &i, &filename);
         ASSERT(res == VFS_RESULT_OK);
-        if(filename == NULL) break;
+        if(filename == nullptr) break;
         log(LOG_LEVEL_DEBUG, "INIT", "| - %s", filename);
     }
 
-    res = vfs_mount(&g_tmpfs_ops, "/tmp", NULL);
+    res = vfs_mount(&g_tmpfs_ops, "/tmp", nullptr);
     if(res != VFS_RESULT_OK) panic("failed to mount /tmp (%i)", res);
 
     x86_64_init_flag_set(X86_64_INIT_FLAG_VFS);
@@ -512,10 +512,10 @@ static void thread_init() {
     x86_64_sched_init_cpu(X86_64_CPU_CURRENT.self);
 
     // Load modules
-    vfs_node_t *test_module_file = NULL;
+    vfs_node_t *test_module_file = nullptr;
     vfs_lookup(&VFS_ABSOLUTE_PATH("/sys/modules/test.cronmod"), &test_module_file);
     if(res != VFS_RESULT_OK) panic("failed to lookup test module (%i)", res);
-    if(test_module_file == NULL) panic("no test module found");
+    if(test_module_file == nullptr) panic("no test module found");
 
     module_t *module;
     module_result_t mres = module_load(test_module_file, &module);
@@ -532,7 +532,7 @@ static void thread_init() {
         vfs_node_t *init_exec;
         res = vfs_lookup(&VFS_ABSOLUTE_PATH("/usr/bin/init"), &init_exec);
         if(res != VFS_RESULT_OK) panic("failed to lookup init executable (%i)", res);
-        if(init_exec == NULL) panic("no init executable found");
+        if(init_exec == nullptr) panic("no init executable found");
 
         elf_file_t *init_elf;
         elf_result_t elf_res = elf_read(init_exec, &init_elf);
@@ -551,7 +551,7 @@ static void thread_init() {
                 vfs_node_t *interpreter_exec;
                 res = vfs_lookup(&VFS_ABSOLUTE_PATH(interpreter), &interpreter_exec);
                 if(res != VFS_RESULT_OK) panic("failed to lookup interpreter for init (%i)", res);
-                if(interpreter_exec == NULL) panic("no interpreter found for init executable");
+                if(interpreter_exec == nullptr) panic("no interpreter found for init executable");
 
                 elf_file_t *interpreter_elf;
                 elf_res = elf_read(interpreter_exec, &interpreter_elf);
@@ -581,8 +581,8 @@ static void thread_init() {
 
         log(LOG_LEVEL_DEBUG, "INIT", "auxv { entry: %#lx; phdr: %#lx; phent: %#lx; phnum: %#lx; }", auxv.entry, auxv.phdr, auxv.phent, auxv.phnum);
 
-        char *argv[] = { "/usr/bin/init", NULL };
-        char *envp[] = { NULL };
+        char *argv[] = { "/usr/bin/init", nullptr };
+        char *envp[] = { nullptr };
 
         process_t *proc = process_create(as);
         uintptr_t thread_stack = x86_64_sysv_stack_setup(proc->address_space, ARCH_PAGE_GRANULARITY * 8, argv, envp, &auxv);

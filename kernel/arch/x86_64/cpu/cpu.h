@@ -11,7 +11,7 @@
 
 #define X86_64_CPU(CPU) (CONTAINER_OF((CPU), x86_64_cpu_t, common))
 
-#define X86_64_CPU_CURRENT (*(__seg_gs x86_64_cpu_t *) NULL)
+#define X86_64_CPU_CURRENT (*(__seg_gs x86_64_cpu_t *) nullptr)
 
 typedef struct x86_64_cpu {
     struct x86_64_cpu *self;

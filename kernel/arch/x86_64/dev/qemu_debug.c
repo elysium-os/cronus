@@ -31,7 +31,7 @@ static void log_debug(log_level_t level, const char *tag, const char *fmt, va_li
 
 log_sink_t g_x86_64_qemu_debug_sink = {
     .name = "QEMU",
-    .filter = { .level = LOG_LEVEL_DEBUG, .tags_as_include = false, .tags = NULL, .tag_count = 0 },
+    .filter = { .level = LOG_LEVEL_DEBUG, .tags_as_include = false, .tags = nullptr, .tag_count = 0 },
     .log = log_debug
 };
 

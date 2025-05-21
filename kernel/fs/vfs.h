@@ -5,7 +5,7 @@
 
 #include <stddef.h>
 
-#define VFS_ABSOLUTE_PATH(PATH) ((vfs_path_t) { .root = NULL, .relative_path = (PATH) })
+#define VFS_ABSOLUTE_PATH(PATH) ((vfs_path_t) { .root = nullptr, .relative_path = (PATH) })
 
 typedef struct vfs vfs_t;
 typedef struct vfs_ops vfs_ops_t;
@@ -101,13 +101,13 @@ struct vfs_node_ops {
 
     /**
      * @brief Look up a node by name.
-     * @param found_node set to looked up node, NULL on parent lookup of fs root
+     * @param found_node set to looked up node, nullptr on parent lookup of fs root
      */
     vfs_result_t (*lookup)(vfs_node_t *node, char *name, PARAM_OUT(vfs_node_t **) found_node);
 
     /**
      * @brief Read the next entry in a directory.
-     * @note Offset is incremented to the next entry. If dirent_name is NULL, it is the last entry.
+     * @note Offset is incremented to the next entry. If dirent_name is nullptr, it is the last entry.
      */
     vfs_result_t (*readdir)(vfs_node_t *node, PARAM_INOUT(size_t *) offset, PARAM_OUT(const char **) dirent_name);
 

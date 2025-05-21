@@ -343,7 +343,7 @@ static interrupt_handler_t g_interrupt_handlers[256] = {};
 
 static void kernelapi_interrupt_handler(x86_64_interrupt_frame_t *frame) {
     interrupt_handler_t *handler = &g_interrupt_handlers[frame->int_no];
-    ASSERT(handler != NULL);
+    ASSERT(handler != nullptr);
     handler->fn(handler->ctx);
 }
 
@@ -366,7 +366,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
 
 uacpi_status uacpi_kernel_uninstall_interrupt_handler([[maybe_unused]] uacpi_interrupt_handler fn, uacpi_handle irq_handle) {
     interrupt_handler_t *handler = (interrupt_handler_t *) irq_handle;
-    x86_64_interrupt_set(handler->vector, NULL);
+    x86_64_interrupt_set(handler->vector, nullptr);
     heap_free(handler, sizeof(interrupt_handler_t));
     return UACPI_STATUS_OK;
 }

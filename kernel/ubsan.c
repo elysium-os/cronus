@@ -222,8 +222,8 @@ void __ubsan_handle_type_mismatch_v1(data_type_mismatch_t *data, void *pointer) 
     static const char *kind_strs[] = { "load of",     "store to",  "reference binding to",    "member access within", "member call on",      "constructor call on", "downcast of",
                                        "downcast of", "upcast of", "cast to virtual base of", "nonnull binding to",   "dynamic operation on" };
 
-    if(pointer == NULL) {
-        log(LOG_LEVEL_WARN, "UBSAN", "type_mismatch @ %s:%u:%u (%s NULL pointer of type %s)", data->location.filename, data->location.line, data->location.column, kind_strs[data->type_check_kind], data->type->name);
+    if(pointer == nullptr) {
+        log(LOG_LEVEL_WARN, "UBSAN", "type_mismatch @ %s:%u:%u (%s nullptr pointer of type %s)", data->location.filename, data->location.line, data->location.column, kind_strs[data->type_check_kind], data->type->name);
     } else if((1 << data->alignment) - 1) {
         log(LOG_LEVEL_WARN, "UBSAN", "type_mismatch @ %s:%u:%u (%s misaligned address %#lx of type %s)", data->location.filename, data->location.line, data->location.column, kind_strs[data->type_check_kind], (uintptr_t) pointer, data->type->name);
     } else {

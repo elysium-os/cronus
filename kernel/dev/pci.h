@@ -37,7 +37,7 @@ extern list_t g_pci_devices;
 
 /**
  * @brief Enumerate PCI devices.
- * @param mcfg MCFG table or NULL
+ * @param mcfg MCFG table or nullptr
  */
 void pci_enumerate(acpi_sdt_header_t *mcfg);
 

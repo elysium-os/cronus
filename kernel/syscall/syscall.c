@@ -14,17 +14,17 @@
 #define MAX_DEBUG_LENGTH 512
 
 int syscall_buffer_out(void *dest, void *src, size_t count) {
-    ASSERT(arch_sched_thread_current()->proc != NULL);
+    ASSERT(arch_sched_thread_current()->proc != nullptr);
     return vm_copy_to(arch_sched_thread_current()->proc->address_space, (uintptr_t) dest, src, count);
 }
 
 void *syscall_buffer_in(void *src, size_t count) {
-    ASSERT(arch_sched_thread_current()->proc != NULL);
+    ASSERT(arch_sched_thread_current()->proc != nullptr);
     void *buffer = heap_alloc(count);
     size_t read_count = vm_copy_from(buffer, arch_sched_thread_current()->proc->address_space, (uintptr_t) src, count);
     if(read_count != count) {
         heap_free(buffer, count);
-        return NULL;
+        return nullptr;
     }
     return buffer;
 }
@@ -40,7 +40,7 @@ int syscall_string_out(char *dest, char *src, size_t max) {
 
 char *syscall_string_in(char *src, size_t length) {
     char *str = syscall_buffer_in(src, length + 1);
-    if(str == NULL) return NULL;
+    if(str == nullptr) return nullptr;
     str[length] = 0;
     return str;
 }
@@ -60,7 +60,7 @@ syscall_return_t syscall_debug(size_t length, char *str) {
     }
 
     str = syscall_string_in(str, length);
-    if(str == NULL) {
+    if(str == nullptr) {
         ret.error = SYSCALL_ERROR_INVALID_VALUE;
         return ret;
     }

@@ -25,7 +25,7 @@ thread_t *sched_thread_next(sched_t *sched) {
     interrupt_state_t previous_state = spinlock_acquire(&sched->lock);
     if(list_is_empty(&sched->thread_queue)) {
         spinlock_release(&sched->lock, previous_state);
-        return NULL;
+        return nullptr;
     }
 
     thread_t *thread = LIST_CONTAINER_GET(LIST_NEXT(&sched->thread_queue), thread_t, list_sched);
@@ -42,8 +42,8 @@ void sched_yield(enum thread_state yield_state) {
     thread_t *current = arch_sched_thread_current();
 
     thread_t *next = sched_thread_next(&arch_cpu_current()->sched);
-    if(next == NULL && current != current->scheduler->idle_thread) next = current->scheduler->idle_thread;
-    if(next != NULL) {
+    if(next == nullptr && current != current->scheduler->idle_thread) next = current->scheduler->idle_thread;
+    if(next != nullptr) {
         ASSERT(current != next);
         current->state = yield_state;
         arch_sched_context_switch(current, next);
@@ -64,7 +64,7 @@ void internal_sched_thread_drop(thread_t *thread) {
 
     switch(thread->state) {
         case THREAD_STATE_DESTROY:
-            if(thread->proc != NULL) {
+            if(thread->proc != nullptr) {
                 interrupt_state_t previous_state = spinlock_acquire(&thread->proc->lock);
                 list_delete(&thread->list_proc);
                 if(list_is_empty(&thread->proc->threads)) {

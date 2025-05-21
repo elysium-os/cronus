@@ -93,7 +93,7 @@ static vm_region_t *region_alloc(bool global_lock_acquired) {
         for(unsigned int i = 1; i < ARCH_PAGE_GRANULARITY / sizeof(vm_region_t); i++) list_append(&g_free_regions, &region[i].list_elem);
     }
     list_element_t *elem = LIST_NEXT(&g_free_regions);
-    ASSERT(elem != NULL);
+    ASSERT(elem != nullptr);
     list_delete(elem);
     spinlock_release(&g_free_regions_lock, previous_state);
     return LIST_CONTAINER_GET(elem, vm_region_t, list_elem);
@@ -106,18 +106,18 @@ static void region_free(vm_region_t *region) {
 }
 
 static vm_region_t *addr_to_region(vm_address_space_t *address_space, uintptr_t address) {
-    if(!ADDRESS_IN_BOUNDS(address, address_space->start, address_space->end)) return NULL;
+    if(!ADDRESS_IN_BOUNDS(address, address_space->start, address_space->end)) return nullptr;
     LIST_FOREACH(&address_space->regions, elem) {
         vm_region_t *region = LIST_CONTAINER_GET(elem, vm_region_t, list_elem);
         if(!ADDRESS_IN_SEGMENT(address, region->base, region->length)) continue;
         return region;
     }
-    return NULL;
+    return nullptr;
 }
 
 static bool address_space_fix_page(vm_address_space_t *address_space, uintptr_t vaddr) {
     vm_region_t *region = addr_to_region(address_space, vaddr);
-    if(region == NULL) return false;
+    if(region == nullptr) return false;
     region_map(region, MATH_FLOOR(vaddr, ARCH_PAGE_GRANULARITY), ARCH_PAGE_GRANULARITY);
     return true;
 }
@@ -148,9 +148,9 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
     log(LOG_LEVEL_DEBUG, "VM", "map(hint: %#lx, length: %#lx, prot: %c%c%c, flags: %lu, cache: %u, type: %u)", (uintptr_t) hint, length, prot.read ? 'R' : '-', prot.write ? 'W' : '-', prot.exec ? 'E' : '-', flags, cache, type);
 
     uintptr_t address = (uintptr_t) hint;
-    if(length == 0 || length % ARCH_PAGE_GRANULARITY != 0) return NULL;
+    if(length == 0 || length % ARCH_PAGE_GRANULARITY != 0) return nullptr;
     if(address % ARCH_PAGE_GRANULARITY != 0) {
-        if(flags & VM_FLAG_FIXED) return NULL;
+        if(flags & VM_FLAG_FIXED) return nullptr;
         address += ARCH_PAGE_GRANULARITY - (address % ARCH_PAGE_GRANULARITY);
     }
 
@@ -160,7 +160,7 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
     if(address == 0 || ((uintptr_t) hint != address && (flags & VM_FLAG_FIXED) != 0)) {
         region_free(region);
         spinlock_release(&address_space->lock, previous_state);
-        return NULL;
+        return nullptr;
     }
 
     ASSERT(SEGMENT_IN_BOUNDS(address, length, address_space->start, address_space->end));
@@ -206,7 +206,7 @@ void vm_unmap(vm_address_space_t *address_space, void *address, size_t length) {
     for(uintptr_t split_base = (uintptr_t) address, split_length = 0; split_base < (uintptr_t) address + length; split_base += split_length) {
         split_length = ARCH_PAGE_GRANULARITY;
         vm_region_t *split_region = addr_to_region(address_space, split_base);
-        if(split_region == NULL) continue;
+        if(split_region == nullptr) continue;
 
         while(ADDRESS_IN_SEGMENT(split_base + split_length, split_region->base, split_region->length) && ADDRESS_IN_SEGMENT(split_base + split_length, (uintptr_t) address, length)) split_length += ARCH_PAGE_GRANULARITY;
 
@@ -245,7 +245,7 @@ bool vm_fault(uintptr_t address, vm_fault_t fault) {
     if(ADDRESS_IN_BOUNDS(address, g_vm_global_address_space->start, g_vm_global_address_space->end)) return false;
 
     process_t *proc = arch_sched_thread_current()->proc;
-    if(proc == NULL) return false;
+    if(proc == nullptr) return false;
 
     return address_space_fix_page(proc->address_space, address);
 }

@@ -12,7 +12,7 @@ buffer_t *buffer_alloc(size_t size) {
 }
 
 void buffer_free(buffer_t *buffer) {
-    ASSERT(buffer != NULL);
+    ASSERT(buffer != nullptr);
     heap_free(buffer, sizeof(buffer_t) + buffer->size);
 }
 

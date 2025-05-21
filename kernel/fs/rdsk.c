@@ -117,7 +117,7 @@ static rdsk_dir_t *find_dir(vfs_t *vfs, rdsk_dir_t *dir, char *name) {
         if(!string_eq(name, get_name(vfs, curdir->nametable_offset))) continue;
         return curdir;
     }
-    return NULL;
+    return nullptr;
 }
 
 static rdsk_file_t *find_file(vfs_t *vfs, rdsk_dir_t *dir, char *name) {
@@ -128,7 +128,7 @@ static rdsk_file_t *find_file(vfs_t *vfs, rdsk_dir_t *dir, char *name) {
         if(!string_eq(name, get_name(vfs, curfile->nametable_offset))) continue;
         return curfile;
     }
-    return NULL;
+    return nullptr;
 }
 
 static vfs_result_t rdsk_rw(vfs_node_t *node, vfs_rw_t *rw, PARAM_OUT(size_t *) rw_count) {
@@ -172,19 +172,19 @@ static vfs_result_t rdsk_lookup(vfs_node_t *node, char *name, PARAM_OUT(vfs_node
         if(DIR(node)->parent_index != 0) {
             *found_node = get_dir_vfs_node(node->vfs, DIR(node)->parent_index);
         } else {
-            *found_node = NULL;
+            *found_node = nullptr;
         }
         return VFS_RESULT_OK;
     }
 
     rdsk_file_t *found_file = find_file(node->vfs, DIR(node), name);
-    if(found_file != NULL) {
+    if(found_file != nullptr) {
         *found_node = get_file_vfs_node(node->vfs, get_file_index(node->vfs, found_file));
         return VFS_RESULT_OK;
     }
 
     rdsk_dir_t *found_dir = find_dir(node->vfs, DIR(node), name);
-    if(found_dir != NULL) {
+    if(found_dir != nullptr) {
         *found_node = get_dir_vfs_node(node->vfs, get_dir_index(node->vfs, found_dir));
         return VFS_RESULT_OK;
     }
@@ -212,7 +212,7 @@ static vfs_result_t rdsk_readdir(vfs_node_t *node, PARAM_INOUT(size_t *) offset,
     rdsk_index_t index = DIR(node)->dirtable_index;
     for(int i = 0; i < local_offset - (int) header->filetable_entry_count && index != 0; i++) index = get_dir(node->vfs, index)->next_index;
     if(index == 0) {
-        *dirent_name = NULL;
+        *dirent_name = nullptr;
         return VFS_RESULT_OK;
     }
 

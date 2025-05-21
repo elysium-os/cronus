@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#define LIST_INIT ((list_t) { .next = NULL, .prev = NULL })
+#define LIST_INIT ((list_t) { .next = nullptr, .prev = nullptr })
 #define LIST_INIT_CIRCULAR(NAME) ((list_t) { .next = &(NAME), .prev = &(NAME) })
 
 typedef struct list_element list_element_t;
@@ -60,4 +60,4 @@ bool list_is_empty(list_t *list);
  * @param LIST `list_t` to iterate over
  * @param ELEMENT `list_element_t *` iterator name
  */
-#define LIST_FOREACH(LIST, ELEMENT) for(list_element_t * (ELEMENT) = LIST_NEXT(LIST); (ELEMENT) != NULL && (ELEMENT) != (LIST); (ELEMENT) = LIST_NEXT(ELEMENT))
+#define LIST_FOREACH(LIST, ELEMENT) for(list_element_t * (ELEMENT) = LIST_NEXT(LIST); (ELEMENT) != nullptr && (ELEMENT) != (LIST); (ELEMENT) = LIST_NEXT(ELEMENT))

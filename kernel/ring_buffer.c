@@ -35,6 +35,6 @@ static void log_ring_buffer(log_level_t level, const char *tag, const char *fmt,
 
 log_sink_t g_ring_buffer_sink = {
     .name = "RING_BUFFER",
-    .filter = { .level = LOG_LEVEL_DEBUG, .tags_as_include = false, .tags = NULL, .tag_count = 0 },
+    .filter = { .level = LOG_LEVEL_DEBUG, .tags_as_include = false, .tags = nullptr, .tag_count = 0 },
     .log = log_ring_buffer
 };

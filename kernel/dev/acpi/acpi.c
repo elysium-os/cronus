@@ -41,7 +41,7 @@ void acpi_init(uintptr_t rsdp) {
 }
 
 acpi_sdt_header_t *acpi_find_table(uint8_t *signature) {
-    if(g_xsdt != NULL) {
+    if(g_xsdt != nullptr) {
         uint32_t entry_count = (g_xsdt->length - sizeof(acpi_sdt_header_t)) / sizeof(uint64_t);
         uint64_t *entry_ptr = (uint64_t *) ((uintptr_t) g_xsdt + sizeof(acpi_sdt_header_t));
         for(uint32_t i = 0; i < entry_count; i++) {
@@ -49,7 +49,7 @@ acpi_sdt_header_t *acpi_find_table(uint8_t *signature) {
             if(memcmp(entry->signature, signature, 4) == 0) return entry;
             entry_ptr++;
         }
-    } else if(g_rsdt != NULL) {
+    } else if(g_rsdt != nullptr) {
         uint32_t entry_count = (g_rsdt->length - sizeof(acpi_sdt_header_t)) / sizeof(uint32_t);
         uint32_t *entry_ptr = (uint32_t *) ((uintptr_t) g_rsdt + sizeof(acpi_sdt_header_t));
         for(uint32_t i = 0; i < entry_count; i++) {
@@ -58,7 +58,7 @@ acpi_sdt_header_t *acpi_find_table(uint8_t *signature) {
             entry_ptr++;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 uint8_t acpi_revision() {

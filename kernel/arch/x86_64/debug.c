@@ -15,7 +15,7 @@ void arch_debug_stack_trace() {
 
 void x86_64_debug_stack_trace_from(x86_64_debug_stack_frame_t *stack_frame) {
     log(LOG_LEVEL_DEBUG, "DEBUG", "Stack Trace:");
-    for(int i = 0; stack_frame != NULL && stack_frame->rip != 0 && i < 30; i++) {
+    for(int i = 0; stack_frame != nullptr && stack_frame->rip != 0 && i < 30; i++) {
         kernel_symbol_t symbol;
         if(!kernel_symbol_lookup(stack_frame->rip, &symbol)) {
             log(LOG_LEVEL_DEBUG, "DEBUG", "    [UNKNOWN] <%#lx>", stack_frame->rip);

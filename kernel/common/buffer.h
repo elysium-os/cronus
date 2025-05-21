@@ -27,5 +27,5 @@ void buffer_clear(buffer_t *buffer);
  * @brief Wraps `buffer_free` for usage with cleanup attribute.
  */
 static inline void buffer_cleanup(buffer_t **buffer) {
-    if(*buffer != NULL) buffer_free(*buffer);
+    if(*buffer != nullptr) buffer_free(*buffer);
 }

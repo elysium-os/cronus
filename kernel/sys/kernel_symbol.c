@@ -28,7 +28,7 @@ typedef struct [[gnu::packed]] {
 } symbol_t;
 
 static char g_invalid_name[1] = { '\0' };
-static header_t *g_kernel_symbols_header = NULL;
+static header_t *g_kernel_symbols_header = nullptr;
 
 static const char *get_name(header_t *header, uint64_t name_offset) {
     if(name_offset >= header->names_length) {
@@ -39,7 +39,7 @@ static const char *get_name(header_t *header, uint64_t name_offset) {
 }
 
 void kernel_symbols_load(void *symbol_data) {
-    if(g_kernel_symbols_header != NULL) log(LOG_LEVEL_WARN, "KERNEL_SYMBOL", "symbol data reloaded");
+    if(g_kernel_symbols_header != nullptr) log(LOG_LEVEL_WARN, "KERNEL_SYMBOL", "symbol data reloaded");
     if(memcmp(symbol_data, IDENTIFIER, 4) != 0) panic("invalid kernel symbol file identifier");
     header_t *header = (header_t *) symbol_data;
     if(header->revision > REVISION) panic("invalid kernel symbol file revision");
@@ -47,13 +47,13 @@ void kernel_symbols_load(void *symbol_data) {
 }
 
 bool kernel_symbols_is_loaded() {
-    return g_kernel_symbols_header != NULL;
+    return g_kernel_symbols_header != nullptr;
 }
 
 bool kernel_symbol_lookup(uintptr_t address, PARAM_FILL(kernel_symbol_t *) symbol) {
     if(!kernel_symbols_is_loaded()) return false;
 
-    symbol_t *prev = NULL, *sym = NULL;
+    symbol_t *prev = nullptr, *sym = nullptr;
     for(size_t i = 0; i < g_kernel_symbols_header->symbols_count; i++) {
         symbol_t *ksymbol = SYMBOL_AT(g_kernel_symbols_header, i);
         if(ksymbol->value > address) {
@@ -67,7 +67,7 @@ bool kernel_symbol_lookup(uintptr_t address, PARAM_FILL(kernel_symbol_t *) symbo
 
         prev = ksymbol;
     }
-    if(sym == NULL) return false;
+    if(sym == nullptr) return false;
 
     symbol->name = get_name(g_kernel_symbols_header, sym->name_index);
     symbol->address = sym->value;

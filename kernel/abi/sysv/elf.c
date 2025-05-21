@@ -115,11 +115,11 @@ elf_result_t elf_load(elf_file_t *elf_file, vm_address_space_t *as) {
                 size_t length = MATH_CEIL(phdr->memsz + (phdr->vaddr - aligned_vaddr), ARCH_PAGE_GRANULARITY);
 
                 void *ptr = vm_map_anon(as, (void *) aligned_vaddr, length, prot, VM_CACHE_STANDARD, VM_FLAG_FIXED | VM_FLAG_ZERO);
-                ASSERT(ptr != NULL);
+                ASSERT(ptr != nullptr);
                 if(phdr->filesz > 0) {
                     size_t buffer_size = MATH_CEIL(phdr->filesz, ARCH_PAGE_GRANULARITY);
-                    void *buffer = vm_map_anon(g_vm_global_address_space, NULL, buffer_size, VM_PROT_RW, VM_CACHE_STANDARD, VM_FLAG_NO_DEMAND);
-                    ASSERT(buffer != NULL);
+                    void *buffer = vm_map_anon(g_vm_global_address_space, nullptr, buffer_size, VM_PROT_RW, VM_CACHE_STANDARD, VM_FLAG_NO_DEMAND);
+                    ASSERT(buffer != nullptr);
 
                     size_t read_count;
                     vfs_result_t res = elf_file->file->ops->rw(elf_file->file, &(vfs_rw_t) { .rw = VFS_RW_READ, .size = phdr->filesz, .offset = phdr->offset, .buffer = buffer }, &read_count);

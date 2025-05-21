@@ -22,7 +22,7 @@ static slab_t *cache_make_slab(slab_cache_t *cache) {
     slab_t *slab = (slab_t *) HHDM(block->paddr);
     slab->cache = cache;
     slab->block = block;
-    slab->freelist = NULL;
+    slab->freelist = nullptr;
     slab->free_count = 0;
 
     size_t slab_size = PMM_ORDER_TO_PAGECOUNT(cache->block_order) * ARCH_PAGE_GRANULARITY - sizeof(slab_t);
@@ -115,7 +115,7 @@ slab_cache_t *slab_cache_create(const char *name, size_t object_size, pmm_order_
     for(size_t i = 0; i < MAGAZINE_COUNT_EXTRA; i++) {
         slab_magazine_t *magazine = slab_allocate(&g_alloc_magazine);
         magazine->round_count = 0;
-        for(size_t j = 0; j < MAGAZINE_SIZE; j++) magazine->rounds[j] = NULL;
+        for(size_t j = 0; j < MAGAZINE_SIZE; j++) magazine->rounds[j] = nullptr;
         list_append(&cache->magazines_empty, &magazine->list_elem);
     }
 
@@ -127,7 +127,7 @@ slab_cache_t *slab_cache_create(const char *name, size_t object_size, pmm_order_
 
             slab_magazine_t *magazine_secondary = slab_allocate(&g_alloc_magazine);
             magazine_secondary->round_count = 0;
-            for(size_t j = 0; j < MAGAZINE_SIZE; j++) magazine_secondary->rounds[j] = NULL;
+            for(size_t j = 0; j < MAGAZINE_SIZE; j++) magazine_secondary->rounds[j] = nullptr;
 
             cache->cpu_cache[i].lock = SPINLOCK_INIT;
             cache->cpu_cache[i].primary = magazine_primary;

@@ -28,7 +28,7 @@ static void auto_free_shdr(elf64_section_header_t **shdr) {
 
 static void auto_free_module(module_t **auto_module) {
     module_t *module = *auto_module;
-    if(module == NULL) return;
+    if(module == nullptr) return;
 
     while(!list_is_empty(&module->module_regions)) {
         list_element_t *elem = LIST_NEXT(&module->module_regions);
@@ -76,7 +76,7 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
         if(res != VFS_RESULT_OK || read_count != sizeof(elf64_section_header_t)) return MODULE_RESULT_ERR_FS;
     }
 
-    [[gnu::cleanup(buffer_cleanup)]] buffer_t *section_strtab = NULL;
+    [[gnu::cleanup(buffer_cleanup)]] buffer_t *section_strtab = nullptr;
     if(header->shstrndx != ELF64_SHN_UNDEF) {
         if(read_section(module_file, &shdrs[header->shstrndx], &section_strtab)) return MODULE_RESULT_ERR_FS;
     }
@@ -86,8 +86,8 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
 
     // load module into memory
     [[gnu::cleanup(auto_free_module)]] module_t *temp_module = heap_alloc(sizeof(module_t));
-    temp_module->initialize = NULL;
-    temp_module->uninitialize = NULL;
+    temp_module->initialize = nullptr;
+    temp_module->uninitialize = nullptr;
     temp_module->module_regions = LIST_INIT;
 
     size_t symtab_index = ELF64_SHN_UNDEF;
@@ -95,7 +95,7 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
         switch(shdrs[i].type) {
             case ELF64_SHT_PROGBITS:
                 if(shdrs[i].size == 0) {
-                    log(LOG_LEVEL_WARN, "MODULE", "ignoring section header `%s` (progbits) because it has null size", section_strtab == NULL ? "no shstrndx" : (char *) &section_strtab->data[shdrs[i].name]);
+                    log(LOG_LEVEL_WARN, "MODULE", "ignoring section header `%s` (progbits) because it has null size", section_strtab == nullptr ? "no shstrndx" : (char *) &section_strtab->data[shdrs[i].name]);
                     continue;
                 }
 
@@ -104,8 +104,8 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
                 if((shdrs[i].flags & ELF64_SHF_EXECINSTR) != 0) prot.exec = true;
 
                 size_t aligned_size = MATH_CEIL(shdrs[i].size, ARCH_PAGE_GRANULARITY);
-                void *addr = vm_map_anon(g_vm_global_address_space, NULL, aligned_size, prot, VM_CACHE_STANDARD, VM_FLAG_NO_DEMAND);
-                if(addr == NULL) return MODULE_RESULT_ERR_VM;
+                void *addr = vm_map_anon(g_vm_global_address_space, nullptr, aligned_size, prot, VM_CACHE_STANDARD, VM_FLAG_NO_DEMAND);
+                if(addr == nullptr) return MODULE_RESULT_ERR_VM;
 
                 module_region_t *region = heap_alloc(sizeof(module_region_t));
                 region->base = addr;
@@ -122,14 +122,14 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
             case ELF64_SHT_STRTAB: break;
             case ELF64_SHT_RELA:   break;
             case ELF64_SHT_REL:    return MODULE_RESULT_ERR_UNSUPPORTED;
-            default:               log(LOG_LEVEL_WARN, "MODULE", "ignoring section header `%s` %u", section_strtab == NULL ? "no shstrndx" : (char *) &section_strtab->data[shdrs[i].name], shdrs[i].type); break;
+            default:               log(LOG_LEVEL_WARN, "MODULE", "ignoring section header `%s` %u", section_strtab == nullptr ? "no shstrndx" : (char *) &section_strtab->data[shdrs[i].name], shdrs[i].type); break;
         }
     }
     if(symtab_index == ELF64_SHN_UNDEF) return MODULE_RESULT_ERR_MISSING_SYMTAB;
 
     // load symbol table
-    [[gnu::cleanup(buffer_cleanup)]] buffer_t *symbols = NULL;
-    [[gnu::cleanup(buffer_cleanup)]] buffer_t *symbol_strtab = NULL;
+    [[gnu::cleanup(buffer_cleanup)]] buffer_t *symbols = nullptr;
+    [[gnu::cleanup(buffer_cleanup)]] buffer_t *symbol_strtab = nullptr;
 
     if(read_section(module_file, &shdrs[shdrs[symtab_index].link], &symbol_strtab)) return MODULE_RESULT_ERR_FS;
     if(read_section(module_file, &shdrs[symtab_index], &symbols)) return MODULE_RESULT_ERR_FS;
@@ -169,7 +169,7 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
             continue;
         }
 
-        [[gnu::cleanup(buffer_cleanup)]] buffer_t *rela_buffer = NULL;
+        [[gnu::cleanup(buffer_cleanup)]] buffer_t *rela_buffer = nullptr;
         if(read_section(module_file, &shdrs[i], &rela_buffer)) return MODULE_RESULT_ERR_FS;
 
         for(size_t j = 0; j < shdrs[i].size / shdrs[i].entsize; j++) {
@@ -191,7 +191,7 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
     }
 
     *module = temp_module;
-    temp_module = NULL;
+    temp_module = nullptr;
     return MODULE_RESULT_OK;
 }
 

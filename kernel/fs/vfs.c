@@ -13,11 +13,11 @@ vfs_result_t vfs_mount(vfs_ops_t *vfs_ops, const char *path, void *private_data)
     vfs->ops->mount(vfs);
 
     if(list_is_empty(&g_vfs_all)) {
-        if(path != NULL) {
+        if(path != nullptr) {
             heap_free(vfs, sizeof(vfs_t));
             return VFS_RESULT_ERR_NOT_FOUND;
         }
-        vfs->mount_point = NULL;
+        vfs->mount_point = nullptr;
     } else {
         vfs_node_t *node;
         vfs_result_t res = vfs_lookup(&VFS_ABSOLUTE_PATH(path), &node);
@@ -29,7 +29,7 @@ vfs_result_t vfs_mount(vfs_ops_t *vfs_ops, const char *path, void *private_data)
             heap_free(vfs, sizeof(vfs_t));
             return VFS_RESULT_ERR_NOT_DIR;
         }
-        if(node->mounted_vfs != NULL) {
+        if(node->mounted_vfs != nullptr) {
             heap_free(vfs, sizeof(vfs_t));
             return VFS_RESULT_ERR_EXISTS;
         }
@@ -50,12 +50,12 @@ vfs_result_t vfs_lookup_ext(vfs_path_t *path, vfs_lookup_create_t create_mode, b
     int comp_start = 0, comp_end = 0;
 
     vfs_node_t *current_node = path->root;
-    if(path->relative_path[comp_end] == '/' || current_node == NULL) {
+    if(path->relative_path[comp_end] == '/' || current_node == nullptr) {
         vfs_result_t res = vfs_root(&current_node);
         if(res != VFS_RESULT_OK) return res;
         comp_start++, comp_end++;
     }
-    if(current_node == NULL) return VFS_RESULT_ERR_NOT_FOUND;
+    if(current_node == nullptr) return VFS_RESULT_ERR_NOT_FOUND;
 
     do {
         bool last_comp = false;
@@ -75,8 +75,8 @@ vfs_result_t vfs_lookup_ext(vfs_path_t *path, vfs_lookup_create_t create_mode, b
                 vfs_node_t *next_node;
                 vfs_result_t res = current_node->ops->lookup(current_node, component, &next_node);
                 if(res == VFS_RESULT_OK) {
-                    if(next_node == NULL) {
-                        if(current_node->vfs->mount_point != NULL) {
+                    if(next_node == nullptr) {
+                        if(current_node->vfs->mount_point != nullptr) {
                             res = current_node->ops->lookup(current_node, "..", &next_node); // TODO: hmm?
                         }
                     } else {
@@ -99,7 +99,7 @@ vfs_result_t vfs_lookup_ext(vfs_path_t *path, vfs_lookup_create_t create_mode, b
                 break;
         }
 
-        if(current_node->mounted_vfs == NULL) continue;
+        if(current_node->mounted_vfs == nullptr) continue;
         vfs_result_t res = current_node->mounted_vfs->ops->root_node(current_node->mounted_vfs, &current_node);
         if(res != VFS_RESULT_OK) return res;
     } while(path->relative_path[comp_end++]);

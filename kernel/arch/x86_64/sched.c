@@ -93,9 +93,9 @@ static int g_sched_vector = 0;
 
 [[gnu::no_instrument_function]] static void sched_switch(x86_64_thread_t *this, x86_64_thread_t *next) {
     ASSERT(!arch_interrupt_state());
-    ASSERT(next != NULL);
+    ASSERT(next != nullptr);
 
-    if(next->common.proc != NULL) {
+    if(next->common.proc != nullptr) {
         arch_ptm_load_address_space(next->common.proc->address_space);
     } else {
         arch_ptm_load_address_space(g_vm_global_address_space);
@@ -110,7 +110,7 @@ static int g_sched_vector = 0;
     x86_64_msr_write(X86_64_MSR_KERNEL_GS_BASE, next->state.gs);
     x86_64_msr_write(X86_64_MSR_FS_BASE, next->state.fs);
 
-    if(this->state.fpu_area != NULL) g_x86_64_fpu_save(this->state.fpu_area);
+    if(this->state.fpu_area != nullptr) g_x86_64_fpu_save(this->state.fpu_area);
     g_x86_64_fpu_restore(next->state.fpu_area);
 
     x86_64_thread_t *prev = x86_64_sched_context_switch(this, next);
@@ -144,18 +144,18 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
     {
         interrupt_state_t previous_state = interrupt_state_mask();
         x86_64_thread_t *current_thread = X86_64_CPU_CURRENT.current_thread;
-        if(current_thread != NULL && current_thread->state.fpu_area != NULL) g_x86_64_fpu_save(current_thread->state.fpu_area);
+        if(current_thread != nullptr && current_thread->state.fpu_area != nullptr) g_x86_64_fpu_save(current_thread->state.fpu_area);
         g_x86_64_fpu_restore(thread->state.fpu_area);
         uint16_t x87cw = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (0b11 << 8);
         asm volatile("fldcw %0" : : "m"(x87cw) : "memory");
         uint32_t mxcsr = (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12);
         asm volatile("ldmxcsr %0" : : "m"(mxcsr) : "memory");
         g_x86_64_fpu_save(thread->state.fpu_area);
-        if(current_thread != NULL && current_thread->state.fpu_area != NULL) g_x86_64_fpu_restore(current_thread->state.fpu_area);
+        if(current_thread != nullptr && current_thread->state.fpu_area != nullptr) g_x86_64_fpu_restore(current_thread->state.fpu_area);
         interrupt_state_restore(previous_state);
     }
 
-    if(proc != NULL) {
+    if(proc != nullptr) {
         interrupt_state_t previous_state = spinlock_acquire(&proc->lock);
         list_append(&proc->threads, &thread->common.list_proc);
         spinlock_release(&proc->lock, previous_state);
@@ -172,7 +172,7 @@ thread_t *arch_sched_thread_create_kernel(void (*func)()) {
     init_stack->thread_init = common_thread_init;
     init_stack->thread_exit_kernel = kernel_thread_exit;
 
-    return &create_thread(NULL, __atomic_fetch_add(&g_next_tid, 1, __ATOMIC_RELAXED), pick_next_scheduler(), kernel_stack, (uintptr_t) init_stack)->common;
+    return &create_thread(nullptr, __atomic_fetch_add(&g_next_tid, 1, __ATOMIC_RELAXED), pick_next_scheduler(), kernel_stack, (uintptr_t) init_stack)->common;
 }
 
 thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t sp) {
@@ -189,7 +189,7 @@ thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t
 
 thread_t *arch_sched_thread_current() {
     x86_64_thread_t *thread = X86_64_CPU_CURRENT.current_thread;
-    ASSERT(thread != NULL);
+    ASSERT(thread != nullptr);
     return &thread->common;
 }
 
@@ -209,7 +209,7 @@ void x86_64_sched_init_cpu(x86_64_cpu_t *cpu) {
     init_stack->thread_init = common_thread_init;
     init_stack->thread_exit_kernel = kernel_thread_exit;
 
-    x86_64_thread_t *idle_thread = create_thread(NULL, IDLE_TID, &cpu->common.sched, kernel_stack, (uintptr_t) init_stack);
+    x86_64_thread_t *idle_thread = create_thread(nullptr, IDLE_TID, &cpu->common.sched, kernel_stack, (uintptr_t) init_stack);
 
     cpu->common.sched = (sched_t) { .lock = SPINLOCK_INIT, .thread_queue = LIST_INIT_CIRCULAR(cpu->common.sched.thread_queue), .idle_thread = &idle_thread->common };
 }
