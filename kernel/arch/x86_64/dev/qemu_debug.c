@@ -17,11 +17,12 @@ static void debug_format(char *fmt, ...) {
 static void log_debug(log_level_t level, const char *tag, const char *fmt, va_list args) {
     char *color;
     switch(level) {
-        case LOG_LEVEL_DEBUG:   color = "\e[36m"; break;
-        case LOG_LEVEL_INFO:    color = "\e[33m"; break;
-        case LOG_LEVEL_WARN:    color = "\e[91m"; break;
-        case LOG_LEVEL_ERROR:   color = "\e[31m"; break;
-        case LOG_LEVEL_DEVONLY: color = "\e[90m"; break;
+        case LOG_LEVEL_DEVONLY: color = "\e[90m"; break; /* Gray */
+        case LOG_LEVEL_DEBUG:   color = "\e[36m"; break; /* Cyan */
+        case LOG_LEVEL_INFO:    color = "\e[32m"; break; /* Green */
+        case LOG_LEVEL_WARN:    color = "\e[33m"; break; /* Yellow */
+        case LOG_LEVEL_ERROR:   color = "\e[91m"; break; /* Light Red  */
+        case LOG_LEVEL_FATAL:   color = "\e[31m"; break; /* Red */
         default:                color = "\e[0m"; break;
     }
     debug_format("%s[%s:%s]%s ", color, log_level_stringify(level), tag, "\e[0m");

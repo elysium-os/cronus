@@ -40,9 +40,9 @@ static const char *get_name(header_t *header, uint64_t name_offset) {
 
 void kernel_symbols_load(void *symbol_data) {
     if(g_kernel_symbols_header != nullptr) log(LOG_LEVEL_WARN, "KERNEL_SYMBOL", "symbol data reloaded");
-    if(memcmp(symbol_data, IDENTIFIER, 4) != 0) panic("invalid kernel symbol file identifier");
+    if(memcmp(symbol_data, IDENTIFIER, 4) != 0) panic("KERNEL_SYMBOL", "invalid kernel symbol file identifier");
     header_t *header = (header_t *) symbol_data;
-    if(header->revision > REVISION) panic("invalid kernel symbol file revision");
+    if(header->revision > REVISION) panic("KERNEL_SYMBOL", "invalid kernel symbol file revision");
     g_kernel_symbols_header = header;
 }
 

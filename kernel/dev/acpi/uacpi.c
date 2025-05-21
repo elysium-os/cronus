@@ -278,7 +278,7 @@ uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request *reques
     switch(request->type) {
         case UACPI_FIRMWARE_REQUEST_TYPE_FATAL:
             log(LOG_LEVEL_ERROR, "UACPI", "Fatal firmware request error");
-            panic("UACPI Fatal. Firmware code: %#lx, argument: %#lx", request->fatal.code, request->fatal.arg);
+            panic("UACPI", "Firmware code: %#lx, argument: %#lx", request->fatal.code, request->fatal.arg);
             break;
         default: break;
     }

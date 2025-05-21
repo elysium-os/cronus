@@ -89,7 +89,7 @@ static uintptr_t g_bootmem_base;
 static size_t g_bootmem_size;
 
 static uintptr_t bootmem_alloc() {
-    if(g_bootmem_size == 0) panic("bootmem: out of memory");
+    if(g_bootmem_size == 0) panic("BOOTMEM", "out of memory");
     uintptr_t address = g_bootmem_base;
     g_bootmem_base += ARCH_PAGE_GRANULARITY;
     g_bootmem_size -= ARCH_PAGE_GRANULARITY;
@@ -186,7 +186,7 @@ static void thread_init() {
     g_hhdm_offset = boot_info->hhdm.offset;
     g_hhdm_size = boot_info->hhdm.size;
 
-    if(boot_info->framebuffer_count == 0) panic("no framebuffer provided");
+    if(boot_info->framebuffer_count == 0) panic("INIT", "no framebuffer provided");
     tartarus_framebuffer_t *framebuffer = &boot_info->framebuffers[0];
     g_framebuffer.physical_address = HHDM_TO_PHYS(framebuffer->address);
     g_framebuffer.size = framebuffer->size;
@@ -471,10 +471,10 @@ static void thread_init() {
         sysroot_module = module;
         break;
     }
-    if(sysroot_module == nullptr) panic("could not locate root.rdk");
+    if(sysroot_module == nullptr) panic("INIT", "could not locate root.rdk");
 
     vfs_result_t res = vfs_mount(&g_rdsk_ops, nullptr, (void *) HHDM(sysroot_module->paddr));
-    if(res != VFS_RESULT_OK) panic("failed to mount rdsk (%i)", res);
+    if(res != VFS_RESULT_OK) panic("INIT", "failed to mount rdsk (%i)", res);
 
     vfs_node_t *root_node;
     res = vfs_root(&root_node);
@@ -490,21 +490,21 @@ static void thread_init() {
     }
 
     res = vfs_mount(&g_tmpfs_ops, "/tmp", nullptr);
-    if(res != VFS_RESULT_OK) panic("failed to mount /tmp (%i)", res);
+    if(res != VFS_RESULT_OK) panic("INIT", "failed to mount /tmp (%i)", res);
 
     x86_64_init_flag_set(X86_64_INIT_FLAG_VFS);
 
     // Flush ring buffer
     vfs_node_t *log_node;
     res = vfs_mkfile(&VFS_ABSOLUTE_PATH("/tmp"), "kernel.log", &log_node);
-    if(res != VFS_RESULT_OK) panic("failed to make log file (%i)", res);
+    if(res != VFS_RESULT_OK) panic("INIT", "failed to make log file (%i)", res);
 
     size_t count;
     res = log_node->ops->rw(log_node, &(vfs_rw_t) { .rw = VFS_RW_WRITE, .size = g_ring_buffer.size - g_ring_buffer.index, .offset = 0, .buffer = &g_ring_buffer.buffer[g_ring_buffer.index] }, &count);
-    if(res != VFS_RESULT_OK || count != g_ring_buffer.size - g_ring_buffer.index) panic("failed to flush ring buffer");
+    if(res != VFS_RESULT_OK || count != g_ring_buffer.size - g_ring_buffer.index) panic("INIT", "failed to flush ring buffer");
     if(g_ring_buffer.full) {
         res = log_node->ops->rw(log_node, &(vfs_rw_t) { .rw = VFS_RW_WRITE, .size = g_ring_buffer.index, .offset = g_ring_buffer.size - g_ring_buffer.index, .buffer = &g_ring_buffer.buffer }, &count);
-        if(res != VFS_RESULT_OK || count != g_ring_buffer.index) panic("failed to flush ring buffer");
+        if(res != VFS_RESULT_OK || count != g_ring_buffer.index) panic("INIT", "failed to flush ring buffer");
     }
 
     // Initialize sched
@@ -514,12 +514,12 @@ static void thread_init() {
     // Load modules
     vfs_node_t *test_module_file = nullptr;
     vfs_lookup(&VFS_ABSOLUTE_PATH("/sys/modules/test.cronmod"), &test_module_file);
-    if(res != VFS_RESULT_OK) panic("failed to lookup test module (%i)", res);
-    if(test_module_file == nullptr) panic("no test module found");
+    if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup test module (%i)", res);
+    if(test_module_file == nullptr) panic("INIT", "no test module found");
 
     module_t *module;
     module_result_t mres = module_load(test_module_file, &module);
-    if(mres != MODULE_RESULT_OK) panic("failed to load test module `%s`", module_result_stringify(mres));
+    if(mres != MODULE_RESULT_OK) panic("INIT", "failed to load test module `%s`", module_result_stringify(mres));
 
     // Schedule init threads
     sched_thread_schedule(reaper_create());
@@ -531,15 +531,15 @@ static void thread_init() {
 
         vfs_node_t *init_exec;
         res = vfs_lookup(&VFS_ABSOLUTE_PATH("/usr/bin/init"), &init_exec);
-        if(res != VFS_RESULT_OK) panic("failed to lookup init executable (%i)", res);
-        if(init_exec == nullptr) panic("no init executable found");
+        if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup init executable (%i)", res);
+        if(init_exec == nullptr) panic("INIT", "no init executable found");
 
         elf_file_t *init_elf;
         elf_result_t elf_res = elf_read(init_exec, &init_elf);
-        if(elf_res != ELF_RESULT_OK) panic("could not read init (%i)", elf_res);
+        if(elf_res != ELF_RESULT_OK) panic("INIT", "could not read init (%i)", elf_res);
 
         elf_res = elf_load(init_elf, as);
-        if(elf_res != ELF_RESULT_OK) panic("could not load init (%i)", elf_res);
+        if(elf_res != ELF_RESULT_OK) panic("INIT", "could not load init (%i)", elf_res);
 
         uintptr_t entry;
         char *interpreter;
@@ -550,21 +550,21 @@ static void thread_init() {
 
                 vfs_node_t *interpreter_exec;
                 res = vfs_lookup(&VFS_ABSOLUTE_PATH(interpreter), &interpreter_exec);
-                if(res != VFS_RESULT_OK) panic("failed to lookup interpreter for init (%i)", res);
-                if(interpreter_exec == nullptr) panic("no interpreter found for init executable");
+                if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup interpreter for init (%i)", res);
+                if(interpreter_exec == nullptr) panic("INIT", "no interpreter found for init executable");
 
                 elf_file_t *interpreter_elf;
                 elf_res = elf_read(interpreter_exec, &interpreter_elf);
-                if(elf_res != ELF_RESULT_OK) panic("could not read interpreter for init (%i)", elf_res);
+                if(elf_res != ELF_RESULT_OK) panic("INIT", "could not read interpreter for init (%i)", elf_res);
 
                 elf_res = elf_load(interpreter_elf, as);
-                if(elf_res != ELF_RESULT_OK) panic("could not load interpreter for init (%i)", elf_res);
+                if(elf_res != ELF_RESULT_OK) panic("INIT", "could not load interpreter for init (%i)", elf_res);
 
                 entry = interpreter_elf->entry;
                 heap_free(interpreter_elf, sizeof(elf_file_t));
                 break;
             case ELF_RESULT_ERR_NOT_FOUND: entry = init_elf->entry; break;
-            default:                       panic("elf interpreter lookup failed (%i)", elf_res);
+            default:                       panic("INIT", "elf interpreter lookup failed (%i)", elf_res);
         }
 
         x86_64_auxv_t auxv = { .entry = init_elf->entry };

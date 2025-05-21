@@ -233,6 +233,6 @@ void x86_64_sched_init_cpu(x86_64_cpu_t *cpu) {
 
 void x86_64_sched_init() {
     int sched_vector = x86_64_interrupt_request(INTERRUPT_PRIORITY_LOW, sched_entry);
-    if(sched_vector < 0) panic("unable to acquire an interrupt vector for the scheduler");
+    if(sched_vector < 0) panic("SCHED", "unable to acquire an interrupt vector for the scheduler");
     g_sched_vector = sched_vector;
 }

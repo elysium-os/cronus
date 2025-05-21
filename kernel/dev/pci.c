@@ -309,7 +309,7 @@ void pci_enumerate(acpi_sdt_header_t *mcfg) {
         g_write = &pci_write;
         check_segment(0); // FIX: fix on real hw
 #else
-        panic("Both legacy PCI and PCIe unavailable");
+        panic("PCI", "Both legacy PCI and PCIe unavailable");
 #endif
     }
 }

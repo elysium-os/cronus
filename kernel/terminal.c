@@ -42,11 +42,19 @@ static void serial_format(char *fmt, ...) {
 
 static void log_fb(log_level_t level, const char *tag, const char *fmt, va_list args) {
     switch(level) {
-        case LOG_LEVEL_DEBUG: g_color = draw_color(45, 111, 173); break;
         case LOG_LEVEL_INFO:  g_color = draw_color(237, 150, 0); break;
         case LOG_LEVEL_WARN:  g_color = draw_color(255, 94, 94); break;
         case LOG_LEVEL_ERROR: g_color = draw_color(255, 15, 15); break;
         default:              g_color = draw_color(237, 150, 0); break;
+    }
+    switch(level) {
+        case LOG_LEVEL_DEVONLY: g_color = draw_color(87, 89, 89); break; /* Gray */
+        case LOG_LEVEL_DEBUG:   g_color = draw_color(45, 139, 173); break; /* Cyan */
+        case LOG_LEVEL_INFO:    g_color = draw_color(56, 224, 73); break; /* Green */
+        case LOG_LEVEL_WARN:    g_color = draw_color(240, 232, 79); break; /* Yellow */
+        case LOG_LEVEL_ERROR:   g_color = draw_color(240, 106, 79); break; /* Light Red  */
+        case LOG_LEVEL_FATAL:   g_color = draw_color(196, 33, 0); break; /* Red */
+        default:                g_color = draw_color(255, 255, 255); break;
     }
     serial_format("[%s:%s] ", log_level_stringify(level), tag, "\e[0m");
 
