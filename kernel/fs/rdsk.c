@@ -154,7 +154,7 @@ static vfs_result_t rdsk_attr(vfs_node_t *node, vfs_node_attr_t *attr) {
 static const char *rdsk_name(vfs_node_t *node) {
     const char *name;
     switch(node->type) {
-        case VFS_NODE_TYPE_DIR:  name = get_name(node->vfs, DIR(node)->nametable_offset);
+        case VFS_NODE_TYPE_DIR:  name = get_name(node->vfs, DIR(node)->nametable_offset); [[fallthrough]];
         case VFS_NODE_TYPE_FILE: name = get_name(node->vfs, FILE(node)->nametable_offset);
     }
     return name;

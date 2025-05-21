@@ -33,6 +33,7 @@ local c_flags = {
     "-Wextra",
     "-Wvla",
     "-Wshadow",
+    "-Wimplicit-fallthrough",
 
     "-D__VERSION=" .. version,
     "-D__ARCH_" .. opt_arch:upper(),
