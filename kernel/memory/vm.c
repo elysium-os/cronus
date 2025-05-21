@@ -173,8 +173,11 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
     region->cache_behavior = cache;
 
     switch(region->type) {
-        case VM_REGION_TYPE_ANON:   region->type_data.anon.back_zeroed = (flags & VM_FLAG_ZERO) != 0; break;
-        case VM_REGION_TYPE_DIRECT: region->type_data.direct.physical_address = direct_physical_address; break;
+        case VM_REGION_TYPE_ANON: region->type_data.anon.back_zeroed = (flags & VM_FLAG_ZERO) != 0; break;
+        case VM_REGION_TYPE_DIRECT:
+            ASSERT(direct_physical_address % ARCH_PAGE_GRANULARITY == 0);
+            region->type_data.direct.physical_address = direct_physical_address;
+            break;
     }
 
     if((flags & VM_FLAG_NO_DEMAND) != 0) region_map(region, region->base, region->length);
