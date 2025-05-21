@@ -5,6 +5,8 @@
 #include "memory/pmm.h"
 
 #define PAGE(PHYSICAL_ADDRESS) (&(g_page_cache[(PHYSICAL_ADDRESS) / ARCH_PAGE_GRANULARITY]))
+#define PAGE_PADDR(PAGE) (((uintptr_t) (PAGE) - (uintptr_t) g_page_cache) / sizeof(page_t) * ARCH_PAGE_GRANULARITY)
+
 #define PAGE_FROM_BLOCK(BLOCK) (CONTAINER_OF((BLOCK), page_t, block))
 
 typedef struct {

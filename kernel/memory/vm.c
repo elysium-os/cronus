@@ -8,6 +8,7 @@
 #include "lib/math.h"
 #include "lib/mem.h"
 #include "memory/hhdm.h"
+#include "memory/page.h"
 #include "memory/pmm.h"
 #include "sched/process.h"
 
@@ -50,7 +51,7 @@ static void region_map(vm_region_t *region, uintptr_t address, uintptr_t length)
         uintptr_t virtual_address = address + i;
         uintptr_t physical_address = 0;
         switch(region->type) {
-            case VM_REGION_TYPE_ANON:   physical_address = pmm_alloc_page(region->type_data.anon.back_zeroed ? PMM_FLAG_ZERO : PMM_FLAG_NONE)->paddr; break;
+            case VM_REGION_TYPE_ANON:   physical_address = PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(region->type_data.anon.back_zeroed ? PMM_FLAG_ZERO : PMM_FLAG_NONE))); break;
             case VM_REGION_TYPE_DIRECT: physical_address = region->type_data.direct.physical_address + (virtual_address - region->base); break;
         }
         arch_ptm_map(region->address_space, virtual_address, physical_address, region->protection, region->cache_behavior, is_global ? VM_PRIVILEGE_KERNEL : VM_PRIVILEGE_USER, is_global);
@@ -77,7 +78,7 @@ static vm_region_t *region_alloc(bool global_lock_acquired) {
         pmm_block_t *page = pmm_alloc_page(PMM_FLAG_ZERO);
         if(!global_lock_acquired) spinlock_primitive_acquire(&g_vm_global_address_space->lock);
         uintptr_t address = find_space(g_vm_global_address_space, 0, ARCH_PAGE_GRANULARITY);
-        arch_ptm_map(g_vm_global_address_space, address, page->paddr, (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
+        arch_ptm_map(g_vm_global_address_space, address, PAGE_PADDR(PAGE_FROM_BLOCK(page)), (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
 
         vm_region_t *region = (vm_region_t *) address;
         region[0].address_space = g_vm_global_address_space;

@@ -28,9 +28,8 @@ typedef struct {
     size_t free_page_count;
 } pmm_zone_t;
 
-typedef struct {
+typedef struct pmm_block {
     list_node_t list_node; /* unallocated = used by pmm */
-    uintptr_t paddr; // TODO: remove
     uint8_t order     : 3;
     uint8_t max_order : 3;
     uint8_t free      : 1;

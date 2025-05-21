@@ -3,8 +3,8 @@
 #include "arch/cpu.h"
 #include "arch/page.h"
 #include "common/assert.h"
-#include "common/log.h"
 #include "memory/hhdm.h"
+#include "memory/page.h"
 
 #define MAGAZINE_SIZE 32
 #define MAGAZINE_COUNT_EXTRA arch_cpu_count() * 2
@@ -20,7 +20,7 @@ static slab_cache_t g_alloc_magazine;
 static slab_t *cache_make_slab(slab_cache_t *cache) {
     pmm_block_t *block = pmm_alloc(cache->block_order, PMM_FLAG_NONE);
 
-    slab_t *slab = (slab_t *) HHDM(block->paddr);
+    slab_t *slab = (slab_t *) HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(block)));
     slab->cache = cache;
     slab->block = block;
     slab->freelist = nullptr;

@@ -10,6 +10,8 @@
 
 #include <stdint.h>
 
+#define BLOCK_PADDR(BLOCK) PAGE_PADDR(PAGE_FROM_BLOCK(BLOCK))
+
 pmm_zone_t g_pmm_zone_low = { .name = "LOW", .start = ARCH_PAGE_GRANULARITY, .end = ARCH_MEM_LOW_SIZE, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
 pmm_zone_t
     g_pmm_zone_normal = { .name = "NORMAL", .start = ARCH_MEM_LOW_SIZE, .end = MATH_FLOOR(UINTPTR_MAX, ARCH_PAGE_GRANULARITY), .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
@@ -41,7 +43,7 @@ void pmm_region_add(uintptr_t base, size_t size, size_t used) {
         zone->free_page_count += page_count - used;
 
         for(size_t j = 0; j < page_count; j++) {
-            g_page_cache[index_offset + j].block = (pmm_block_t) { .free = true, .paddr = local_base + j * ARCH_PAGE_GRANULARITY, .order = 0 };
+            g_page_cache[index_offset + j].block = (pmm_block_t) { .free = true, .order = 0 };
         }
 
         for(size_t j = 0; j < used; j++) {
@@ -84,10 +86,8 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
     }
 
     pmm_block_t *block = LIST_CONTAINER_GET(list_pop(&zone->lists[avl_order]), pmm_block_t, list_node);
-    ASSERT(block->paddr != 0);
-
     for(; avl_order > order; avl_order--) {
-        pmm_block_t *buddy = &PAGE(block->paddr + (PMM_ORDER_TO_PAGECOUNT(avl_order - 1) * ARCH_PAGE_GRANULARITY))->block;
+        pmm_block_t *buddy = &PAGE(BLOCK_PADDR(block) + (PMM_ORDER_TO_PAGECOUNT(avl_order - 1) * ARCH_PAGE_GRANULARITY))->block;
         buddy->order = avl_order - 1;
         buddy->free = true;
         list_push(&zone->lists[avl_order - 1], &buddy->list_node);
@@ -98,7 +98,7 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
     block->free = false;
     zone->free_page_count -= PMM_ORDER_TO_PAGECOUNT(order);
 
-    if((flags & PMM_FLAG_ZERO) != 0) memclear((void *) HHDM(block->paddr), PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY);
+    if((flags & PMM_FLAG_ZERO) != 0) memclear((void *) HHDM(BLOCK_PADDR(block)), PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY);
 
     return block;
 }
@@ -112,21 +112,21 @@ pmm_block_t *pmm_alloc_page(pmm_flags_t flags) {
 }
 
 void pmm_free(pmm_block_t *block) {
-    pmm_zone_t *zone = (block->paddr & ~ARCH_MEM_LOW_MASK) > 0 ? &g_pmm_zone_normal : &g_pmm_zone_low;
+    pmm_zone_t *zone = (BLOCK_PADDR(block) & ~ARCH_MEM_LOW_MASK) > 0 ? &g_pmm_zone_normal : &g_pmm_zone_low;
     zone->free_page_count += PMM_ORDER_TO_PAGECOUNT(block->order);
 
     block->free = true;
 
     interrupt_state_t previous_state = spinlock_acquire(&zone->lock);
     while(block->order < block->max_order) {
-        pmm_block_t *buddy = &PAGE(block->paddr ^ (PMM_ORDER_TO_PAGECOUNT(block->order) * ARCH_PAGE_GRANULARITY))->block;
+        pmm_block_t *buddy = &PAGE(BLOCK_PADDR(block) ^ (PMM_ORDER_TO_PAGECOUNT(block->order) * ARCH_PAGE_GRANULARITY))->block;
         if(!buddy->free || buddy->order != block->order) break;
 
         list_node_delete(&zone->lists[block->order], &buddy->list_node);
         buddy->order++;
         block->order++;
 
-        if(buddy->paddr < block->paddr) block = buddy;
+        if(BLOCK_PADDR(buddy) < BLOCK_PADDR(block)) block = buddy;
     }
     list_push(&zone->lists[block->order], &block->list_node);
     spinlock_release(&zone->lock, previous_state);

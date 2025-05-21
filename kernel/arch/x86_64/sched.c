@@ -13,6 +13,7 @@
 #include "lib/mem.h"
 #include "memory/heap.h"
 #include "memory/hhdm.h"
+#include "memory/page.h"
 #include "memory/pmm.h"
 #include "memory/vm.h"
 #include "sched/process.h"
@@ -134,7 +135,7 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
     thread->kernel_stack = kernel_stack;
     thread->state.fs = 0;
     thread->state.gs = 0;
-    thread->state.fpu_area = (void *) HHDM(pmm_alloc_pages(MATH_DIV_CEIL(g_x86_64_fpu_area_size, ARCH_PAGE_GRANULARITY), PMM_FLAG_ZERO)->paddr); // TODO: wasting a page here...
+    thread->state.fpu_area = (void *) HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(MATH_DIV_CEIL(g_x86_64_fpu_area_size, ARCH_PAGE_GRANULARITY), PMM_FLAG_ZERO)))); // TODO: wasting a page here...
 #ifdef __ENV_DEVELOPMENT
     thread->prof_current_call_frame = 0;
 #endif
@@ -165,7 +166,7 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
 }
 
 thread_t *arch_sched_thread_create_kernel(void (*func)()) {
-    x86_64_thread_stack_t kernel_stack = { .base = HHDM(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO)->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
+    x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));
     init_stack->entry = func;
@@ -176,7 +177,7 @@ thread_t *arch_sched_thread_create_kernel(void (*func)()) {
 }
 
 thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t sp) {
-    x86_64_thread_stack_t kernel_stack = { .base = HHDM(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO)->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
+    x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_user_t *init_stack = (init_stack_user_t *) (kernel_stack.base - sizeof(init_stack_user_t));
     init_stack->entry = (void (*)()) ip;
@@ -202,7 +203,7 @@ void arch_sched_context_switch(thread_t *current, thread_t *next) {
 }
 
 void x86_64_sched_init_cpu(x86_64_cpu_t *cpu) {
-    x86_64_thread_stack_t kernel_stack = { .base = HHDM(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO)->paddr + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
+    x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));
     init_stack->entry = sched_idle;
