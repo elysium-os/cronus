@@ -17,19 +17,19 @@ void sched_thread_schedule(thread_t *thread) {
     thread->state = THREAD_STATE_READY;
 
     interrupt_state_t previous_state = spinlock_acquire(&thread->scheduler->lock);
-    list_prepend(&thread->scheduler->thread_queue, &thread->list_sched);
+    list_push_back(&thread->scheduler->thread_queue, &thread->list_sched);
     spinlock_release(&thread->scheduler->lock, previous_state);
 }
 
 thread_t *sched_thread_next(sched_t *sched) {
     interrupt_state_t previous_state = spinlock_acquire(&sched->lock);
-    if(list_is_empty(&sched->thread_queue)) {
+    if(sched->thread_queue.count == 0) {
         spinlock_release(&sched->lock, previous_state);
         return nullptr;
     }
 
-    thread_t *thread = LIST_CONTAINER_GET(LIST_NEXT(&sched->thread_queue), thread_t, list_sched);
-    list_delete(&thread->list_sched);
+    thread_t *thread = LIST_CONTAINER_GET(list_pop(&sched->thread_queue), thread_t, list_sched);
+
     spinlock_release(&sched->lock, previous_state);
     thread->state = THREAD_STATE_ACTIVE; // TODO: move this?
     return thread;
@@ -66,8 +66,8 @@ void internal_sched_thread_drop(thread_t *thread) {
         case THREAD_STATE_DESTROY:
             if(thread->proc != nullptr) {
                 interrupt_state_t previous_state = spinlock_acquire(&thread->proc->lock);
-                list_delete(&thread->list_proc);
-                if(list_is_empty(&thread->proc->threads)) {
+                list_node_delete(&thread->proc->threads, &thread->list_proc);
+                if(thread->proc->threads.count == 0) {
                     reaper_queue_process(thread->proc);
                     interrupt_state_restore(previous_state);
                 } else {

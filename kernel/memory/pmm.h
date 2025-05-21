@@ -29,8 +29,8 @@ typedef struct {
 } pmm_zone_t;
 
 typedef struct {
-    list_element_t list_elem; /* unallocated = used by pmm, allocated = reserved for vmm */
-    uintptr_t paddr; // TODO remove
+    list_node_t list_node; /* unallocated = used by pmm */
+    uintptr_t paddr; // TODO: remove
     uint8_t order     : 3;
     uint8_t max_order : 3;
     uint8_t free      : 1;

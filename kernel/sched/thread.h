@@ -21,7 +21,7 @@ struct thread {
 
     struct sched *scheduler;
 
-    list_element_t list_sched; /* list used by scheduler/reaper */
-    list_element_t list_proc; /* list used by process */
-    list_element_t list_wait; /* list used by waitable */
+    list_node_t list_sched; /* list used by scheduler/reaper */
+    list_node_t list_proc; /* list used by process */
+    list_node_t list_wait; /* list used by waitable */
 };

@@ -1,40 +1,9 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
-#define LIST_INIT ((list_t) { .next = nullptr, .prev = nullptr })
-#define LIST_INIT_CIRCULAR(NAME) ((list_t) { .next = &(NAME), .prev = &(NAME) })
-
-typedef struct list_element list_element_t;
-typedef struct list_element list_t;
-
-struct list_element {
-    list_element_t *next;
-    list_element_t *prev;
-};
-
-/**
- * @brief Insert a new element behind an existing element in a list.
- * @param position element to insert behind
- */
-void list_append(list_element_t *position, list_element_t *element);
-
-/**
- * @brief Insert a new element before an existing element in a list.
- * @param position element to insert before
- */
-void list_prepend(list_element_t *position, list_element_t *element);
-
-/**
- * @brief Delete a element from a list.
- */
-void list_delete(list_element_t *element);
-
-/**
- * @brief Test if a list is empty.
- * @param list list head
- */
-bool list_is_empty(list_t *list);
+#define LIST_INIT ((list_t) { .count = 0, .head = nullptr, .tail = nullptr })
 
 /**
  * @brief Get the structure/container that the element is embedded in.
@@ -46,18 +15,32 @@ bool list_is_empty(list_t *list);
 #define LIST_CONTAINER_GET(ELEMENT, TYPE, MEMBER) ((TYPE *) ((uintptr_t) (ELEMENT) - __builtin_offsetof(TYPE, MEMBER)))
 
 /**
- * @brief Get the next element in a list.
- */
-#define LIST_NEXT(ELEMENT) ((ELEMENT)->next)
-
-/**
- * @brief Get the previous element in a list.
- */
-#define LIST_PREVIOUS(ELEMENT) ((ELEMENT)->prev)
-
-/**
  * @brief Iterate over a list.
  * @param LIST `list_t` to iterate over
- * @param ELEMENT `list_element_t *` iterator name
+ * @param NODE `list_node_t *` iterator name
  */
-#define LIST_FOREACH(LIST, ELEMENT) for(list_element_t * (ELEMENT) = LIST_NEXT(LIST); (ELEMENT) != nullptr && (ELEMENT) != (LIST); (ELEMENT) = LIST_NEXT(ELEMENT))
+#define LIST_ITERATE(LIST, NODE) for(list_node_t * (NODE) = (LIST)->head; (NODE) != nullptr; (NODE) = (NODE)->next)
+
+typedef struct list_node list_node_t;
+typedef struct list list_t;
+
+struct list {
+    size_t count;
+    list_node_t *head, *tail;
+};
+
+struct list_node {
+    list_node_t *next, *prev;
+};
+
+void list_push_front(list_t *list, list_node_t *node);
+void list_push_back(list_t *list, list_node_t *node);
+void list_push(list_t *list, list_node_t *node);
+
+list_node_t *list_pop_front(list_t *list);
+list_node_t *list_pop_back(list_t *list);
+list_node_t *list_pop(list_t *list);
+
+void list_node_append(list_t *list, list_node_t *pos, list_node_t *node);
+void list_node_prepend(list_t *list, list_node_t *pos, list_node_t *node);
+void list_node_delete(list_t *list, list_node_t *node);

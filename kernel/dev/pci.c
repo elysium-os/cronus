@@ -202,7 +202,7 @@ static void check_function(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t 
         return;
     }
     interrupt_state_t previous_state = spinlock_acquire(&g_pci_devices_lock);
-    list_append(&g_pci_devices, &device->list);
+    list_push(&g_pci_devices, &device->list_node);
     spinlock_release(&g_pci_devices_lock, previous_state);
 
     uint8_t class = readb(device, offsetof(pci_device_header_t, class));

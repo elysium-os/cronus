@@ -29,8 +29,8 @@ static uintptr_t find_space(vm_address_space_t *address_space, uintptr_t address
     while(true) {
         if(!SEGMENT_IN_BOUNDS(address, length, address_space->start, address_space->end)) return 0;
         bool valid = true;
-        LIST_FOREACH(&address_space->regions, elem) {
-            vm_region_t *region = LIST_CONTAINER_GET(elem, vm_region_t, list_elem);
+        LIST_ITERATE(&address_space->regions, node) {
+            vm_region_t *region = LIST_CONTAINER_GET(node, vm_region_t, list_node);
             if(!SEGMENT_INTERSECTS(address, length, region->base, region->length)) continue;
             valid = false;
             address = region->base + region->length;
@@ -73,7 +73,7 @@ static void region_unmap(vm_region_t *region, uintptr_t address, uintptr_t lengt
 
 static vm_region_t *region_alloc(bool global_lock_acquired) {
     interrupt_state_t previous_state = spinlock_acquire(&g_free_regions_lock);
-    if(list_is_empty(&g_free_regions)) {
+    if(g_free_regions.count == 0) {
         pmm_block_t *page = pmm_alloc_page(PMM_FLAG_ZERO);
         if(!global_lock_acquired) spinlock_primitive_acquire(&g_vm_global_address_space->lock);
         uintptr_t address = find_space(g_vm_global_address_space, 0, ARCH_PAGE_GRANULARITY);
@@ -87,28 +87,27 @@ static vm_region_t *region_alloc(bool global_lock_acquired) {
         region[0].protection = (vm_protection_t) { .read = true, .write = true };
         region[0].cache_behavior = VM_CACHE_STANDARD;
 
-        list_append(&g_vm_global_address_space->regions, &region[0].list_elem);
+        list_push(&g_vm_global_address_space->regions, &region[0].list_node);
         if(!global_lock_acquired) spinlock_primitive_release(&g_vm_global_address_space->lock);
 
-        for(unsigned int i = 1; i < ARCH_PAGE_GRANULARITY / sizeof(vm_region_t); i++) list_append(&g_free_regions, &region[i].list_elem);
+        for(unsigned int i = 1; i < ARCH_PAGE_GRANULARITY / sizeof(vm_region_t); i++) list_push(&g_free_regions, &region[i].list_node);
     }
-    list_element_t *elem = LIST_NEXT(&g_free_regions);
-    ASSERT(elem != nullptr);
-    list_delete(elem);
+
+    list_node_t *node = list_pop(&g_free_regions);
     spinlock_release(&g_free_regions_lock, previous_state);
-    return LIST_CONTAINER_GET(elem, vm_region_t, list_elem);
+    return LIST_CONTAINER_GET(node, vm_region_t, list_node);
 }
 
 static void region_free(vm_region_t *region) {
     interrupt_state_t previous_state = spinlock_acquire(&g_free_regions_lock);
-    list_append(&g_free_regions, &region->list_elem);
+    list_push(&g_free_regions, &region->list_node);
     spinlock_release(&g_free_regions_lock, previous_state);
 }
 
 static vm_region_t *addr_to_region(vm_address_space_t *address_space, uintptr_t address) {
     if(!ADDRESS_IN_BOUNDS(address, address_space->start, address_space->end)) return nullptr;
-    LIST_FOREACH(&address_space->regions, elem) {
-        vm_region_t *region = LIST_CONTAINER_GET(elem, vm_region_t, list_elem);
+    LIST_ITERATE(&address_space->regions, node) {
+        vm_region_t *region = LIST_CONTAINER_GET(node, vm_region_t, list_node);
         if(!ADDRESS_IN_SEGMENT(address, region->base, region->length)) continue;
         return region;
     }
@@ -127,8 +126,8 @@ static bool memory_exists(vm_address_space_t *address_space, uintptr_t address, 
     if(!ADDRESS_IN_BOUNDS(address, address_space->start, address_space->end) || !ADDRESS_IN_BOUNDS(address + length, address_space->start, address_space->end)) return false;
 restart:
     if(length == 0) return true;
-    LIST_FOREACH(&address_space->regions, elem) {
-        vm_region_t *region = LIST_CONTAINER_GET(elem, vm_region_t, list_elem);
+    LIST_ITERATE(&address_space->regions, node) {
+        vm_region_t *region = LIST_CONTAINER_GET(node, vm_region_t, list_node);
         if(region->base <= address && region->base + region->length > address) {
             uintptr_t new_addr = region->base + region->length;
             if(new_addr >= address + length) return true;
@@ -180,7 +179,7 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
 
     if((flags & VM_FLAG_NO_DEMAND) != 0) region_map(region, region->base, region->length);
 
-    list_append(&address_space->regions, &region->list_elem);
+    list_push(&address_space->regions, &region->list_node);
     spinlock_release(&address_space->lock, previous_state);
 
     log(LOG_LEVEL_DEBUG, "VM", "map success (base: %#lx, length: %#lx)", region->base, region->length);
@@ -227,13 +226,13 @@ void vm_unmap(vm_address_space_t *address_space, void *address, size_t length) {
                 case VM_REGION_TYPE_DIRECT: region->type_data = split_region->type_data; break;
             }
 
-            list_append(&split_region->list_elem, &region->list_elem);
+            list_node_append(&address_space->regions, &split_region->list_node, &region->list_node);
         }
 
         if(split_region->base < split_base) {
             split_region->length = split_base - split_region->base;
         } else {
-            list_delete(&split_region->list_elem);
+            list_node_delete(&address_space->regions, &split_region->list_node);
             region_free(split_region);
         }
     }

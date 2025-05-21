@@ -58,7 +58,7 @@ typedef struct {
     vm_protection_t protection;
     vm_cache_t cache_behavior;
 
-    list_element_t list_elem;
+    list_node_t list_node;
 
     union {
         struct {

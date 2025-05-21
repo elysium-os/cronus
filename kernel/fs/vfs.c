@@ -4,7 +4,7 @@
 #include "lib/mem.h"
 #include "memory/heap.h"
 
-list_t g_vfs_all = LIST_INIT_CIRCULAR(g_vfs_all);
+list_t g_vfs_all = LIST_INIT;
 
 vfs_result_t vfs_mount(vfs_ops_t *vfs_ops, const char *path, void *private_data) {
     vfs_t *vfs = heap_alloc(sizeof(vfs_t));
@@ -12,7 +12,7 @@ vfs_result_t vfs_mount(vfs_ops_t *vfs_ops, const char *path, void *private_data)
     vfs->private_data = private_data;
     vfs->ops->mount(vfs);
 
-    if(list_is_empty(&g_vfs_all)) {
+    if(g_vfs_all.count == 0) {
         if(path != nullptr) {
             heap_free(vfs, sizeof(vfs_t));
             return VFS_RESULT_ERR_NOT_FOUND;
@@ -36,13 +36,13 @@ vfs_result_t vfs_mount(vfs_ops_t *vfs_ops, const char *path, void *private_data)
         node->mounted_vfs = vfs;
         vfs->mount_point = node;
     }
-    list_prepend(&g_vfs_all, &vfs->list_elem);
+    list_push_back(&g_vfs_all, &vfs->list_node);
     return VFS_RESULT_OK;
 }
 
 vfs_result_t vfs_root(PARAM_OUT(vfs_node_t **) root_node) {
-    if(list_is_empty(&g_vfs_all)) return VFS_RESULT_ERR_NOT_FOUND;
-    vfs_t *vfs = LIST_CONTAINER_GET(LIST_NEXT(&g_vfs_all), vfs_t, list_elem);
+    if(g_vfs_all.count == 0) return VFS_RESULT_ERR_NOT_FOUND;
+    vfs_t *vfs = LIST_CONTAINER_GET(g_vfs_all.head, vfs_t, list_node);
     return vfs->ops->root_node(vfs, root_node);
 }
 

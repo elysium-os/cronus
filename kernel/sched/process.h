@@ -9,7 +9,7 @@ typedef struct {
     spinlock_t lock;
     vm_address_space_t *address_space;
     list_t threads;
-    list_element_t list_sched; /* used by scheduler/reaper */
+    list_node_t list_sched; /* used by scheduler/reaper */
 } process_t;
 
 /**

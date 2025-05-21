@@ -1,26 +1,81 @@
 #include "list.h"
 
-#include <stddef.h>
+#include "common/assert.h"
 
-void list_append(list_element_t *position, list_element_t *element) {
-    element->prev = position;
-    element->next = position->next;
-    if(position->next != nullptr) position->next->prev = element;
-    position->next = element;
+static void list_initial_node(list_t *list, list_node_t *node) {
+    ASSERT(list->count == 0);
+    node->next = nullptr;
+    node->prev = nullptr;
+    list->head = node;
+    list->tail = node;
+    list->count = 1;
 }
 
-void list_prepend(list_element_t *position, list_element_t *element) {
-    element->next = position;
-    element->prev = position->prev;
-    if(position->prev != nullptr) position->prev->next = element;
-    position->prev = element;
+void list_push_front(list_t *list, list_node_t *node) {
+    if(list->head == nullptr) {
+        ASSERT(list->tail == nullptr);
+        list_initial_node(list, node);
+        return;
+    }
+
+    ASSERT(list->count != 0);
+    list_node_prepend(list, list->head, node);
 }
 
-void list_delete(list_element_t *element) {
-    if(element->prev != nullptr) element->prev->next = element->next;
-    if(element->next != nullptr) element->next->prev = element->prev;
+void list_push_back(list_t *list, list_node_t *node) {
+    if(list->tail == nullptr) {
+        ASSERT(list->head == nullptr);
+        list_initial_node(list, node);
+        return;
+    }
+
+    ASSERT(list->count != 0);
+    list_node_append(list, list->tail, node);
 }
 
-bool list_is_empty(list_t *list) {
-    return list->next == nullptr || list->next == list;
+[[gnu::alias("list_push_front")]] void list_push(list_t *list, list_node_t *node);
+
+list_node_t *list_pop_front(list_t *list) {
+    list_node_t *node = list->head;
+    list_node_delete(list, node);
+    return node;
+}
+
+list_node_t *list_pop_back(list_t *list) {
+    list_node_t *node = list->tail;
+    list_node_delete(list, node);
+    return node;
+}
+
+[[gnu::alias("list_pop_front")]] list_node_t *list_pop(list_t *list);
+
+void list_node_append(list_t *list, list_node_t *pos, list_node_t *node) {
+    node->next = pos->next;
+    node->prev = pos;
+
+    pos->next = node;
+    if(node->next != nullptr) node->next->prev = node;
+
+    if(list->tail == pos) list->tail = node;
+    list->count++;
+}
+
+void list_node_prepend(list_t *list, list_node_t *pos, list_node_t *node) {
+    node->next = pos;
+    node->prev = pos->prev;
+
+    pos->prev = node;
+    if(node->prev != nullptr) node->prev->next = node;
+
+    if(list->head == pos) list->head = node;
+    list->count++;
+}
+
+void list_node_delete(list_t *list, list_node_t *node) {
+    list->count--;
+    if(list->head == node) list->head = node->next;
+    if(list->tail == node) list->tail = node->prev;
+
+    if(node->prev != nullptr) node->prev->next = node->next;
+    if(node->next != nullptr) node->next->prev = node->prev;
 }

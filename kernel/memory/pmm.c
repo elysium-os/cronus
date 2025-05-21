@@ -59,7 +59,7 @@ void pmm_region_add(uintptr_t base, size_t size, size_t used) {
             page_t *page = &g_page_cache[index_offset + j];
             page->block.order = order;
             page->block.max_order = order;
-            list_append(&zone->lists[order], &page->block.list_elem);
+            list_push(&zone->lists[order], &page->block.list_node);
 
             j += PMM_ORDER_TO_PAGECOUNT(order);
         }
@@ -78,20 +78,19 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
     pmm_order_t avl_order = order;
     pmm_zone_t *zone = (flags & PMM_FLAG_ZONE_LOW) != 0 ? &g_pmm_zone_low : &g_pmm_zone_normal;
     interrupt_state_t previous_state = spinlock_acquire(&zone->lock);
-    while(list_is_empty(&zone->lists[avl_order])) {
+    while(zone->lists[avl_order].count == 0) {
         avl_order++;
         if(avl_order > PMM_MAX_ORDER) panic("PMM", "out of memory");
     }
 
-    pmm_block_t *block = LIST_CONTAINER_GET(LIST_NEXT(&zone->lists[avl_order]), pmm_block_t, list_elem);
+    pmm_block_t *block = LIST_CONTAINER_GET(list_pop(&zone->lists[avl_order]), pmm_block_t, list_node);
     ASSERT(block->paddr != 0);
 
-    list_delete(&block->list_elem);
     for(; avl_order > order; avl_order--) {
         pmm_block_t *buddy = &PAGE(block->paddr + (PMM_ORDER_TO_PAGECOUNT(avl_order - 1) * ARCH_PAGE_GRANULARITY))->block;
         buddy->order = avl_order - 1;
         buddy->free = true;
-        list_append(&zone->lists[avl_order - 1], &buddy->list_elem);
+        list_push(&zone->lists[avl_order - 1], &buddy->list_node);
     }
     spinlock_release(&zone->lock, previous_state);
 
@@ -123,12 +122,12 @@ void pmm_free(pmm_block_t *block) {
         pmm_block_t *buddy = &PAGE(block->paddr ^ (PMM_ORDER_TO_PAGECOUNT(block->order) * ARCH_PAGE_GRANULARITY))->block;
         if(!buddy->free || buddy->order != block->order) break;
 
-        list_delete(&buddy->list_elem);
+        list_node_delete(&zone->lists[block->order], &buddy->list_node);
         buddy->order++;
         block->order++;
 
         if(buddy->paddr < block->paddr) block = buddy;
     }
-    list_append(&zone->lists[block->order], &block->list_elem);
+    list_push(&zone->lists[block->order], &block->list_node);
     spinlock_release(&zone->lock, previous_state);
 }

@@ -304,7 +304,7 @@ static void thread_init() {
     g_hhdm_region.cache_behavior = VM_CACHE_STANDARD;
     g_hhdm_region.type = VM_REGION_TYPE_DIRECT;
     g_hhdm_region.type_data.direct.physical_address = 0;
-    list_append(&g_vm_global_address_space->regions, &g_hhdm_region.list_elem);
+    list_push(&g_vm_global_address_space->regions, &g_hhdm_region.list_node);
 
     g_kernel_region.address_space = g_vm_global_address_space;
     g_kernel_region.base = MATH_FLOOR(boot_info->kernel.vaddr, ARCH_PAGE_GRANULARITY);
@@ -312,7 +312,7 @@ static void thread_init() {
     g_kernel_region.protection = (vm_protection_t) { .read = true, .write = true };
     g_kernel_region.cache_behavior = VM_CACHE_STANDARD;
     g_kernel_region.type = VM_REGION_TYPE_ANON;
-    list_append(&g_vm_global_address_space->regions, &g_kernel_region.list_elem);
+    list_push(&g_vm_global_address_space->regions, &g_kernel_region.list_node);
 
     ADJUST_STACK(g_hhdm_offset);
     arch_ptm_load_address_space(g_vm_global_address_space);
@@ -353,7 +353,7 @@ static void thread_init() {
     g_page_cache_region.cache_behavior = VM_CACHE_STANDARD;
     g_page_cache_region.type = VM_REGION_TYPE_ANON; // TODO: this is a lie
     g_page_cache_region.type_data.anon.back_zeroed = false;
-    list_append(&g_vm_global_address_space->regions, &g_page_cache_region.list_elem);
+    list_push(&g_vm_global_address_space->regions, &g_page_cache_region.list_node);
     log(LOG_LEVEL_DEBUG, "INIT", "Page Cache (base: %#lx, size: %#lx)", pagecache_start, g_page_cache_size);
 
     g_x86_64_ptm_phys_allocator = proper_alloc;

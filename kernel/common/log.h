@@ -28,7 +28,7 @@ typedef struct {
         const char **tags;
         size_t tag_count;
     } filter;
-    list_element_t list_elem;
+    list_node_t list_node;
 
     void (*log)(log_level_t level, const char *tag, const char *fmt, va_list args);
 } log_sink_t;

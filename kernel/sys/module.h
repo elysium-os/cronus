@@ -4,7 +4,6 @@
 #include "lib/list.h"
 
 #include <stddef.h>
-#include <stdint.h>
 
 typedef enum {
     MODULE_RESULT_OK,
@@ -25,7 +24,7 @@ typedef enum {
 typedef struct {
     void *base;
     size_t size;
-    list_element_t list_elem;
+    list_node_t list_node;
 } module_region_t;
 
 typedef struct {

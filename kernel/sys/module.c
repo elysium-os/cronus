@@ -30,11 +30,8 @@ static void auto_free_module(module_t **auto_module) {
     module_t *module = *auto_module;
     if(module == nullptr) return;
 
-    while(!list_is_empty(&module->module_regions)) {
-        list_element_t *elem = LIST_NEXT(&module->module_regions);
-        list_delete(elem);
-
-        module_region_t *region = LIST_CONTAINER_GET(elem, module_region_t, list_elem);
+    while(module->module_regions.count > 0) {
+        module_region_t *region = LIST_CONTAINER_GET(list_pop(&module->module_regions), module_region_t, list_node);
         vm_unmap(g_vm_global_address_space, region->base, region->size);
         heap_free(region, sizeof(module_region_t));
     }
@@ -110,7 +107,7 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
                 module_region_t *region = heap_alloc(sizeof(module_region_t));
                 region->base = addr;
                 region->size = aligned_size;
-                list_append(&temp_module->module_regions, &region->list_elem);
+                list_push(&temp_module->module_regions, &region->list_node);
 
                 res = module_file->ops->rw(module_file, &(vfs_rw_t) { .rw = VFS_RW_READ, .size = shdrs[i].size, .offset = shdrs[i].offset, .buffer = addr }, &read_count);
                 if(res != VFS_RESULT_OK || read_count != shdrs[i].size) return MODULE_RESULT_ERR_FS;

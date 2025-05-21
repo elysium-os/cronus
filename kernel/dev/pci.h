@@ -21,7 +21,7 @@ typedef struct pci_device {
     uint8_t bus;
     uint8_t slot;
     uint8_t func;
-    list_t list;
+    list_node_t list_node;
 } pci_device_t;
 
 typedef struct {

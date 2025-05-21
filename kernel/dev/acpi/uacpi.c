@@ -64,8 +64,10 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address, uacpi_handl
     device->slot = address.device;
     device->func = address.function;
 
+    // TODO: this should not just create a device and push it,
+    // it REALLY needs to first check if we are aware of such a device
     interrupt_state_t previous_state = spinlock_acquire(&g_pci_devices_lock);
-    list_append(&g_pci_devices, &device->list);
+    list_push(&g_pci_devices, &device->list_node);
     spinlock_release(&g_pci_devices_lock, previous_state);
 
     *out_handle = device;

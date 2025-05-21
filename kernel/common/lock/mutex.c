@@ -23,7 +23,7 @@ void mutex_acquire(mutex_t *mutex) {
 
     interrupt_state_t previous_state = spinlock_acquire(&mutex->lock);
     if(EXPECT_LIKELY(__atomic_exchange_n(&mutex->state, MUTEX_STATE_CONTESTED, __ATOMIC_ACQ_REL) != MUTEX_STATE_UNLOCKED)) {
-        list_append(&mutex->wait_queue, &arch_sched_thread_current()->list_wait);
+        list_push_back(&mutex->wait_queue, &arch_sched_thread_current()->list_wait);
 
         spinlock_primitive_release(&mutex->lock); // TODO: race condition here ?
         sched_yield(THREAD_STATE_BLOCK);
@@ -42,13 +42,12 @@ void mutex_release(mutex_t *mutex) {
     interrupt_state_t previous_state = spinlock_acquire(&mutex->lock);
 
     ASSERT(state == MUTEX_STATE_CONTESTED);
-    ASSERT(!list_is_empty(&mutex->wait_queue));
+    ASSERT(mutex->wait_queue.count != 0);
 
-    thread_t *thread = LIST_CONTAINER_GET(LIST_NEXT(&mutex->wait_queue), thread_t, list_wait);
-    list_delete(&thread->list_wait);
+    thread_t *thread = LIST_CONTAINER_GET(list_pop(&mutex->wait_queue), thread_t, list_wait);
     sched_thread_schedule(thread);
 
-    if(list_is_empty(&mutex->wait_queue)) __atomic_store_n(&mutex->state, MUTEX_STATE_LOCKED, __ATOMIC_RELEASE);
+    if(mutex->wait_queue.count == 0) __atomic_store_n(&mutex->state, MUTEX_STATE_LOCKED, __ATOMIC_RELEASE);
 
     spinlock_release(&mutex->lock, previous_state);
 }

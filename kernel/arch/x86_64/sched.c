@@ -157,7 +157,7 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
 
     if(proc != nullptr) {
         interrupt_state_t previous_state = spinlock_acquire(&proc->lock);
-        list_append(&proc->threads, &thread->common.list_proc);
+        list_push(&proc->threads, &thread->common.list_proc);
         spinlock_release(&proc->lock, previous_state);
     }
 
@@ -211,7 +211,7 @@ void x86_64_sched_init_cpu(x86_64_cpu_t *cpu) {
 
     x86_64_thread_t *idle_thread = create_thread(nullptr, IDLE_TID, &cpu->common.sched, kernel_stack, (uintptr_t) init_stack);
 
-    cpu->common.sched = (sched_t) { .lock = SPINLOCK_INIT, .thread_queue = LIST_INIT_CIRCULAR(cpu->common.sched.thread_queue), .idle_thread = &idle_thread->common };
+    cpu->common.sched = (sched_t) { .lock = SPINLOCK_INIT, .thread_queue = LIST_INIT, .idle_thread = &idle_thread->common };
 }
 
 [[gnu::no_instrument_function]] [[noreturn]] void x86_64_sched_handoff_cpu(x86_64_cpu_t *cpu, bool release) {

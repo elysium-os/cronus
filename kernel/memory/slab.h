@@ -7,7 +7,7 @@
 #include <stddef.h>
 
 typedef struct {
-    list_element_t list_elem;
+    list_node_t list_node;
     size_t round_count;
     void *rounds[];
 } slab_magazine_t;
@@ -22,7 +22,7 @@ typedef struct {
     size_t object_size;
     pmm_order_t block_order;
 
-    list_element_t list_elem;
+    list_node_t list_node;
 
     spinlock_t slabs_lock;
     list_t slabs_full;
@@ -38,7 +38,7 @@ typedef struct {
 
 typedef struct {
     slab_cache_t *cache;
-    list_element_t list_elem;
+    list_node_t list_node;
     pmm_block_t *block;
 
     size_t free_count;

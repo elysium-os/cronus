@@ -38,7 +38,7 @@ struct vfs {
     vfs_ops_t *ops;
     void *private_data;
     vfs_node_t *mount_point;
-    list_element_t list_elem;
+    list_node_t list_node;
 };
 
 struct vfs_node {
