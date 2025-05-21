@@ -2,6 +2,9 @@
 
 #include <stddef.h>
 
+#define STRING_MACRO_STRINGIFY_(VALUE) #VALUE
+#define STRING_MACRO_STRINGIFY(VALUE) STRING_MACRO_STRINGIFY_(VALUE)
+
 /**
  * @brief Compute the length of a string. Excluding the null terminator.
  */

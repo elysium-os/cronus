@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/panic.h"
+#include "lib/string.h"
 
 #ifdef __ENV_PRODUCTION
 #define ASSERT(ASSERTION)
@@ -8,8 +9,8 @@
 /**
  * @brief Make an assertion and panic on failure.
  */
-#define ASSERT(ASSERTION)                                                                 \
-    if(!(ASSERTION)) panic("ASSERT", "Assertion \"%s\" failed in " __FILE__, #ASSERTION);
+#define ASSERT(ASSERTION)                                                                                                      \
+    if(!(ASSERTION)) panic("ASSERT", "Assertion \"%s\" failed in " __FILE__ ":" STRING_MACRO_STRINGIFY(__LINE__), #ASSERTION);
 #endif
 
 
@@ -19,8 +20,8 @@
 /**
  * @brief Assert is unreachable, if reached panic.
  */
-#define ASSERT_UNREACHABLE()                  \
-    panic("ASSERT", "Unreachable " __FILE__); \
+#define ASSERT_UNREACHABLE()                                                       \
+    panic("ASSERT", "Unreachable " __FILE__ ":" STRING_MACRO_STRINGIFY(__LINE__)); \
     __builtin_unreachable()
 #endif
 
@@ -31,7 +32,7 @@
 /**
  * @brief Assert is unreachable, if reached panic with a comment.
  */
-#define ASSERT_UNREACHABLE_COMMENT(COMMENT)                      \
-    panic("ASSERT", "Unreachable " __FILE__ " \"%s\"", COMMENT); \
+#define ASSERT_UNREACHABLE_COMMENT(COMMENT)                                                           \
+    panic("ASSERT", "Unreachable " __FILE__ ":" STRING_MACRO_STRINGIFY(__LINE__) " \"%s\"", COMMENT); \
     __builtin_unreachable()
 #endif
