@@ -9,7 +9,7 @@
     va_list list;
     va_start(list, format);
     log_list(LOG_LEVEL_FATAL, tag, fmt, list);
-    arch_debug_stack_trace();
+    arch_debug_stack_trace(LOG_LEVEL_FATAL, tag);
     va_end(list);
     arch_cpu_halt();
     __builtin_unreachable();
