@@ -225,10 +225,7 @@ void vm_unmap(vm_address_space_t *address_space, void *address, size_t length) {
             region->length = (split_region->base + split_region->length) - (split_base + split_length);
             region->protection = split_region->protection;
             region->type = split_region->type;
-            switch(region->type) {
-                case VM_REGION_TYPE_ANON:   break;
-                case VM_REGION_TYPE_DIRECT: region->type_data = split_region->type_data; break;
-            }
+            region->type_data = split_region->type_data;
 
             list_node_append(&address_space->regions, &split_region->list_node, &region->list_node);
         }
