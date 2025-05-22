@@ -9,7 +9,9 @@
 #include <stdint.h>
 
 #define IDENTIFIER "KSyM"
-#define REVISION 1
+#define REVISION 2
+
+#define IS_GLOBAL(KSYM) (((KSYM)->flags & 1) != 0)
 
 #define SYMBOL_AT(HEADER, INDEX) ((symbol_t *) ((uintptr_t) (HEADER) + (HEADER)->symbols_offset + ((HEADER)->symbol_size * (INDEX))))
 
@@ -22,7 +24,10 @@ typedef struct [[gnu::packed]] {
 } header_t;
 
 typedef struct [[gnu::packed]] {
-    uint64_t name_index;
+    uint64_t name_offset;
+    uint16_t flags;
+    uint16_t rsv0;
+    uint32_t rsv1;
     uint64_t size;
     uint64_t value;
 } symbol_t;
@@ -50,7 +55,7 @@ bool kernel_symbols_is_loaded() {
     return g_kernel_symbols_header != nullptr;
 }
 
-bool kernel_symbol_lookup(uintptr_t address, PARAM_FILL(kernel_symbol_t *) symbol) {
+bool kernel_symbol_lookup_by_address(uintptr_t address, PARAM_FILL(kernel_symbol_t *) symbol) {
     if(!kernel_symbols_is_loaded()) return false;
 
     symbol_t *prev = nullptr, *sym = nullptr;
@@ -69,9 +74,10 @@ bool kernel_symbol_lookup(uintptr_t address, PARAM_FILL(kernel_symbol_t *) symbo
     }
     if(sym == nullptr) return false;
 
-    symbol->name = get_name(g_kernel_symbols_header, sym->name_index);
+    symbol->name = get_name(g_kernel_symbols_header, sym->name_offset);
     symbol->address = sym->value;
     symbol->size = sym->size;
+    symbol->global = IS_GLOBAL(sym);
     return true;
 }
 
@@ -80,11 +86,13 @@ bool kernel_symbol_lookup_by_name(const char *name, PARAM_FILL(kernel_symbol_t *
 
     for(size_t i = 0; i < g_kernel_symbols_header->symbols_count; i++) {
         symbol_t *ksymbol = SYMBOL_AT(g_kernel_symbols_header, i);
-        if(!string_eq(get_name(g_kernel_symbols_header, ksymbol->name_index), name)) continue;
+        if(!IS_GLOBAL(ksymbol)) continue;
+        if(!string_eq(get_name(g_kernel_symbols_header, ksymbol->name_offset), name)) continue;
 
-        symbol->name = get_name(g_kernel_symbols_header, ksymbol->name_index);
+        symbol->name = get_name(g_kernel_symbols_header, ksymbol->name_offset);
         symbol->address = ksymbol->value;
         symbol->size = ksymbol->size;
+        symbol->global = IS_GLOBAL(ksymbol);
         return true;
     }
 

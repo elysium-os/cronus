@@ -131,7 +131,7 @@ static int g_prof_active = 0;
     log(LOG_LEVEL_DEBUG, "PROFILE", "Profiler results for `%s` (%lu):", name, g_record_count);
     for(size_t i = 0; i < g_record_count; i++) {
         kernel_symbol_t symbol;
-        if(kernel_symbol_lookup((uintptr_t) g_records[i].function, &symbol) && symbol.address == (uintptr_t) g_records[i].function) {
+        if(kernel_symbol_lookup_by_address((uintptr_t) g_records[i].function, &symbol) && symbol.address == (uintptr_t) g_records[i].function) {
             log(LOG_LEVEL_DEBUG,
                 "PROFILE",
                 "%lu. %s <%#lx>: %lu (calls: %lu, average: %lu)",

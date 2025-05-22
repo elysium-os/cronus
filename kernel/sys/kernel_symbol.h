@@ -7,6 +7,7 @@
 
 typedef struct {
     const char *name;
+    bool global;
     size_t size;
     uintptr_t address;
 } kernel_symbol_t;
@@ -25,10 +26,10 @@ bool kernel_symbols_is_loaded();
  * @brief Lookup kernel symbol by address.
  * @returns true on success
  */
-bool kernel_symbol_lookup(uintptr_t address, PARAM_FILL(kernel_symbol_t *) symbol);
+bool kernel_symbol_lookup_by_address(uintptr_t address, PARAM_FILL(kernel_symbol_t *) symbol);
 
 /**
- * @brief Lookyp kernel symbol by name.
+ * @brief Lookyp kernel symbol by name. This will only return global symbols.
  * @returns true on success
  */
 bool kernel_symbol_lookup_by_name(const char *name, PARAM_FILL(kernel_symbol_t *) symbol);

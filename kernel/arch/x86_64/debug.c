@@ -16,7 +16,7 @@ void x86_64_debug_stack_trace_from(log_level_t level, const char *tag, x86_64_de
     log(level, tag, "Stack Trace:");
     for(int i = 0; stack_frame != nullptr && stack_frame->rip != 0 && i < 30; i++) {
         kernel_symbol_t symbol;
-        if(!kernel_symbol_lookup(stack_frame->rip, &symbol)) {
+        if(!kernel_symbol_lookup_by_address(stack_frame->rip, &symbol)) {
             log(level, tag, "    [UNKNOWN] <%#lx>", stack_frame->rip);
         } else {
             log(level, tag, "    %s+%lu <%#lx>", symbol.name, stack_frame->rip - symbol.address, stack_frame->rip);
