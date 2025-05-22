@@ -33,14 +33,51 @@ struct list_node {
     list_node_t *next, *prev;
 };
 
+/**
+ * @brief Push a node to the front of the list.
+ */
 void list_push_front(list_t *list, list_node_t *node);
+
+/**
+ * @brief Push a node to the back of the list.
+ */
 void list_push_back(list_t *list, list_node_t *node);
+
+/**
+ * @brief Alias of `list_push_font`.
+ */
 void list_push(list_t *list, list_node_t *node);
 
+/**
+ * @brief Pop the head of the list.
+ */
 list_node_t *list_pop_front(list_t *list);
+
+/**
+ * @brief Pop the tail of the list.
+ */
 list_node_t *list_pop_back(list_t *list);
+
+/**
+ * @brief Alias of `list_pop_front`.
+ */
 list_node_t *list_pop(list_t *list);
 
+/**
+ * @brief Insert a node after another node in a list.
+ * @param pos The "position", insert the new node after this node
+ * @param node The new node
+ */
 void list_node_append(list_t *list, list_node_t *pos, list_node_t *node);
+
+/**
+ * @brief Insert a node before another node in a list.
+ * @param pos The "position", insert the new node before this node
+ * @param node The new node
+ */
 void list_node_prepend(list_t *list, list_node_t *pos, list_node_t *node);
+
+/**
+ * @brief Remove a node off of a list.
+ */
 void list_node_delete(list_t *list, list_node_t *node);
