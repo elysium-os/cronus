@@ -6,5 +6,6 @@ build/
 
 .zed
 .vscode
+.gdbinit
 
 log.txt
