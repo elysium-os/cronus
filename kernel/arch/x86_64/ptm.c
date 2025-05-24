@@ -133,9 +133,13 @@ static void tlb_shootdown_handler([[maybe_unused]] x86_64_interrupt_frame_t *fra
     __atomic_add_fetch(&g_tlb_shootdown_complete, 1, __ATOMIC_RELEASE);
 }
 
+static rb_value_t region_node_value(rb_node_t *node) {
+    return CONTAINER_OF(node, vm_region_t, rb_node)->base;
+}
+
 vm_address_space_t *x86_64_ptm_init() {
     g_initial_address_space.common.lock = SPINLOCK_INIT;
-    g_initial_address_space.common.regions = LIST_INIT;
+    g_initial_address_space.common.regions = RB_TREE_INIT(region_node_value);
     g_initial_address_space.common.start = KERNELSPACE_START;
     g_initial_address_space.common.end = KERNELSPACE_END;
     g_initial_address_space.cr3 = g_x86_64_ptm_phys_allocator();
@@ -165,7 +169,7 @@ vm_address_space_t *arch_ptm_address_space_create() {
     address_space->cr3 = g_x86_64_ptm_phys_allocator();
     address_space->cr3_lock = SPINLOCK_INIT;
     address_space->common.lock = SPINLOCK_INIT;
-    address_space->common.regions = LIST_INIT;
+    address_space->common.regions = RB_TREE_INIT(region_node_value);
     address_space->common.start = USERSPACE_START;
     address_space->common.end = USERSPACE_END;
 

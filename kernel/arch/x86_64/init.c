@@ -1,7 +1,6 @@
 #include "init.h"
 
 #include "abi/sysv/elf.h"
-#include "arch/debug.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
 #include "arch/sched.h"
@@ -190,7 +189,7 @@ static void thread_init() {
     g_framebuffer.width = framebuffer->width;
     g_framebuffer.height = framebuffer->height;
     g_framebuffer.pitch = framebuffer->pitch;
-    // TODO handle pixel format
+    // TODO: handle pixel format
 
     size_t bsp_seq_id = 0;
     for(size_t i = 0; i < boot_info->cpu_count; i++) {
@@ -301,7 +300,8 @@ static void thread_init() {
     g_hhdm_region.cache_behavior = VM_CACHE_STANDARD;
     g_hhdm_region.type = VM_REGION_TYPE_DIRECT;
     g_hhdm_region.type_data.direct.physical_address = 0;
-    list_push(&g_vm_global_address_space->regions, &g_hhdm_region.list_node);
+    rb_insert(&g_vm_global_address_space->regions, &g_hhdm_region.rb_node);
+    log(LOG_LEVEL_DEBUG, "INIT", "HHDM (base: %#lx, size: %#lx)", g_hhdm_region.base, g_hhdm_region.length);
 
     g_kernel_region.address_space = g_vm_global_address_space;
     g_kernel_region.base = MATH_FLOOR(boot_info->kernel.vaddr, ARCH_PAGE_GRANULARITY);
@@ -309,7 +309,8 @@ static void thread_init() {
     g_kernel_region.protection = (vm_protection_t) { .read = true, .write = true };
     g_kernel_region.cache_behavior = VM_CACHE_STANDARD;
     g_kernel_region.type = VM_REGION_TYPE_ANON;
-    list_push(&g_vm_global_address_space->regions, &g_kernel_region.list_node);
+    rb_insert(&g_vm_global_address_space->regions, &g_kernel_region.rb_node);
+    log(LOG_LEVEL_DEBUG, "INIT", "Kernel (base: %#lx, size: %#lx)", g_kernel_region.base, g_kernel_region.length);
 
     ADJUST_STACK(g_hhdm_offset);
     arch_ptm_load_address_space(g_vm_global_address_space);
@@ -350,7 +351,7 @@ static void thread_init() {
     g_page_cache_region.cache_behavior = VM_CACHE_STANDARD;
     g_page_cache_region.type = VM_REGION_TYPE_ANON; // TODO: this is a lie
     g_page_cache_region.type_data.anon.back_zeroed = false;
-    list_push(&g_vm_global_address_space->regions, &g_page_cache_region.list_node);
+    rb_insert(&g_vm_global_address_space->regions, &g_page_cache_region.rb_node);
     log(LOG_LEVEL_DEBUG, "INIT", "Page Cache (base: %#lx, size: %#lx)", pagecache_start, g_page_cache_size);
 
     g_x86_64_ptm_phys_allocator = proper_alloc;
@@ -508,7 +509,8 @@ static void thread_init() {
     x86_64_sched_init();
     x86_64_sched_init_cpu(X86_64_CPU_CURRENT.self);
 
-    // Load modules
+#ifdef __ENV_DEVELOPMENT
+    // Load Test Module
     vfs_node_t *test_module_file = nullptr;
     vfs_lookup(&VFS_ABSOLUTE_PATH("/sys/modules/test.cronmod"), &test_module_file);
     if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup test module (%i)", res);
@@ -517,6 +519,11 @@ static void thread_init() {
     module_t *module;
     module_result_t mres = module_load(test_module_file, &module);
     if(mres != MODULE_RESULT_OK) panic("INIT", "failed to load test module `%s`", module_result_stringify(mres));
+
+    // Run tests
+    if(module->initialize != nullptr) module->initialize();
+    if(module->uninitialize != nullptr) module->uninitialize();
+#endif
 
     // Schedule init threads
     sched_thread_schedule(reaper_create());

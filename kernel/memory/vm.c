@@ -7,6 +7,7 @@
 #include "common/log.h"
 #include "lib/math.h"
 #include "lib/mem.h"
+#include "lib/param.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"
 #include "memory/pmm.h"
@@ -19,27 +20,48 @@
 
 vm_address_space_t *g_vm_global_address_space;
 
-static spinlock_t g_free_regions_lock = SPINLOCK_INIT;
-static list_t g_free_regions = LIST_INIT;
+static spinlock_t g_region_cache_lock = SPINLOCK_INIT;
+static list_t g_region_cache = LIST_INIT;
 
 static_assert(ARCH_PAGE_GRANULARITY > (sizeof(vm_region_t) * 2));
 
-/** @warning Assumes address space lock is acquired. */
-static uintptr_t find_space(vm_address_space_t *address_space, uintptr_t address, size_t length) {
-    if(!SEGMENT_IN_BOUNDS(address, length, address_space->start, address_space->end)) address = address_space->start;
-    while(true) {
-        if(!SEGMENT_IN_BOUNDS(address, length, address_space->start, address_space->end)) return 0;
-        bool valid = true;
-        LIST_ITERATE(&address_space->regions, node) {
-            vm_region_t *region = LIST_CONTAINER_GET(node, vm_region_t, list_node);
-            if(!SEGMENT_INTERSECTS(address, length, region->base, region->length)) continue;
-            valid = false;
-            address = region->base + region->length;
-            break;
-        }
-        if(valid) break;
+/**
+ * @brief Find last region within a segment.
+ */
+static vm_region_t *find_region(vm_address_space_t *address_space, uintptr_t address, size_t length) {
+    rb_node_t *node = rb_search(&address_space->regions, address + length, RB_SEARCH_TYPE_NEAREST_LT);
+    if(node == nullptr) return nullptr;
+
+    vm_region_t *region = CONTAINER_OF(node, vm_region_t, rb_node);
+    if(region->base + region->length > address) return region;
+
+    return nullptr;
+}
+
+/**
+ * @brief Find a hole (free space) in an address space.
+ * @warning Assumes address space lock is acquired.
+ * @returns true = hole found, false = not found
+ */
+static bool find_hole(vm_address_space_t *address_space, uintptr_t address, size_t length, PARAM_OUT(uintptr_t *) hole) {
+    if(SEGMENT_IN_BOUNDS(address, length, address_space->start, address_space->end) && find_region(address_space, address, length) == nullptr) {
+        *hole = address;
+        return true;
     }
-    return address;
+
+    address = address_space->start;
+    while(true) {
+        if(!SEGMENT_IN_BOUNDS(address, length, address_space->start, address_space->end)) return false;
+
+        vm_region_t *region = find_region(address_space, address, length);
+        if(region == nullptr) {
+            *hole = address;
+            return true;
+        }
+
+        address = region->base + region->length;
+    }
+    return false;
 }
 
 static void region_map(vm_region_t *region, uintptr_t address, uintptr_t length) {
@@ -73,11 +95,15 @@ static void region_unmap(vm_region_t *region, uintptr_t address, uintptr_t lengt
 }
 
 static vm_region_t *region_alloc(bool global_lock_acquired) {
-    interrupt_state_t previous_state = spinlock_acquire(&g_free_regions_lock);
-    if(g_free_regions.count == 0) {
+    interrupt_state_t previous_state = spinlock_acquire(&g_region_cache_lock);
+    if(g_region_cache.count == 0) {
         pmm_block_t *page = pmm_alloc_page(PMM_FLAG_ZERO);
         if(!global_lock_acquired) spinlock_primitive_acquire(&g_vm_global_address_space->lock);
-        uintptr_t address = find_space(g_vm_global_address_space, 0, ARCH_PAGE_GRANULARITY);
+
+        uintptr_t address;
+        bool result = find_hole(g_vm_global_address_space, 0, ARCH_PAGE_GRANULARITY, &address);
+        ASSERT_COMMENT(result, "out of global address space");
+
         arch_ptm_map(g_vm_global_address_space, address, PAGE_PADDR(PAGE_FROM_BLOCK(page)), (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
 
         vm_region_t *region = (vm_region_t *) address;
@@ -88,31 +114,33 @@ static vm_region_t *region_alloc(bool global_lock_acquired) {
         region[0].protection = (vm_protection_t) { .read = true, .write = true };
         region[0].cache_behavior = VM_CACHE_STANDARD;
 
-        list_push(&g_vm_global_address_space->regions, &region[0].list_node);
+        rb_insert(&g_vm_global_address_space->regions, &region[0].rb_node);
         if(!global_lock_acquired) spinlock_primitive_release(&g_vm_global_address_space->lock);
 
-        for(unsigned int i = 1; i < ARCH_PAGE_GRANULARITY / sizeof(vm_region_t); i++) list_push(&g_free_regions, &region[i].list_node);
+        for(unsigned int i = 1; i < ARCH_PAGE_GRANULARITY / sizeof(vm_region_t); i++) list_push(&g_region_cache, &region[i].list_node);
     }
 
-    list_node_t *node = list_pop(&g_free_regions);
-    spinlock_release(&g_free_regions_lock, previous_state);
+    list_node_t *node = list_pop(&g_region_cache);
+    spinlock_release(&g_region_cache_lock, previous_state);
     return LIST_CONTAINER_GET(node, vm_region_t, list_node);
 }
 
 static void region_free(vm_region_t *region) {
-    interrupt_state_t previous_state = spinlock_acquire(&g_free_regions_lock);
-    list_push(&g_free_regions, &region->list_node);
-    spinlock_release(&g_free_regions_lock, previous_state);
+    interrupt_state_t previous_state = spinlock_acquire(&g_region_cache_lock);
+    list_push(&g_region_cache, &region->list_node);
+    spinlock_release(&g_region_cache_lock, previous_state);
 }
 
 static vm_region_t *addr_to_region(vm_address_space_t *address_space, uintptr_t address) {
     if(!ADDRESS_IN_BOUNDS(address, address_space->start, address_space->end)) return nullptr;
-    LIST_ITERATE(&address_space->regions, node) {
-        vm_region_t *region = LIST_CONTAINER_GET(node, vm_region_t, list_node);
-        if(!ADDRESS_IN_SEGMENT(address, region->base, region->length)) continue;
-        return region;
-    }
-    return nullptr;
+
+    rb_node_t *node = rb_search(&address_space->regions, address, RB_SEARCH_TYPE_NEAREST_LTE);
+    if(node == nullptr) return nullptr;
+
+    vm_region_t *region = CONTAINER_OF(node, vm_region_t, rb_node);
+    if(!ADDRESS_IN_SEGMENT(address, region->base, region->length)) return nullptr;
+
+    return region;
 }
 
 static bool address_space_fix_page(vm_address_space_t *address_space, uintptr_t vaddr) {
@@ -122,26 +150,22 @@ static bool address_space_fix_page(vm_address_space_t *address_space, uintptr_t 
     return true;
 }
 
-// OPTIMIZE: this is very slow/inefficient, segments should probably be ordered or in a tree and we could do this fast
 static bool memory_exists(vm_address_space_t *address_space, uintptr_t address, size_t length) {
     if(!ADDRESS_IN_BOUNDS(address, address_space->start, address_space->end) || !ADDRESS_IN_BOUNDS(address + length, address_space->start, address_space->end)) return false;
-restart:
-    if(length == 0) return true;
-    LIST_ITERATE(&address_space->regions, node) {
-        vm_region_t *region = LIST_CONTAINER_GET(node, vm_region_t, list_node);
-        if(region->base <= address && region->base + region->length > address) {
-            uintptr_t new_addr = region->base + region->length;
-            if(new_addr >= address + length) return true;
-            length = (address + length) - new_addr;
-            address = new_addr;
-            goto restart;
-        }
-        if(region->base > address && region->base < address + length && region->base + region->length >= address + length) {
-            length -= (address + length) - region->base;
-            goto restart;
-        }
+
+    uintptr_t top = address + length;
+    while(top > address) {
+        // OPTIMIZE: (low priority) this can technically be improved by manually walking
+        // the btree instead of doing many binary searches.
+        rb_node_t *node = rb_search(&address_space->regions, top, RB_SEARCH_TYPE_NEAREST_LT);
+        if(node == nullptr) return false;
+
+        vm_region_t *region = CONTAINER_OF(node, vm_region_t, rb_node);
+        if(region->base + region->length < top) return false;
+
+        top = region->base;
     }
-    return false;
+    return true;
 }
 
 static void *map_common(vm_address_space_t *address_space, void *hint, size_t length, vm_protection_t prot, vm_cache_t cache, vm_flags_t flags, vm_region_type_t type, uintptr_t direct_physical_address) {
@@ -156,8 +180,8 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
 
     vm_region_t *region = region_alloc(false);
     interrupt_state_t previous_state = spinlock_acquire(&address_space->lock);
-    address = find_space(address_space, address, length);
-    if(address == 0 || ((uintptr_t) hint != address && (flags & VM_FLAG_FIXED) != 0)) {
+    bool result = find_hole(address_space, address, length, &address);
+    if(!result || ((uintptr_t) hint != address && (flags & VM_FLAG_FIXED) != 0)) {
         region_free(region);
         spinlock_release(&address_space->lock, previous_state);
         return nullptr;
@@ -183,7 +207,7 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
 
     if((flags & VM_FLAG_NO_DEMAND) != 0) region_map(region, region->base, region->length);
 
-    list_push(&address_space->regions, &region->list_node);
+    rb_insert(&address_space->regions, &region->rb_node);
     spinlock_release(&address_space->lock, previous_state);
 
     log(LOG_LEVEL_DEBUG, "VM", "map success (base: %#lx, length: %#lx)", region->base, region->length);
@@ -227,13 +251,13 @@ void vm_unmap(vm_address_space_t *address_space, void *address, size_t length) {
             region->type = split_region->type;
             region->type_data = split_region->type_data;
 
-            list_node_append(&address_space->regions, &split_region->list_node, &region->list_node);
+            rb_insert(&address_space->regions, &region->rb_node);
         }
 
         if(split_region->base < split_base) {
             split_region->length = split_base - split_region->base;
         } else {
-            list_node_delete(&address_space->regions, &split_region->list_node);
+            rb_remove(&address_space->regions, &split_region->rb_node);
             region_free(split_region);
         }
     }

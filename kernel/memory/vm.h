@@ -2,6 +2,7 @@
 
 #include "common/lock/spinlock.h"
 #include "lib/list.h"
+#include "lib/rb.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -44,7 +45,7 @@ typedef uint64_t vm_flags_t;
 
 typedef struct {
     spinlock_t lock;
-    list_t regions;
+    rb_tree_t regions;
     uintptr_t start, end;
 } vm_address_space_t;
 
@@ -58,7 +59,8 @@ typedef struct {
     vm_protection_t protection;
     vm_cache_t cache_behavior;
 
-    list_node_t list_node;
+    rb_node_t rb_node; /* Used for regions list */
+    list_node_t list_node; /* Used for region cache */
 
     union {
         struct {
