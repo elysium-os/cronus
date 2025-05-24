@@ -41,7 +41,7 @@ static void *slab_direct_alloc(slab_cache_t *cache) {
     interrupt_state_t previous_state = spinlock_acquire(&cache->slabs_lock);
 
     if(cache->slabs_partial.count == 0) list_push(&cache->slabs_partial, &cache_make_slab(cache)->list_node);
-    slab_t *slab = LIST_CONTAINER_GET(cache->slabs_partial.head, slab_t, list_node);
+    slab_t *slab = CONTAINER_OF(cache->slabs_partial.head, slab_t, list_node);
     ASSERT(slab->free_count > 0);
 
     void *obj = slab->freelist;
@@ -167,7 +167,7 @@ alloc:
     if(cache->magazines_full.count != 0) {
         list_push(&cache->magazines_empty, &cc->secondary->list_node);
         cc->secondary = cc->primary;
-        cc->primary = LIST_CONTAINER_GET(list_pop(&cache->magazines_full), slab_magazine_t, list_node);
+        cc->primary = CONTAINER_OF(list_pop(&cache->magazines_full), slab_magazine_t, list_node);
 
         spinlock_primitive_release(&cache->magazines_lock);
         goto alloc;
@@ -202,7 +202,7 @@ free:
     if(cache->magazines_empty.count != 0) {
         list_push(&cache->magazines_full, &cc->secondary->list_node);
         cc->secondary = cc->primary;
-        cc->primary = LIST_CONTAINER_GET(list_pop(&cache->magazines_empty), slab_magazine_t, list_node);
+        cc->primary = CONTAINER_OF(list_pop(&cache->magazines_empty), slab_magazine_t, list_node);
 
         spinlock_primitive_release(&cache->magazines_lock);
         goto free;

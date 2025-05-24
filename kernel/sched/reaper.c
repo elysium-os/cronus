@@ -4,6 +4,7 @@
 #include "common/assert.h"
 #include "common/lock/spinlock.h"
 #include "common/log.h"
+#include "lib/container.h"
 #include "lib/list.h"
 #include "memory/heap.h"
 #include "sched/process.h"
@@ -23,7 +24,7 @@ repeat:
             spinlock_release(&g_reaper_lock, previous_state);
             break;
         }
-        process_t *process = LIST_CONTAINER_GET(list_pop(&g_process_queue), process_t, list_sched);
+        process_t *process = CONTAINER_OF(list_pop(&g_process_queue), process_t, list_sched);
         spinlock_release(&g_reaper_lock, previous_state);
 
         ASSERT(!spinlock_acquire(&process->lock));
@@ -41,7 +42,7 @@ repeat:
             spinlock_release(&g_reaper_lock, previous_state);
             break;
         }
-        thread_t *thread = LIST_CONTAINER_GET(list_pop(&g_thread_queue), thread_t, list_sched);
+        thread_t *thread = CONTAINER_OF(list_pop(&g_thread_queue), thread_t, list_sched);
         spinlock_release(&g_reaper_lock, previous_state);
 
         log(LOG_LEVEL_DEBUG, "REAPER", "tid: %lu", thread->id);

@@ -1,6 +1,7 @@
 #include "log.h"
 
 #include "common/lock/spinlock.h"
+#include "lib/container.h"
 #include "lib/string.h"
 
 static spinlock_t g_lock = SPINLOCK_INIT;
@@ -29,7 +30,7 @@ void log_sink_remove(log_sink_t *sink) {
     va_list local_list;
     interrupt_state_t previous_state = spinlock_acquire(&g_lock);
     LIST_ITERATE(&g_sinks, node) {
-        log_sink_t *sink = LIST_CONTAINER_GET(node, log_sink_t, list_node);
+        log_sink_t *sink = CONTAINER_OF(node, log_sink_t, list_node);
         if(sink->filter.level < level) continue;
         for(size_t i = 0; i < sink->filter.tag_count; i++)
             if(string_eq(sink->filter.tags[i], tag) != sink->filter.tags_as_include) goto skip;

@@ -85,7 +85,7 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
         if(avl_order > PMM_MAX_ORDER) panic("PMM", "out of memory");
     }
 
-    pmm_block_t *block = LIST_CONTAINER_GET(list_pop(&zone->lists[avl_order]), pmm_block_t, list_node);
+    pmm_block_t *block = CONTAINER_OF(list_pop(&zone->lists[avl_order]), pmm_block_t, list_node);
     for(; avl_order > order; avl_order--) {
         pmm_block_t *buddy = &PAGE(BLOCK_PADDR(block) + (PMM_ORDER_TO_PAGECOUNT(avl_order - 1) * ARCH_PAGE_GRANULARITY))->block;
         buddy->order = avl_order - 1;

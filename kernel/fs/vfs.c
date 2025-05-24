@@ -1,5 +1,6 @@
 #include "vfs.h"
 
+#include "lib/container.h"
 #include "lib/list.h"
 #include "lib/mem.h"
 #include "memory/heap.h"
@@ -42,7 +43,7 @@ vfs_result_t vfs_mount(vfs_ops_t *vfs_ops, const char *path, void *private_data)
 
 vfs_result_t vfs_root(PARAM_OUT(vfs_node_t **) root_node) {
     if(g_vfs_all.count == 0) return VFS_RESULT_ERR_NOT_FOUND;
-    vfs_t *vfs = LIST_CONTAINER_GET(g_vfs_all.head, vfs_t, list_node);
+    vfs_t *vfs = CONTAINER_OF(g_vfs_all.head, vfs_t, list_node);
     return vfs->ops->root_node(vfs, root_node);
 }
 

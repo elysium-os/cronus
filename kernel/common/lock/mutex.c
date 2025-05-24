@@ -2,6 +2,7 @@
 
 #include "arch/sched.h"
 #include "common/assert.h"
+#include "lib/container.h"
 #include "lib/expect.h"
 #include "sched/sched.h"
 #include "sched/thread.h"
@@ -44,7 +45,7 @@ void mutex_release(mutex_t *mutex) {
     ASSERT(state == MUTEX_STATE_CONTESTED);
     ASSERT(mutex->wait_queue.count != 0);
 
-    thread_t *thread = LIST_CONTAINER_GET(list_pop(&mutex->wait_queue), thread_t, list_wait);
+    thread_t *thread = CONTAINER_OF(list_pop(&mutex->wait_queue), thread_t, list_wait);
     sched_thread_schedule(thread);
 
     if(mutex->wait_queue.count == 0) __atomic_store_n(&mutex->state, MUTEX_STATE_LOCKED, __ATOMIC_RELEASE);

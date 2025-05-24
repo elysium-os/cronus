@@ -5,8 +5,7 @@
 #include "arch/sched.h"
 #include "common/assert.h"
 #include "common/lock/spinlock.h"
-#include "common/log.h"
-#include "common/panic.h"
+#include "lib/container.h"
 #include "lib/list.h"
 #include "reaper.h"
 #include "sched/thread.h"
@@ -28,7 +27,7 @@ thread_t *sched_thread_next(sched_t *sched) {
         return nullptr;
     }
 
-    thread_t *thread = LIST_CONTAINER_GET(list_pop(&sched->thread_queue), thread_t, list_sched);
+    thread_t *thread = CONTAINER_OF(list_pop(&sched->thread_queue), thread_t, list_sched);
 
     spinlock_release(&sched->lock, previous_state);
     thread->state = THREAD_STATE_ACTIVE; // TODO: move this?

@@ -6,15 +6,6 @@
 #define LIST_INIT ((list_t) { .count = 0, .head = nullptr, .tail = nullptr })
 
 /**
- * @brief Get the structure/container that the element is embedded in.
- * @param ELEMENT embedded element
- * @param TYPE type of container
- * @param MEMBER name of the list embedded within the container
- * @returns pointer to container
- */
-#define LIST_CONTAINER_GET(ELEMENT, TYPE, MEMBER) ((TYPE *) ((uintptr_t) (ELEMENT) - __builtin_offsetof(TYPE, MEMBER)))
-
-/**
  * @brief Iterate over a list.
  * @param LIST `list_t` to iterate over
  * @param NODE `list_node_t *` iterator name

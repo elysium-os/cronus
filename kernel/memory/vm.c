@@ -122,7 +122,7 @@ static vm_region_t *region_alloc(bool global_lock_acquired) {
 
     list_node_t *node = list_pop(&g_region_cache);
     spinlock_release(&g_region_cache_lock, previous_state);
-    return LIST_CONTAINER_GET(node, vm_region_t, list_node);
+    return CONTAINER_OF(node, vm_region_t, list_node);
 }
 
 static void region_free(vm_region_t *region) {

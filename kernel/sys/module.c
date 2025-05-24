@@ -7,6 +7,7 @@
 #include "common/buffer.h"
 #include "common/log.h"
 #include "fs/vfs.h"
+#include "lib/container.h"
 #include "lib/list.h"
 #include "lib/math.h"
 #include "lib/param.h"
@@ -31,7 +32,7 @@ static void auto_free_module(module_t **auto_module) {
     if(module == nullptr) return;
 
     while(module->module_regions.count > 0) {
-        module_region_t *region = LIST_CONTAINER_GET(list_pop(&module->module_regions), module_region_t, list_node);
+        module_region_t *region = CONTAINER_OF(list_pop(&module->module_regions), module_region_t, list_node);
         vm_unmap(g_vm_global_address_space, region->base, region->size);
         heap_free(region, sizeof(module_region_t));
     }
