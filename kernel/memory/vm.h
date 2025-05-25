@@ -28,7 +28,8 @@ typedef enum {
 
 typedef enum {
     VM_CACHE_STANDARD,
-    VM_CACHE_WRITE_COMBINE
+    VM_CACHE_WRITE_COMBINE,
+    VM_CACHE_NONE
 } vm_cache_t;
 
 typedef enum {

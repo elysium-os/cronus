@@ -88,7 +88,8 @@ static uint64_t privilege_to_x86_flags(vm_privilege_t privilege) {
 static uint64_t cache_to_x86_flags(vm_cache_t cache) {
     switch(cache) {
         case VM_CACHE_STANDARD:      return PTE_PAT0;
-        case VM_CACHE_WRITE_COMBINE: return PTE_PAT4;
+        case VM_CACHE_WRITE_COMBINE: return PTE_PAT6;
+        case VM_CACHE_NONE:          return PTE_PAT3;
     }
     ASSERT_UNREACHABLE();
 }

@@ -41,6 +41,7 @@
 #include "arch/x86_64/cpu/gdt.h"
 #include "arch/x86_64/cpu/lapic.h"
 #include "arch/x86_64/cpu/msr.h"
+#include "arch/x86_64/cpu/pat.h"
 #include "arch/x86_64/dev/hpet.h"
 #include "arch/x86_64/dev/ioapic.h"
 #include "arch/x86_64/dev/pic8259.h"
@@ -117,10 +118,7 @@ static void thread_init() {
     x86_64_gdt_init();
 
     // Virtual Memory
-    uint64_t pat = x86_64_msr_read(X86_64_MSR_PAT);
-    pat &= ~(((uint64_t) 0b111 << 48) | ((uint64_t) 0b111 << 40));
-    pat |= ((uint64_t) 0x1 << 48) | ((uint64_t) 0x5 << 40);
-    x86_64_msr_write(X86_64_MSR_PAT, pat);
+    pat_init();
 
     uint64_t cr4 = x86_64_cr4_read();
     cr4 |= 1 << 7; /* CR4.PGE */
@@ -281,10 +279,7 @@ static void thread_init() {
     x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_PHYS_EARLY);
 
     // Initialize Virtual Memory
-    uint64_t pat = x86_64_msr_read(X86_64_MSR_PAT);
-    pat &= ~(((uint64_t) 0b111 << 48) | ((uint64_t) 0b111 << 40));
-    pat |= ((uint64_t) 0x1 << 48) | ((uint64_t) 0x5 << 40);
-    x86_64_msr_write(X86_64_MSR_PAT, pat);
+    pat_init();
 
     uint64_t cr4 = x86_64_cr4_read();
     cr4 |= 1 << 7; /* CR4.PGE */
