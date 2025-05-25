@@ -282,7 +282,7 @@ size_t vm_copy_to(vm_address_space_t *dest_as, uintptr_t dest_addr, void *src, s
             ASSERT(success);
         }
 
-        size_t len = math_min(count - i, ARCH_PAGE_GRANULARITY - offset);
+        size_t len = MATH_MIN(count - i, ARCH_PAGE_GRANULARITY - offset);
         memcpy((void *) HHDM(phys + offset), src, len);
         i += len;
         src += len;
@@ -302,7 +302,7 @@ size_t vm_copy_from(void *dest, vm_address_space_t *src_as, uintptr_t src_addr, 
             ASSERT(success);
         }
 
-        size_t len = math_min(count - i, ARCH_PAGE_GRANULARITY - offset);
+        size_t len = MATH_MIN(count - i, ARCH_PAGE_GRANULARITY - offset);
         memcpy(dest, (void *) HHDM(phys + offset), len);
         i += len;
         dest += len;

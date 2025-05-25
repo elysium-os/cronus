@@ -1,20 +1,41 @@
 #pragma once
 
 /// Divide and round up.
-#define MATH_DIV_CEIL(DIVIDEND, DIVISOR) (((DIVIDEND) + (DIVISOR) - 1) / (DIVISOR))
+#define MATH_DIV_CEIL(DIVIDEND, DIVISOR)      \
+    ({                                        \
+        auto divisor = (DIVISOR);             \
+        ((DIVIDEND) + divisor - 1) / divisor; \
+    })
 
 /// Round up.
-#define MATH_CEIL(VALUE, PRECISION) (MATH_DIV_CEIL((VALUE), (PRECISION)) * (PRECISION))
+#define MATH_CEIL(VALUE, PRECISION)                    \
+    ({                                                 \
+        auto precision = (PRECISION);                  \
+        MATH_DIV_CEIL((VALUE), precision) * precision; \
+    })
 
 /// Round down.
-#define MATH_FLOOR(VALUE, PRECISION) (((VALUE) / (PRECISION)) * (PRECISION))
+#define MATH_FLOOR(VALUE, PRECISION)       \
+    ({                                     \
+        auto precision = (PRECISION);      \
+        ((VALUE) / precision) * precision; \
+    })
 
 /// Find the minimum number.
-static inline int math_min(int a, int b) {
-    return a < b ? a : b;
-}
+#define MATH_MIN(A, B) \
+    ({                 \
+        auto a = (A);  \
+        auto b = (B);  \
+        a < b ? a : b; \
+    })
 
 /// Find the maximum number.
-static inline int math_max(int a, int b) {
-    return a > b ? a : b;
-}
+#define MATH_MAX(A, B) \
+    ({                 \
+        auto a = (A);  \
+        auto b = (B);  \
+        a > b ? a : b; \
+    })
+
+// Clamp value between min and max.
+#define MATH_CLAMP(VALUE, MIN, MAX) MATH_MAX(MATH_MIN((VALUE), (MAX)), (MIN))
