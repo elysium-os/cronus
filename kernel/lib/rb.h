@@ -32,19 +32,13 @@ typedef struct {
     rb_node_t *root;
 } rb_tree_t;
 
-/**
- * @brief Insert a node into red black tree.
- * @note Only member preserved is `value`.
- */
+/// Insert a node into red black tree.
+/// @note Only member preserved is `value`.
 void rb_insert(rb_tree_t *tree, rb_node_t *node);
 
-/**
- * @brief Remove a node from red black tree.
- */
+/// Remove a node from red black tree.
 void rb_remove(rb_tree_t *tree, rb_node_t *node);
 
-/**
- * @brief Binary search for a node.
- * @returns pointer to found node or `nullptr`
- */
+/// Binary search for a node.
+/// @returns pointer to found node or `nullptr`
 rb_node_t *rb_search(rb_tree_t *tree, rb_value_t search_value, rb_search_type_t search_type);

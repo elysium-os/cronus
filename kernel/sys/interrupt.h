@@ -10,18 +10,14 @@ typedef enum {
     INTERRUPT_PRIORITY_CRITICAL
 } interrupt_priority_t;
 
-/**
- * @brief Mask interrupts and return the previous state.
- */
+/// Mask interrupts and return the previous state.
 static inline interrupt_state_t interrupt_state_mask() {
     interrupt_state_t previous_state = arch_interrupt_state();
     arch_interrupt_disable();
     return previous_state;
 }
 
-/**
- * @brief Restore interrupt state.
- */
+/// Restore interrupt state.
 static inline void interrupt_state_restore(interrupt_state_t state) {
     interrupt_state_t current_state = arch_interrupt_state();
     if(current_state == state) return;

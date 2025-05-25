@@ -35,46 +35,30 @@ typedef struct {
 extern spinlock_t g_pci_devices_lock;
 extern list_t g_pci_devices;
 
-/**
- * @brief Enumerate PCI devices.
- * @param mcfg MCFG table or nullptr
- */
+/// Enumerate PCI devices.
+/// @param mcfg MCFG table or nullptr
 void pci_enumerate(acpi_sdt_header_t *mcfg);
 
-/**
- * @brief Read byte from device config.
- */
+/// Read byte from device config.
 uint8_t pci_config_read_byte(pci_device_t *device, uint8_t offset);
 
-/**
- * @brief Read word from device config.
- */
+/// Read word from device config.
 uint16_t pci_config_read_word(pci_device_t *device, uint8_t offset);
 
-/**
- * @brief Read doubleword from device config.
- */
+/// Read doubleword from device config.
 uint32_t pci_config_read_double(pci_device_t *device, uint8_t offset);
 
-/**
- * @brief Write byte to device config.
- */
+/// Write byte to device config.
 void pci_config_write_byte(pci_device_t *device, uint8_t offset, uint8_t data);
 
-/**
- * @brief Write word to device config.
- */
+/// Write word to device config.
 void pci_config_write_word(pci_device_t *device, uint8_t offset, uint16_t data);
 
-/**
- * @brief Write doubleword to device config.
- */
+/// Write doubleword to device config.
 void pci_config_write_double(pci_device_t *device, uint8_t offset, uint32_t data);
 
-/**
- * @brief Read BAR register from device config.
- * @warning Heap allocation on success.
- * @param index BAR index (0-5)
- * @return PCI bar on success, 0 on failure
- */
+/// Read BAR register from device config.
+/// @warning Heap allocation on success.
+/// @param index BAR index (0-5)
+/// @return PCI bar on success, 0 on failure
 pci_bar_t *pci_config_read_bar(pci_device_t *device, uint8_t index);

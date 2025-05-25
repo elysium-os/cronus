@@ -13,9 +13,7 @@
 #define X86_64_MSR_GS_BASE 0xC000'0101
 #define X86_64_MSR_KERNEL_GS_BASE 0xC000'0102
 
-/**
- * @brief Read from machine specific register.
- */
+/// Read from machine specific register.
 static inline uint64_t x86_64_msr_read(uint64_t msr) {
     uint32_t low;
     uint32_t high;
@@ -23,9 +21,7 @@ static inline uint64_t x86_64_msr_read(uint64_t msr) {
     return low + ((uint64_t) high << 32);
 }
 
-/**
- * @brief Write to machine specific register.
- */
+/// Write to machine specific register.
 static inline void x86_64_msr_write(uint64_t msr, uint64_t value) {
     asm volatile("wrmsr" : : "a"((uint32_t) value), "d"((uint32_t) (value >> 32)), "c"(msr));
 }

@@ -33,12 +33,8 @@ typedef struct {
     list_t module_regions;
 } module_t;
 
-/**
- * @brief Load a kernel module.
- */
+/// Load a kernel module.
 module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) module);
 
-/**
- * @brief Return the string version of a module result.
- */
+/// Return the string version of a module result.
 const char *module_result_stringify(module_result_t result);

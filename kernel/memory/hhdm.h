@@ -3,18 +3,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/**
- * @brief Convert a physical address to a virtual HHDM address.
- * @param ADDRESS physical address
- * @returns virtual address within the HHDM
- */
+/// Convert a physical address to a virtual HHDM address.
+/// @param ADDRESS physical address
+/// @returns virtual address within the HHDM
 #define HHDM(ADDRESS) ((uintptr_t) (ADDRESS) + g_hhdm_offset)
 
-/**
- * @brief Convert a virtual address within the HHDM to a physical address.
- * @param ADDRESS virtual address within the HHDM
- * @returns physical address
- */
+/// Convert a virtual address within the HHDM to a physical address.
+/// @param ADDRESS virtual address within the HHDM
+/// @returns physical address
 #define HHDM_TO_PHYS(ADDRESS) ((uintptr_t) (ADDRESS) - g_hhdm_offset)
 
 extern uintptr_t g_hhdm_offset;

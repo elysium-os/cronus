@@ -11,12 +11,8 @@
 #define X86_64_INIT_FLAG_SCHED (1 << 6)
 #define X86_64_INIT_FLAG_VFS (1 << 7)
 
-/**
- * @brief Check if given initialization flags are set.
- */
+/// Check if given initialization flags are set.
 bool x86_64_init_flag_check(size_t flags);
 
-/**
- * @brief Set an initialization flag.
- */
+/// Set an initialization flag.
 void x86_64_init_flag_set(size_t flags);

@@ -69,98 +69,64 @@ typedef struct {
 } vfs_node_attr_t;
 
 struct vfs_ops {
-    /**
-     * @brief Called on VFS mount.
-     */
+    /// Called on VFS mount.
     vfs_result_t (*mount)(vfs_t *vfs);
 
-    /**
-     * @brief Retrieves root node from the VFS.
-     */
+    /// Retrieves root node from the VFS.
     vfs_result_t (*root_node)(vfs_t *vfs, PARAM_OUT(vfs_node_t **) root_node);
 };
 
 struct vfs_node_ops {
-    /**
-     * @brief Read/write a file.
-     * @param rw_count bytes read/written
-     */
+    /// Read/write a file.
+    /// @param rw_count bytes read/written
     vfs_result_t (*rw)(vfs_node_t *node, vfs_rw_t *rw, PARAM_OUT(size_t *) rw_count);
 
-    /**
-     * @brief Retrieve node attributes.
-     * @param attr attributes struct to populate
-     */
+    /// Retrieve node attributes.
+    /// @param attr attributes struct to populate
     vfs_result_t (*attr)(vfs_node_t *node, vfs_node_attr_t *attr);
 
-    /**
-     * @brief Retrieve node name.
-     * @warn The string is only safe for as long as the refcount is kept.
-     */
+    /// Retrieve node name.
+    /// @warn The string is only safe for as long as the refcount is kept.
     const char *(*name)(vfs_node_t *node);
 
-    /**
-     * @brief Look up a node by name.
-     * @param found_node set to looked up node, nullptr on parent lookup of fs root
-     */
+    /// Look up a node by name.
+    /// @param found_node set to looked up node, nullptr on parent lookup of fs root
     vfs_result_t (*lookup)(vfs_node_t *node, char *name, PARAM_OUT(vfs_node_t **) found_node);
 
-    /**
-     * @brief Read the next entry in a directory.
-     * @note Offset is incremented to the next entry. If dirent_name is nullptr, it is the last entry.
-     */
+    /// Read the next entry in a directory.
+    /// @note Offset is incremented to the next entry. If dirent_name is nullptr, it is the last entry.
     vfs_result_t (*readdir)(vfs_node_t *node, PARAM_INOUT(size_t *) offset, PARAM_OUT(const char **) dirent_name);
 
-    /**
-     * @brief Create a new directory in a directory.
-     */
+    /// Create a new directory in a directory.
     vfs_result_t (*mkdir)(vfs_node_t *node, const char *name, PARAM_OUT(vfs_node_t **) new_node);
 
-    /**
-     * @brief Create a new file in a directory.
-     */
+    /// Create a new file in a directory.
     vfs_result_t (*mkfile)(vfs_node_t *node, const char *name, PARAM_OUT(vfs_node_t **) new_node);
 
-    /**
-     * @brief Truncate a file.
-     */
+    /// Truncate a file.
     vfs_result_t (*truncate)(vfs_node_t *node, size_t length);
 };
 
 extern list_t g_vfs_all;
 
-/**
- * @brief Mount a VFS at path.
- */
+/// Mount a VFS at path.
 vfs_result_t vfs_mount(vfs_ops_t *vfs_ops, const char *path, void *private_data);
 
-/**
- * @brief Gets the root node of the entire VFS.
- */
+/// Gets the root node of the entire VFS.
 vfs_result_t vfs_root(PARAM_OUT(vfs_node_t **) root_node);
 
-/**
- * @brief Extended lookup a node at path.
- */
+/// Extended lookup a node at path.
 vfs_result_t vfs_lookup_ext(vfs_path_t *path, vfs_lookup_create_t create_mode, bool exclusive, PARAM_OUT(vfs_node_t **) found_node);
 
-/**
- * @brief Lookup node at path.
- */
+/// Lookup node at path.
 vfs_result_t vfs_lookup(vfs_path_t *path, PARAM_OUT(vfs_node_t **) found_node);
 
-/**
- * @brief Read/write file at path.
- * @param rw_count bytes read/written
- */
+/// Read/write file at path.
+/// @param rw_count bytes read/written
 vfs_result_t vfs_rw(vfs_path_t *path, vfs_rw_t *rw, PARAM_OUT(size_t *) rw_count);
 
-/**
- * @brief Create directory at path.
- */
+/// Create directory at path.
 vfs_result_t vfs_mkdir(vfs_path_t *path, const char *name, PARAM_OUT(vfs_node_t **) new_node);
 
-/**
- * @brief Create file at path.
- */
+/// Create file at path.
 vfs_result_t vfs_mkfile(vfs_path_t *path, const char *name, PARAM_OUT(vfs_node_t **) new_node);

@@ -4,7 +4,5 @@
 
 extern log_sink_t g_x86_64_qemu_debug_sink;
 
-/**
- * @brief Print a character to qemu debug.
- */
+/// Print a character to qemu debug.
 void x86_64_qemu_debug_putc(char ch);

@@ -80,17 +80,13 @@ typedef struct {
     uint32_t bit;
 } x86_64_cpuid_feature_t;
 
-/**
- * @brief Test for a feature exposed in CPUID.
- * @param feature feature in CPUID
- * @retval true = supported
- * @retval false = unsupported
- */
+/// Test for a feature exposed in CPUID.
+/// @param feature feature in CPUID
+/// @retval true = supported
+/// @retval false = unsupported
 bool x86_64_cpuid_feature(x86_64_cpuid_feature_t feature);
 
-/**
- * @brief Retrieve the value from a specific register exposed by CPUID.
- * @param out value returned by CPUID
- * @returns false = success
- */
+/// Retrieve the value from a specific register exposed by CPUID.
+/// @param out value returned by CPUID
+/// @returns false = success
 bool x86_64_cpuid_register(uint32_t leaf, x86_64_cpuid_register_t reg, uint32_t *out);

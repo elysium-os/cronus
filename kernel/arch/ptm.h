@@ -5,29 +5,19 @@
 
 #include <stdint.h>
 
-/**
- * @brief Create a new address space.
- * @warning Depends on heap.
- */
+/// Create a new address space.
+/// @warning Depends on heap.
 vm_address_space_t *arch_ptm_address_space_create();
 
-/**
- * @brief Load a virtual address space.
- */
+/// Load a virtual address space.
 void arch_ptm_load_address_space(vm_address_space_t *address_space);
 
-/**
- * @brief Map a virtual address to a physical address.
- */
+/// Map a virtual address to a physical address.
 void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t paddr, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global);
 
-/**
- * @brief Unmap a virtual address from address space.
- */
+/// Unmap a virtual address from address space.
 void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr);
 
-/**
- * @brief Translate a virtual address to a physical address.
- * @returns true on success
- */
+/// Translate a virtual address to a physical address.
+/// @returns true on success
 bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, PARAM_OUT(uintptr_t *) paddr);

@@ -12,9 +12,7 @@ typedef enum {
     RB_DIRECTION_RIGHT,
 } rb_direction_t;
 
-/**
- * @brief Replace u with the subtree at v.
- */
+/// Replace u with the subtree at v.
 static void transplant(rb_tree_t *tree, rb_node_t *u, rb_node_t *v) {
     if(u->parent == nullptr) {
         ASSERT(tree->root == u);

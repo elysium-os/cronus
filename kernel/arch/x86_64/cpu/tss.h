@@ -22,12 +22,8 @@ typedef struct [[gnu::packed]] {
     uint16_t iomap_base;
 } x86_64_tss_t;
 
-/**
- * @brief Set the CPL0 stack pointer.
- */
+/// Set the CPL0 stack pointer.
 void x86_64_tss_set_rsp0(x86_64_tss_t *tss, uintptr_t stack_pointer);
 
-/**
- * @brief Set ist[n] stack pointer.
- */
+/// Set ist[n] stack pointer.
 void x86_64_tss_set_ist(x86_64_tss_t *tss, int index, uintptr_t stack_pointer);

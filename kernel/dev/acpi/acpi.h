@@ -77,24 +77,16 @@ typedef struct [[gnu::packed]] {
     acpi_generic_address_structure_t x_gpe1_block;
 } acpi_fadt_t;
 
-/**
- * @brief Initialize ACPI.
- * @param rsdp root system description pointer
- */
+/// Initialize ACPI.
+/// @param rsdp root system description pointer
 void acpi_init(uintptr_t rsdp);
 
-/**
- * @brief Find ACPI table.
- */
+/// Find ACPI table.
 acpi_sdt_header_t *acpi_find_table(uint8_t *signature);
 
-/**
- * @brief Get ACPI revision.
- */
+/// Get ACPI revision.
 uint8_t acpi_revision();
 
-/**
- * @brief Get ACPI rsdp.
- * @returns physical rsdp address OR zero
- */
+/// Get ACPI rsdp.
+/// @returns physical rsdp address OR zero
 uintptr_t acpi_rsdp();

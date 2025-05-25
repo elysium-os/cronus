@@ -17,12 +17,8 @@ typedef struct {
     list_t wait_queue;
 } mutex_t;
 
-/**
- * @brief Acquire mutex. First spins some cycles and then blocks.
- */
+/// Acquire mutex. First spins some cycles and then blocks.
 void mutex_acquire(mutex_t *mutex);
 
-/**
- * @brief Release mutex.
- */
+/// Release mutex.
 void mutex_release(mutex_t *mutex);

@@ -45,23 +45,15 @@ typedef struct {
     void *freelist;
 } slab_t;
 
-/**
- * @brief Initialize slab allocator.
- */
+/// Initialize slab allocator.
 void slab_init();
 
-/**
- * @brief Create slab cache.
- * @param order the block order of each slab in the cache
- */
+/// Create slab cache.
+/// @param order the block order of each slab in the cache
 slab_cache_t *slab_cache_create(const char *name, size_t object_size, pmm_order_t order);
 
-/**
- * @brief Allocate an object from a cache.
- */
+/// Allocate an object from a cache.
 void *slab_allocate(slab_cache_t *cache);
 
-/**
- * @brief Free a previously allocated object to its cache.
- */
+/// Free a previously allocated object to its cache.
 void slab_free(slab_cache_t *cache, void *obj);

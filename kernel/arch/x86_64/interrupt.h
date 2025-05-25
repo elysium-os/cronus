@@ -16,29 +16,19 @@ typedef void (*x86_64_interrupt_irq_eoi_t)(uint8_t);
 
 extern x86_64_interrupt_irq_eoi_t g_x86_64_interrupt_irq_eoi;
 
-/**
- * @brief Initialize IDT and interrupt management.
- */
+/// Initialize IDT and interrupt management.
 void x86_64_interrupt_init();
 
-/**
- * @brief Set an IST for a given interrupt vector.
- */
+/// Set an IST for a given interrupt vector.
 void x86_64_interrupt_set_ist(uint8_t vector, uint8_t ist);
 
-/**
- * @brief Load the IDT.
- */
+/// Load the IDT.
 void x86_64_interrupt_load_idt();
 
-/**
- * @brief Set a handler onto an interrupt vector.
- * @warning Will carelessly override existing handlers.
- */
+/// Set a handler onto an interrupt vector.
+/// @warning Will carelessly override existing handlers.
 void x86_64_interrupt_set(uint8_t vector, x86_64_interrupt_handler_t handler);
 
-/**
- * @brief Request a free interrupt vector.
- * @return chosen interrupt vector, -1 on error
- */
+/// Request a free interrupt vector.
+/// @return chosen interrupt vector, -1 on error
 int x86_64_interrupt_request(interrupt_priority_t priority, x86_64_interrupt_handler_t handler);

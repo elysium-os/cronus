@@ -75,40 +75,28 @@ typedef struct {
 
 extern vm_address_space_t *g_vm_global_address_space;
 
-/**
- * @brief Map a region of anonymous memory.
- * @param hint page aligned address
- * @param length page aligned length
- */
+/// Map a region of anonymous memory.
+/// @param hint page aligned address
+/// @param length page aligned length
 void *vm_map_anon(vm_address_space_t *address_space, void *hint, size_t length, vm_protection_t prot, vm_cache_t cache, vm_flags_t flags);
 
-/**
- * @brief Map a region of direct memory.
- * @param hint page aligned address
- * @param length page aligned length
- */
+/// Map a region of direct memory.
+/// @param hint page aligned address
+/// @param length page aligned length
 void *vm_map_direct(vm_address_space_t *address_space, void *hint, size_t length, vm_protection_t prot, vm_cache_t cache, uintptr_t physical_address, vm_flags_t flags);
 
-/**
- * @brief Unmap a region of memory.
- * @param address page aligned address
- * @param length page aligned length
- */
+/// Unmap a region of memory.
+/// @param address page aligned address
+/// @param length page aligned length
 void vm_unmap(vm_address_space_t *address_space, void *address, size_t length);
 
-/**
- * @brief Handle a virtual memory fault
- * @param fault cause of the fault
- * @returns is fault handled
- */
+/// Handle a virtual memory fault
+/// @param fault cause of the fault
+/// @returns is fault handled
 bool vm_fault(uintptr_t address, vm_fault_t fault);
 
-/**
- * @brief Copy data to another address space.
- */
+/// Copy data to another address space.
 size_t vm_copy_to(vm_address_space_t *dest_as, uintptr_t dest_addr, void *src, size_t count);
 
-/**
- * @brief Copy data from another address space.
- */
+/// Copy data from another address space.
 size_t vm_copy_from(void *dest, vm_address_space_t *src_as, uintptr_t src_addr, size_t count);

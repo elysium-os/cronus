@@ -11,22 +11,14 @@ typedef struct sched {
     struct thread *idle_thread;
 } sched_t;
 
-/**
- * @brief Schedule a thread.
- */
+/// Schedule a thread.
 void sched_thread_schedule(struct thread *thread);
 
-/**
- * @brief Retrieve the next thread off of scheduler.
- */
+/// Retrieve the next thread off of scheduler.
 struct thread *sched_thread_next(sched_t *sched);
 
-/**
- * @brief Yield.
- */
+/// Yield.
 void sched_yield(enum thread_state yield_state);
 
-/**
- * @brief Called when a thread is dropped by a CPU.
- */
+/// Called when a thread is dropped by a CPU.
 void internal_sched_thread_drop(struct thread *thread);

@@ -25,9 +25,7 @@ static list_t g_region_cache = LIST_INIT;
 
 static_assert(ARCH_PAGE_GRANULARITY > (sizeof(vm_region_t) * 2));
 
-/**
- * @brief Find last region within a segment.
- */
+/// Find last region within a segment.
 static vm_region_t *find_region(vm_address_space_t *address_space, uintptr_t address, size_t length) {
     rb_node_t *node = rb_search(&address_space->regions, address + length, RB_SEARCH_TYPE_NEAREST_LT);
     if(node == nullptr) return nullptr;
@@ -38,11 +36,9 @@ static vm_region_t *find_region(vm_address_space_t *address_space, uintptr_t add
     return nullptr;
 }
 
-/**
- * @brief Find a hole (free space) in an address space.
- * @warning Assumes address space lock is acquired.
- * @returns true = hole found, false = not found
- */
+/// Find a hole (free space) in an address space.
+/// @warning Assumes address space lock is acquired.
+/// @returns true = hole found, false = not found
 static bool find_hole(vm_address_space_t *address_space, uintptr_t address, size_t length, PARAM_OUT(uintptr_t *) hole) {
     if(SEGMENT_IN_BOUNDS(address, length, address_space->start, address_space->end) && find_region(address_space, address, length) == nullptr) {
         *hole = address;
