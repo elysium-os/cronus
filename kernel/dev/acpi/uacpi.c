@@ -75,7 +75,7 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address, uacpi_handl
     return UACPI_STATUS_OK;
 }
 
-void uacpi_kernel_pci_device_close([[maybe_unused]] uacpi_handle handle) { /* no-op*/ }
+void uacpi_kernel_pci_device_close([[maybe_unused]] uacpi_handle handle) { /* no-op */ }
 
 uacpi_status uacpi_kernel_pci_read8(uacpi_handle handle, uacpi_size offset, uacpi_u8 *out_value) {
     pci_device_t *device = (pci_device_t *) handle;

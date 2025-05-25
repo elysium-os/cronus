@@ -1,7 +1,8 @@
 #include "pci.h"
 
+#include "arch/mmio.h"
 #include "common/assert.h"
-#include "common/panic.h"
+#include "common/log.h"
 #include "lib/list.h"
 #include "memory/heap.h"
 #include "memory/hhdm.h"
@@ -129,9 +130,9 @@ static uint32_t pcie_read(pci_device_t *device, uint8_t offset, uint8_t size) {
     volatile void *address = (void *) HHDM(g_segments[device->segment].base_address) + register_offset;
 
     switch(size) {
-        case 4: return *(volatile uint32_t *) address;
-        case 2: return *(volatile uint16_t *) address;
-        case 1: return *(volatile uint8_t *) address;
+        case 4: return mmio_read32(address);
+        case 2: return mmio_read16(address);
+        case 1: return mmio_read8(address);
     }
     ASSERT_UNREACHABLE_COMMENT("invalid pcie read size");
 }
@@ -144,9 +145,9 @@ static void pcie_write(pci_device_t *device, uint8_t offset, uint8_t size, uint3
     volatile void *address = (void *) (HHDM(g_segments[device->segment].base_address) + register_offset);
 
     switch(size) {
-        case 4: *(volatile uint32_t *) address = (uint32_t) value; return;
-        case 2: *(volatile uint16_t *) address = (uint16_t) value; return;
-        case 1: *(volatile uint8_t *) address = (uint8_t) value; return;
+        case 4: mmio_write32(address, value); return;
+        case 2: mmio_write16(address, value); return;
+        case 1: mmio_write8(address, value); return;
     }
     ASSERT_UNREACHABLE_COMMENT("invalid pcie write size");
 }
@@ -207,7 +208,9 @@ static void check_function(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t 
 
     uint8_t class = readb(device, offsetof(pci_device_header_t, class));
     uint8_t sub_class = readb(device, offsetof(pci_device_header_t, sub_class));
-    // uint8_t prog_if = readb(device, offsetof(pci_device_header_t, program_interface));
+    uint8_t prog_if = readb(device, offsetof(pci_device_header_t, program_interface));
+
+    log(LOG_LEVEL_INFO, "PCI", "Enumerated PCI Device { VendorID: %#x, Class: %#x, SubClass: %#x, ProgIf: %#x }", vendor_id, class, sub_class, prog_if);
 
     if(class == 0x6 && sub_class == 0x4) {
         check_bus(segment, (uint8_t) (readb(device, offsetof(pci_header1_t, secondary_bus)) >> 8));
@@ -267,7 +270,7 @@ void pci_config_write_double(pci_device_t *device, uint8_t offset, uint32_t data
 }
 
 pci_bar_t *pci_config_read_bar(pci_device_t *device, uint8_t index) {
-    if(index > 5) return 0;
+    if(index > 5) return nullptr;
 
     pci_bar_t *new_bar = heap_alloc(sizeof(pci_bar_t));
     uint8_t offset = sizeof(pci_device_header_t) + index * sizeof(uint32_t);
@@ -290,7 +293,7 @@ pci_bar_t *pci_config_read_bar(pci_device_t *device, uint8_t index) {
         switch(type) {
             case 0:  break;
             case 2:  new_bar->address |= (uint64_t) pci_config_read_double(device, offset + sizeof(uint32_t)) << 32; break;
-            default: heap_free(new_bar, sizeof(pci_bar_t)); return 0;
+            default: heap_free(new_bar, sizeof(pci_bar_t)); return nullptr;
         }
     }
     return new_bar;
@@ -298,12 +301,14 @@ pci_bar_t *pci_config_read_bar(pci_device_t *device, uint8_t index) {
 
 void pci_enumerate(acpi_sdt_header_t *mcfg) {
     if(mcfg) {
+        log(LOG_LEVEL_INFO, "PCI", "Enumerating PCI-e Devices");
         g_segments = (pcie_segment_entry_t *) ((uintptr_t) mcfg + sizeof(acpi_sdt_header_t) + 8);
         g_read = &pcie_read;
         g_write = &pcie_write;
         unsigned int entry_count = (mcfg->length - (sizeof(acpi_sdt_header_t) + 8)) / sizeof(pcie_segment_entry_t);
         for(unsigned int i = 0; i < entry_count; i++) check_segment(i); // FIX: fix on real hw
     } else {
+        log(LOG_LEVEL_INFO, "PCI", "Enumerating PCI Devices");
 #ifdef __ARCH_X86_64
         g_read = &pci_read;
         g_write = &pci_write;

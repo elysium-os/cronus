@@ -1,6 +1,7 @@
 #include "ioapic.h"
 
-#include <memory/hhdm.h>
+#include "arch/mmio.h"
+#include "memory/hhdm.h"
 
 #define VER 0x1
 #define VER_MAX_REDIRECTION_ENTRY(val) (((val) >> 16) & 0xFF)
@@ -103,13 +104,13 @@ static legacy_irq_translation_t g_legacy_irq_map[16] = {
 static volatile uint32_t *g_ioapic;
 
 static void ioapic_write(uint32_t index, uint32_t data) {
-    g_ioapic[0] = index & 0xFF;
-    g_ioapic[4] = data;
+    mmio_write32(g_ioapic, index & 0xFF);
+    mmio_write32(&g_ioapic[4], data);
 }
 
 static uint32_t ioapic_read(uint32_t index) {
-    g_ioapic[0] = index & 0xFF;
-    return g_ioapic[4];
+    mmio_write32(g_ioapic, index & 0xFF);
+    return mmio_read32(&g_ioapic[4]);
 }
 
 void x86_64_ioapic_init(acpi_sdt_header_t *apic_header) {

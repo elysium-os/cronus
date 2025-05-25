@@ -1,5 +1,6 @@
 #include "lapic.h"
 
+#include "arch/mmio.h"
 #include "memory/hhdm.h"
 #include "sys/time.h"
 
@@ -20,11 +21,11 @@
 #define REG_TIMER_CURRENT_COUNT 0x390
 
 static inline void lapic_write(uint32_t reg, uint32_t data) {
-    *(volatile uint32_t *) HHDM((x86_64_msr_read(X86_64_MSR_APIC_BASE) & BASE_MASK) + reg) = data;
+    mmio_write32((void *) HHDM((x86_64_msr_read(X86_64_MSR_APIC_BASE) & BASE_MASK) + reg), data);
 }
 
 static inline uint32_t lapic_read(uint32_t reg) {
-    return *(volatile uint32_t *) HHDM((x86_64_msr_read(X86_64_MSR_APIC_BASE) & BASE_MASK) + reg);
+    return mmio_read32((void *) HHDM((x86_64_msr_read(X86_64_MSR_APIC_BASE) & BASE_MASK) + reg));
 }
 
 void x86_64_lapic_initialize() {
