@@ -63,12 +63,10 @@ extern void x86_64_sched_userspace_init();
 static long g_next_tid = BOOTSTRAP_TID + 1;
 static int g_sched_vector = 0;
 
-/**
-    @warning The prev parameter relies on the fact
-    that sched_context_switch takes a thread "this" which
-    will stay in RDI throughout the asm routine and will still
-    be present upon entry here
-*/
+/// @warning The prev parameter relies on the fact
+/// that sched_context_switch takes a thread "this" which
+/// will stay in RDI throughout the asm routine and will still
+/// be present upon entry here.
 [[gnu::no_instrument_function]] static void common_thread_init(x86_64_thread_t *prev) {
     log(LOG_LEVEL_DEBUG, "SCHED", "common thread init for %lu", arch_sched_thread_current()->id);
     internal_sched_thread_drop(&prev->common);

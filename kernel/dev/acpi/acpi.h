@@ -78,7 +78,7 @@ typedef struct [[gnu::packed]] {
 } acpi_fadt_t;
 
 /// Initialize ACPI.
-/// @param rsdp root system description pointer
+/// @param rsdp Root system description pointer
 void acpi_init(uintptr_t rsdp);
 
 /// Find ACPI table.
@@ -88,5 +88,5 @@ acpi_sdt_header_t *acpi_find_table(uint8_t *signature);
 uint8_t acpi_revision();
 
 /// Get ACPI rsdp.
-/// @returns physical rsdp address OR zero
+/// @returns Physical rsdp address OR zero
 uintptr_t acpi_rsdp();

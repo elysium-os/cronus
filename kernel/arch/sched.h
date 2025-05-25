@@ -3,8 +3,8 @@
 #include "sched/thread.h"
 
 /// Create a new userspace thread.
-/// @param ip userspace entry point
-/// @param sp userspace stack pointer
+/// @param ip Userspace entry point
+/// @param sp Userspace stack pointer
 thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t sp);
 
 /// Create a new kernel thread.

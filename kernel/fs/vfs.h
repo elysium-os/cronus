@@ -78,11 +78,11 @@ struct vfs_ops {
 
 struct vfs_node_ops {
     /// Read/write a file.
-    /// @param rw_count bytes read/written
+    /// @param rw_count Bytes read/written
     vfs_result_t (*rw)(vfs_node_t *node, vfs_rw_t *rw, PARAM_OUT(size_t *) rw_count);
 
     /// Retrieve node attributes.
-    /// @param attr attributes struct to populate
+    /// @param attr Attributes struct to populate
     vfs_result_t (*attr)(vfs_node_t *node, vfs_node_attr_t *attr);
 
     /// Retrieve node name.
@@ -90,7 +90,7 @@ struct vfs_node_ops {
     const char *(*name)(vfs_node_t *node);
 
     /// Look up a node by name.
-    /// @param found_node set to looked up node, nullptr on parent lookup of fs root
+    /// @param found_node Set to looked up node, nullptr on parent lookup of fs root
     vfs_result_t (*lookup)(vfs_node_t *node, char *name, PARAM_OUT(vfs_node_t **) found_node);
 
     /// Read the next entry in a directory.
@@ -122,7 +122,7 @@ vfs_result_t vfs_lookup_ext(vfs_path_t *path, vfs_lookup_create_t create_mode, b
 vfs_result_t vfs_lookup(vfs_path_t *path, PARAM_OUT(vfs_node_t **) found_node);
 
 /// Read/write file at path.
-/// @param rw_count bytes read/written
+/// @param rw_count Bytes read/written
 vfs_result_t vfs_rw(vfs_path_t *path, vfs_rw_t *rw, PARAM_OUT(size_t *) rw_count);
 
 /// Create directory at path.

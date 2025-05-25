@@ -17,6 +17,6 @@ void draw_pixel(framebuffer_t *fb, unsigned int x, unsigned int y, draw_color_t 
 void draw_char(framebuffer_t *fb, unsigned int x, unsigned int y, char c, font_t *font, draw_color_t color);
 
 /// Draw a rectangle to a context.
-/// @param w rectangle width
-/// @param h rectangle height
+/// @param w Rectangle width
+/// @param h Rectangle height
 void draw_rect(framebuffer_t *fb, unsigned int x, unsigned int y, uint16_t w, uint16_t h, draw_color_t color);

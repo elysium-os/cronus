@@ -19,8 +19,8 @@ typedef struct {
 } x86_64_debug_prof_call_frame_t;
 
 /// Log a stack trace starting at the provided stack frame.
-/// @param level log level to print stack trace at
-/// @param tag tag to print stack trace under
+/// @param level Log level to print stack trace at
+/// @param tag Tag to print stack trace under
 void x86_64_debug_stack_trace_from(log_level_t level, const char *tag, x86_64_debug_stack_frame_t *stack_frame);
 
 #ifdef __ENV_DEVELOPMENT

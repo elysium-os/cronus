@@ -76,23 +76,23 @@ typedef struct {
 extern vm_address_space_t *g_vm_global_address_space;
 
 /// Map a region of anonymous memory.
-/// @param hint page aligned address
-/// @param length page aligned length
+/// @param hint Page aligned address
+/// @param length Page aligned length
 void *vm_map_anon(vm_address_space_t *address_space, void *hint, size_t length, vm_protection_t prot, vm_cache_t cache, vm_flags_t flags);
 
 /// Map a region of direct memory.
-/// @param hint page aligned address
-/// @param length page aligned length
+/// @param hint Page aligned address
+/// @param length Page aligned length
 void *vm_map_direct(vm_address_space_t *address_space, void *hint, size_t length, vm_protection_t prot, vm_cache_t cache, uintptr_t physical_address, vm_flags_t flags);
 
 /// Unmap a region of memory.
-/// @param address page aligned address
-/// @param length page aligned length
+/// @param address Page aligned address
+/// @param length Page aligned length
 void vm_unmap(vm_address_space_t *address_space, void *address, size_t length);
 
 /// Handle a virtual memory fault
-/// @param fault cause of the fault
-/// @returns is fault handled
+/// @param fault Cause of the fault
+/// @returns Is fault handled
 bool vm_fault(uintptr_t address, vm_fault_t fault);
 
 /// Copy data to another address space.
