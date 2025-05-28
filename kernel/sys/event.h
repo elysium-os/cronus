@@ -13,9 +13,8 @@ typedef struct {
     void *data;
 } event_t;
 
-// Initialize event interrupts.
-// @returns Vector to setup for event timer.
-int event_init();
+/// Process outstanding events and rearm.
+void events_process();
 
 /// Create an event queue, used to initialize CPU local.
 rb_tree_t event_queue_make();

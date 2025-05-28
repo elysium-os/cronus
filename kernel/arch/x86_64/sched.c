@@ -24,10 +24,8 @@
 
 #include "arch/x86_64/cpu/cpu.h"
 #include "arch/x86_64/cpu/fpu.h"
-#include "arch/x86_64/cpu/lapic.h"
 #include "arch/x86_64/cpu/msr.h"
 #include "arch/x86_64/init.h"
-#include "arch/x86_64/interrupt.h"
 #include "arch/x86_64/thread.h"
 
 #include <stddef.h>
@@ -72,6 +70,7 @@ static long g_next_tid = BOOTSTRAP_TID + 1;
     internal_sched_thread_drop(&prev->common);
     arch_interrupt_enable();
     arch_sched_preempt();
+    events_process();
 }
 
 [[gnu::no_instrument_function]] static void kernel_thread_exit() {

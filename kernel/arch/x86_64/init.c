@@ -461,7 +461,8 @@ static time_frequency_t calibrate_tsc() {
     log(LOG_LEVEL_DEBUG, "INIT", "BSP TSC calibrated, freq: %lu", tsc_timer_freq);
 
     // Initialize event system
-    g_event_interrupt_vector = event_init();
+    g_event_interrupt_vector = arch_interrupt_request(INTERRUPT_PRIORITY_EVENT, events_process);
+    if(g_event_interrupt_vector < 0) panic("INIT", "Failed to acquire interrupt vector for event handler");
 
     // SMP init
     g_x86_64_cpus = heap_alloc(sizeof(x86_64_cpu_t) * boot_info->cpu_count);
