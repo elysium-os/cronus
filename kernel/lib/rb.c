@@ -98,10 +98,11 @@ void rb_insert(rb_tree_t *tree, rb_node_t *node) {
         node->parent = current;
 
         rb_value_t current_value = tree->value(current);
-
-        ASSERT(current_value != node_value);
-        if(node_value > current_value) direction = RB_DIRECTION_RIGHT;
-        if(node_value < current_value) direction = RB_DIRECTION_LEFT;
+        if(node_value < current_value) {
+            direction = RB_DIRECTION_LEFT;
+        } else {
+            direction = RB_DIRECTION_RIGHT;
+        }
 
         current = current->children[direction];
     }
