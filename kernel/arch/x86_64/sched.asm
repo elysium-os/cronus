@@ -13,8 +13,8 @@ x86_64_sched_context_switch:
     mov rsp, qword [rsi + THREAD_RSP_OFFSET]
 
     xor r12, r12
-    mov r12, ds
-    mov r12, es
+    mov ds, r12
+    mov es, r12
 
     pop r12
     pop r13
