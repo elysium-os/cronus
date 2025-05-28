@@ -8,6 +8,12 @@
 #define FLAGS_TRAP 0x8F
 #define IDT_SIZE 256
 
+typedef enum {
+    HANDLER_TYPE_NONE,
+    HANDLER_TYPE_X86_64,
+    HANDLER_TYPE_ARCH,
+} handler_type_t;
+
 typedef struct [[gnu::packed]] {
     uint16_t low_offset;
     uint16_t segment_selector;
@@ -19,11 +25,14 @@ typedef struct [[gnu::packed]] {
 } idt_entry_t;
 
 typedef struct {
-    bool free;
-    x86_64_interrupt_handler_t handler;
+    handler_type_t type;
+    union {
+        x86_64_interrupt_handler_t x86_64_handler;
+        arch_interrupt_handler_t arch_handler;
+    };
 } interrupt_entry_t;
 
-static uint64_t g_priority_map[] = { [INTERRUPT_PRIORITY_LOW] = 0x2, [INTERRUPT_PRIORITY_NORMAL] = 0x5, [INTERRUPT_PRIORITY_CRITICAL] = 0xF };
+static uint64_t g_priority_map[] = { [INTERRUPT_PRIORITY_LOW] = 0x2, [INTERRUPT_PRIORITY_NORMAL] = 0x5, [INTERRUPT_PRIORITY_EVENT] = 0x7, [INTERRUPT_PRIORITY_CRITICAL] = 0xF };
 
 extern uint64_t g_x86_64_isr_stubs[IDT_SIZE];
 
@@ -31,6 +40,15 @@ static idt_entry_t g_idt[IDT_SIZE];
 static interrupt_entry_t g_entries[IDT_SIZE];
 
 x86_64_interrupt_irq_eoi_t g_x86_64_interrupt_irq_eoi;
+
+static int find_vector(interrupt_priority_t priority) {
+    int offset = g_priority_map[priority] << 4;
+    for(int i = offset; i < IDT_SIZE && i < offset + 16; i++) {
+        if(g_entries[i].type != HANDLER_TYPE_NONE) continue;
+        return i;
+    }
+    return -1;
+}
 
 bool arch_interrupt_state() {
     uint64_t rflags;
@@ -47,7 +65,11 @@ void arch_interrupt_disable() {
 }
 
 void x86_64_interrupt_handler(x86_64_interrupt_frame_t *frame) {
-    if(!g_entries[frame->int_no].free) g_entries[frame->int_no].handler(frame);
+    switch(g_entries[frame->int_no].type) {
+        case HANDLER_TYPE_X86_64: g_entries[frame->int_no].x86_64_handler(frame); break;
+        case HANDLER_TYPE_ARCH:   g_entries[frame->int_no].arch_handler(); break;
+        case HANDLER_TYPE_NONE:   break;
+    }
     if(frame->int_no >= 32) g_x86_64_interrupt_irq_eoi(frame->int_no);
 }
 
@@ -61,7 +83,7 @@ void x86_64_interrupt_init() {
         g_idt[i].ist = 0;
         g_idt[i].rsv0 = 0;
 
-        g_entries[i].free = true;
+        g_entries[i].type = HANDLER_TYPE_NONE;
     }
 }
 
@@ -78,16 +100,21 @@ void x86_64_interrupt_load_idt() {
 }
 
 void x86_64_interrupt_set(uint8_t vector, x86_64_interrupt_handler_t handler) {
-    g_entries[vector].free = false;
-    g_entries[vector].handler = handler;
+    g_entries[vector].type = HANDLER_TYPE_X86_64;
+    g_entries[vector].x86_64_handler = handler;
 }
 
 int x86_64_interrupt_request(interrupt_priority_t priority, x86_64_interrupt_handler_t handler) {
-    int offset = g_priority_map[priority] << 4;
-    for(int i = offset; i < IDT_SIZE && i < offset + 16; i++) {
-        if(!g_entries[i].free) continue;
-        x86_64_interrupt_set(i, handler);
-        return i;
+    int vector = find_vector(priority);
+    if(vector >= 0) x86_64_interrupt_set(vector, handler);
+    return vector;
+}
+
+int arch_interrupt_request(enum interrupt_priority priority, arch_interrupt_handler_t handler) {
+    int vector = find_vector(priority);
+    if(vector >= 0) {
+        g_entries[vector].type = HANDLER_TYPE_ARCH;
+        g_entries[vector].arch_handler = handler;
     }
-    return -1;
+    return vector;
 }

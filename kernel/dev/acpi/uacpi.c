@@ -1,5 +1,6 @@
 #include "arch/cpu.h"
 #include "arch/sched.h"
+#include "arch/time.h"
 #include "common/assert.h"
 #include "common/lock/mutex.h"
 #include "common/log.h"
@@ -229,7 +230,7 @@ void uacpi_kernel_vlog(uacpi_log_level level, const uacpi_char *fmt, uacpi_va_li
 
 /* Time */
 uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot() {
-    return (uacpi_u64) time_monotonic();
+    return (uacpi_u64) arch_time_monotonic();
 }
 
 /* Mutexes*/
@@ -325,8 +326,8 @@ uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16 timeout) {
         return UACPI_TRUE;
     }
 
-    time_t deadline = time_monotonic() + (timeout * (TIME_NANOSECONDS_IN_SECOND / TIME_MILLISECONDS_IN_SECOND));
-    while(*counter != 0 && time_monotonic() < deadline) arch_cpu_relax();
+    time_t deadline = arch_time_monotonic() + (timeout * (TIME_NANOSECONDS_IN_SECOND / TIME_MILLISECONDS_IN_SECOND));
+    while(*counter != 0 && arch_time_monotonic() < deadline) arch_cpu_relax();
     if(*counter == 0) return UACPI_TRUE;
     __atomic_fetch_sub((size_t *) handle, 1, __ATOMIC_SEQ_CST);
     return UACPI_FALSE;

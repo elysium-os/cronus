@@ -57,7 +57,7 @@ void sched_yield(enum thread_state yield_state) {
 
 void internal_sched_thread_drop(thread_t *thread) {
     ASSERT(!arch_interrupt_state());
-    ASSERT(thread->scheduler == &arch_cpu_current()->sched)
+    ASSERT(thread->scheduler == &arch_cpu_current()->sched);
 
     if(thread == thread->scheduler->idle_thread) return;
 

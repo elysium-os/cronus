@@ -30,5 +30,5 @@ void x86_64_interrupt_load_idt();
 void x86_64_interrupt_set(uint8_t vector, x86_64_interrupt_handler_t handler);
 
 /// Request a free interrupt vector.
-/// @return chosen interrupt vector, -1 on error
+/// @returns chosen interrupt vector, -1 on error
 int x86_64_interrupt_request(interrupt_priority_t priority, x86_64_interrupt_handler_t handler);

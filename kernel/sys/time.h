@@ -2,18 +2,14 @@
 
 #include <stdint.h>
 
-#define TIME_NANOSECONDS_IN_SECOND 1'000'000'000
-#define TIME_MICROSECONDS_IN_SECOND 1'000'000
-#define TIME_MILLISECONDS_IN_SECOND 1'000
+#define TIME_FEMTOSECONDS_IN_SECOND 1'000'000'000'000'000lu
+#define TIME_PICOSECONDS_IN_SECOND 1'000'000'000'000lu
+#define TIME_NANOSECONDS_IN_SECOND 1'000'000'000lu
+#define TIME_MICROSECONDS_IN_SECOND 1'000'000lu
+#define TIME_MILLISECONDS_IN_SECOND 1'000lu
 
-typedef uint64_t time_t; /* stored in nanoseconds */
+/// Time stored in nanoseconds.
+typedef uint64_t time_t;
 
-typedef struct {
-    const char *name;
-    time_t resolution;
-    time_t (*current)();
-} time_source_t;
-
-void time_source_register(time_source_t *source);
-
-time_t time_monotonic();
+/// Frequency in hz (ticks per second).
+typedef uint64_t time_frequency_t;

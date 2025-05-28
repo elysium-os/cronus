@@ -4,9 +4,10 @@
 
 typedef bool interrupt_state_t;
 
-typedef enum {
+typedef enum interrupt_priority {
     INTERRUPT_PRIORITY_LOW,
     INTERRUPT_PRIORITY_NORMAL,
+    INTERRUPT_PRIORITY_EVENT,
     INTERRUPT_PRIORITY_CRITICAL
 } interrupt_priority_t;
 

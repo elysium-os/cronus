@@ -1,9 +1,12 @@
 #include "init.h"
 
 #include "abi/sysv/elf.h"
+#include "arch/cpu.h"
+#include "arch/event.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
 #include "arch/sched.h"
+#include "arch/time.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "common/panic.h"
@@ -27,6 +30,7 @@
 #include "sched/process.h"
 #include "sched/reaper.h"
 #include "sched/sched.h"
+#include "sys/event.h"
 #include "sys/kernel_symbol.h"
 #include "sys/module.h"
 #include "sys/time.h"
@@ -58,9 +62,6 @@
 #include <tartarus.h>
 #include <uacpi/uacpi.h>
 
-#define PIT_TIMER_FREQ 1'000
-#define LAPIC_CALIBRATION_TICKS 0x1'0000
-
 #define ADJUST_STACK(OFFSET) asm volatile("mov %%rsp, %%rax\nadd %0, %%rax\nmov %%rax, %%rsp\nmov %%rbp, %%rax\nadd %0, %%rax\nmov %%rax, %%rbp" : : "rm"(OFFSET) : "rax", "memory")
 
 uintptr_t g_hhdm_offset;
@@ -85,6 +86,10 @@ static x86_64_cpu_t g_early_bsp;
 static uintptr_t g_bootmem_base;
 static size_t g_bootmem_size;
 
+static bool g_hpet_initialized = false;
+
+static int g_event_interrupt_vector = -1;
+
 static uintptr_t bootmem_alloc() {
     if(g_bootmem_size == 0) panic("BOOTMEM", "out of memory");
     uintptr_t address = g_bootmem_base;
@@ -99,7 +104,7 @@ static uintptr_t proper_alloc() {
 }
 
 static void thread_init() {
-    // OPTIMIZE we can mask interrupts for uacpi perf lol
+    // OPTIMIZE: we can mask interrupts for uacpi perf lol
 
     uacpi_status ret = uacpi_initialize(0);
     if(uacpi_unlikely_error(ret)) {
@@ -112,8 +117,62 @@ static void thread_init() {
     log(LOG_LEVEL_INFO, "UACPI", "Setup Done");
 }
 
+static time_frequency_t calibrate_lapic_timer() {
+    uint32_t nominal_freq = 0;
+    if(!x86_64_cpuid_register(0x15, X86_64_CPUID_REGISTER_ECX, &nominal_freq) && nominal_freq != 0) {
+        return (time_frequency_t) nominal_freq;
+    }
+
+    x86_64_lapic_timer_setup(X86_64_LAPIC_TIMER_TYPE_ONESHOT, true, 0xFF, X86_64_LAPIC_TIMER_DIVISOR_16);
+    if(!g_hpet_initialized) {
+        for(size_t sample_count = 8;; sample_count *= 2) {
+            x86_64_pit_set_reload(0xFFF0);
+            uint16_t start_count = x86_64_pit_count();
+            x86_64_lapic_timer_start(sample_count);
+            while(x86_64_lapic_timer_read() != 0) arch_cpu_relax();
+            uint64_t delta = start_count - x86_64_pit_count();
+
+            if(delta < 0x4000) continue;
+
+            x86_64_lapic_timer_stop();
+            return (sample_count / MATH_MAX(1lu, delta)) * X86_64_PIT_BASE_FREQ;
+        }
+    } else {
+        time_t timeout = (TIME_NANOSECONDS_IN_SECOND / TIME_MILLISECONDS_IN_SECOND) * 100;
+        x86_64_lapic_timer_start(UINT32_MAX);
+        time_t target = hpet_current_time() + timeout;
+        while(hpet_current_time() < target) arch_cpu_relax();
+        return ((uint64_t) UINT32_MAX - x86_64_lapic_timer_read()) * (TIME_NANOSECONDS_IN_SECOND / timeout);
+    }
+    ASSERT_UNREACHABLE();
+}
+
+// TODO: cpuid for TSC freq if available :)
+static time_frequency_t calibrate_tsc() {
+    if(!g_hpet_initialized) {
+        for(size_t sample_count = 8;; sample_count *= 2) {
+            x86_64_pit_set_reload(0xFFF0);
+            uint16_t start_count = x86_64_pit_count();
+            uint64_t tsc_target = __rdtsc() + sample_count;
+            while(__rdtsc() < tsc_target) arch_cpu_relax();
+            uint64_t delta = start_count - x86_64_pit_count();
+
+            if(delta < 0x4000) continue;
+
+            return (sample_count / MATH_MAX(1lu, delta)) * X86_64_PIT_BASE_FREQ;
+        }
+    } else {
+        time_t timeout = (TIME_NANOSECONDS_IN_SECOND / TIME_MILLISECONDS_IN_SECOND) * 100;
+        uint64_t tsc_start = __rdtsc();
+        time_t target = hpet_current_time() + timeout;
+        while(hpet_current_time() < target) arch_cpu_relax();
+        return (__rdtsc() - tsc_start) * (TIME_NANOSECONDS_IN_SECOND / timeout);
+    }
+    ASSERT_UNREACHABLE();
+}
+
 [[noreturn]] static void init_ap() {
-    log(LOG_LEVEL_INFO, "INIT", "Initializing AP %i", x86_64_lapic_id());
+    log(LOG_LEVEL_INFO, "INIT", "Initializing AP %lu", g_init_cpu_id_counter);
 
     x86_64_gdt_init();
 
@@ -135,7 +194,7 @@ static void thread_init() {
 
     // Interrupts
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
-    x86_64_lapic_initialize();
+    x86_64_lapic_init_cpu();
     x86_64_interrupt_load_idt();
 
     // CPU Local
@@ -144,15 +203,12 @@ static void thread_init() {
     tss->iomap_base = sizeof(x86_64_tss_t);
     x86_64_gdt_load_tss(tss);
 
-    x86_64_pit_set_reload(UINT16_MAX);
-    uint16_t start_count = x86_64_pit_count();
-    x86_64_lapic_timer_poll(LAPIC_CALIBRATION_TICKS);
-    uint16_t end_count = x86_64_pit_count();
-
     cpu->lapic_id = x86_64_lapic_id();
-    cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * X86_64_PIT_BASE_FREQ;
+    cpu->lapic_timer_frequency = calibrate_lapic_timer();
+    cpu->tsc_timer_frequency = calibrate_tsc();
     cpu->tss = tss;
     cpu->current_thread = nullptr;
+    cpu->common.events = event_queue_make();
 
     // Initialize FPU
     x86_64_fpu_init_cpu();
@@ -166,10 +222,13 @@ static void thread_init() {
     // Initialize syscalls
     x86_64_syscall_init_cpu();
 
+    // Initialize event timer
+    arch_event_timer_setup(g_event_interrupt_vector);
+
     // Initialize scheduler
     x86_64_sched_init_cpu(cpu);
 
-    log(LOG_LEVEL_DEBUG, "INIT", "AP %lu:%i init exit", g_init_cpu_id_counter, x86_64_lapic_id());
+    log(LOG_LEVEL_DEBUG, "INIT", "AP %lu (Lapic ID: %i) init exit", g_init_cpu_id_counter, x86_64_lapic_id());
     __atomic_add_fetch(&g_init_cpu_id_counter, 1, __ATOMIC_SEQ_CST);
 
     x86_64_sched_handoff_cpu(cpu, false);
@@ -213,7 +272,7 @@ static void thread_init() {
     ASSERT(g_x86_64_cpu_count > 0);
 
     draw_rect(&g_framebuffer, 0, 0, g_framebuffer.width, g_framebuffer.height, draw_color(14, 14, 15));
-    log(LOG_LEVEL_INFO, "INIT", "Elysium " STRING_MACRO_STRINGIFY(__ARCH) " " STRING_MACRO_STRINGIFY(__VERSION) " (" __DATE__ " " __TIME__ ")");
+    log(LOG_LEVEL_INFO, "INIT", "Elysium " MACROS_STRINGIFY(__ARCH) " " MACROS_STRINGIFY(__VERSION) " (" __DATE__ " " __TIME__ ")");
 
     char brand1[12];
     x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_EBX, (uint32_t *) &brand1);
@@ -243,12 +302,7 @@ static void thread_init() {
 
     x86_64_gdt_init();
 
-    // Initialize interrupt & exception handling
-    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
-    x86_64_pic8259_remap();
-    x86_64_pic8259_disable();
-    x86_64_lapic_initialize();
-    g_x86_64_interrupt_irq_eoi = x86_64_lapic_eoi;
+    // Initialize exception handling
     x86_64_interrupt_init();
     x86_64_interrupt_load_idt();
     for(int i = 0; i < 32; i++) {
@@ -256,7 +310,6 @@ static void thread_init() {
             default: x86_64_interrupt_set(i, x86_64_exception_unhandled); break;
         }
     }
-    x86_64_init_flag_set(X86_64_INIT_FLAG_INTERRUPTS);
 
     // Initialize early physical memory
     size_t early_mem_index = ({
@@ -359,6 +412,20 @@ static void thread_init() {
         log(LOG_LEVEL_DEBUG, "INIT", "» %-6s %#-18lx -> %#-18lx %lu/%lu pages", zone->name, zone->start, zone->end, zone->free_page_count, zone->total_page_count);
     }
 
+    // Initialize interrupts
+    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
+    // TODO: fails ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_ARAT));
+
+    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_TSC));
+    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_TSC_INVARIANT));
+
+    x86_64_pic8259_remap();
+    x86_64_pic8259_disable();
+    x86_64_lapic_init();
+    x86_64_lapic_init_cpu();
+    g_x86_64_interrupt_irq_eoi = x86_64_lapic_eoi;
+    x86_64_init_flag_set(X86_64_INIT_FLAG_INTERRUPTS);
+
     // Initialize HEAP
     slab_init();
     heap_initialize();
@@ -379,6 +446,23 @@ static void thread_init() {
     acpi_sdt_header_t *mcfg = acpi_find_table((uint8_t *) "MCFG");
     pci_enumerate(mcfg);
 
+    // Initialize timer
+    acpi_sdt_header_t *hpet_header = acpi_find_table((uint8_t *) "HPET");
+    if(hpet_header == nullptr) {
+        panic("INIT", "no viable time source found");
+    }
+    x86_64_hpet_init(hpet_header);
+    g_hpet_initialized = true;
+
+    time_frequency_t lapic_timer_freq = calibrate_lapic_timer();
+    time_frequency_t tsc_timer_freq = calibrate_tsc();
+
+    log(LOG_LEVEL_DEBUG, "INIT", "BSP Local Apic Timer calibrated, freq: %lu", lapic_timer_freq);
+    log(LOG_LEVEL_DEBUG, "INIT", "BSP TSC calibrated, freq: %lu", tsc_timer_freq);
+
+    // Initialize event system
+    g_event_interrupt_vector = event_init();
+
     // SMP init
     g_x86_64_cpus = heap_alloc(sizeof(x86_64_cpu_t) * boot_info->cpu_count);
     memclear(g_x86_64_cpus, sizeof(x86_64_cpu_t) * boot_info->cpu_count);
@@ -387,11 +471,6 @@ static void thread_init() {
     memclear(tss, sizeof(x86_64_tss_t));
     tss->iomap_base = sizeof(x86_64_tss_t);
     x86_64_gdt_load_tss(tss);
-
-    x86_64_pit_set_reload(UINT16_MAX);
-    uint16_t start_count = x86_64_pit_count();
-    x86_64_lapic_timer_poll(LAPIC_CALIBRATION_TICKS);
-    uint16_t end_count = x86_64_pit_count();
 
     log(LOG_LEVEL_DEBUG, "INIT", "> BSP(%u)", boot_info->bsp_index);
 
@@ -406,8 +485,10 @@ static void thread_init() {
             cpu->sequential_id = g_init_cpu_id_counter;
             ASSERT(g_init_cpu_id_counter == bsp_seq_id);
             cpu->lapic_id = x86_64_lapic_id();
-            cpu->lapic_timer_frequency = (uint64_t) (LAPIC_CALIBRATION_TICKS / (start_count - end_count)) * X86_64_PIT_BASE_FREQ;
+            cpu->lapic_timer_frequency = lapic_timer_freq;
+            cpu->tsc_timer_frequency = tsc_timer_freq;
             cpu->tss = tss;
+            cpu->common.events = event_queue_make();
             cpu->current_thread = nullptr;
             x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
             g_init_cpu_id_counter++;
@@ -431,30 +512,13 @@ static void thread_init() {
     x86_64_interrupt_set_ist(2, 1); // Non-maskable
     x86_64_interrupt_set_ist(18, 2); // Machine check
 
-    // Initialize timer
-    acpi_sdt_header_t *hpet_header = acpi_find_table((uint8_t *) "HPET");
-    if(hpet_header != nullptr) {
-        x86_64_hpet_init(hpet_header);
-        time_source_register(&g_hpet_time_source);
-        //     int timer = x86_64_hpet_find_timer(true);
-        //     if(timer == -1) goto use_pit;
-        //     int gsi_vector = x86_64_hpet_configure_timer(timer, HPET_TIMER_FREQ, false);
-
-        //     int hpet_time_vector = x86_64_interrupt_request(IPL_CRITICAL, hpet_time_handler);
-        //     ASSERT(hpet_time_vector != -1);
-        //     x86_64_ioapic_map_gsi(gsi_vector, x86_64_lapic_id(), false, true, hpet_time_vector);
-    } else {
-        // use_pit:
-        // x86_64_pit_match_frequency(PIT_TIMER_FREQ);
-        // int pit_time_vector = x86_64_interrupt_request(IPL_CRITICAL, pit_time_handler);
-        // ASSERT(pit_time_vector != -1);
-        // x86_64_ioapic_map_legacy_irq(0, x86_64_lapic_id(), false, true, pit_time_vector);
-    }
-
     x86_64_init_flag_set(X86_64_INIT_FLAG_TIME);
 
     // Initialize syscalls
     x86_64_syscall_init_cpu();
+
+    // Initialize event timer
+    arch_event_timer_setup(g_event_interrupt_vector);
 
     // Initialize VFS
     tartarus_module_t *sysroot_module = nullptr;
@@ -501,7 +565,6 @@ static void thread_init() {
     }
 
     // Initialize sched
-    x86_64_sched_init();
     x86_64_sched_init_cpu(X86_64_CPU_CURRENT.self);
 
 #ifdef __ENV_DEVELOPMENT

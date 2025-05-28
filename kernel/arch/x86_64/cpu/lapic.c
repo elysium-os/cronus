@@ -1,13 +1,13 @@
 #include "lapic.h"
 
 #include "arch/mmio.h"
-#include "memory/hhdm.h"
-#include "sys/time.h"
+#include "common/assert.h"
+#include "memory/vm.h"
 
-#include "arch/x86_64/cpu/cpu.h"
 #include "arch/x86_64/cpu/msr.h"
 
-#define BASE_MASK 0xF'FFFF'FFFF'F000
+#define BASE_ADDR_MASK 0xF'FFFF'FFFF'F000
+#define BASE_GLOBAL_ENABLE (1 << 11)
 
 #define REG_ID 0x20
 #define REG_SPURIOUS 0xF0
@@ -20,15 +20,31 @@
 #define REG_TIMER_INITIAL_COUNT 0x380
 #define REG_TIMER_CURRENT_COUNT 0x390
 
-static inline void lapic_write(uint32_t reg, uint32_t data) {
-    mmio_write32((void *) HHDM((x86_64_msr_read(X86_64_MSR_APIC_BASE) & BASE_MASK) + reg), data);
+static uintptr_t g_common_paddr = 0;
+static void *g_common_vaddr = nullptr;
+
+[[clang::always_inline]] static void lapic_write(uint32_t reg, uint32_t data) {
+    mmio_write32((void *) ((uintptr_t) g_common_vaddr + reg), data);
 }
 
-static inline uint32_t lapic_read(uint32_t reg) {
-    return mmio_read32((void *) HHDM((x86_64_msr_read(X86_64_MSR_APIC_BASE) & BASE_MASK) + reg));
+[[clang::always_inline]] static uint32_t lapic_read(uint32_t reg) {
+    return mmio_read32((void *) ((uintptr_t) g_common_vaddr + reg));
 }
 
-void x86_64_lapic_initialize() {
+void x86_64_lapic_init() {
+    g_common_paddr = x86_64_msr_read(X86_64_MSR_APIC_BASE) & BASE_ADDR_MASK;
+    g_common_vaddr = vm_map_direct(g_vm_global_address_space, nullptr, 4096, VM_PROT_RW, VM_CACHE_NONE, g_common_paddr, VM_FLAG_NO_DEMAND);
+    ASSERT(g_common_vaddr != nullptr);
+    ASSERT(g_common_paddr != 0 && (g_common_paddr & BASE_ADDR_MASK) == g_common_paddr);
+}
+
+void x86_64_lapic_init_cpu() {
+    uint64_t lapic_base_msr = x86_64_msr_read(X86_64_MSR_APIC_BASE);
+    lapic_base_msr &= ~BASE_ADDR_MASK;
+    lapic_base_msr |= g_common_paddr;
+    lapic_base_msr |= BASE_GLOBAL_ENABLE;
+    x86_64_msr_write(X86_64_MSR_APIC_BASE, lapic_base_msr);
+
     lapic_write(REG_SPURIOUS, 0xFF | (1 << 8));
 }
 
@@ -45,23 +61,21 @@ uint32_t x86_64_lapic_id() {
     return (uint8_t) (lapic_read(REG_ID) >> 24);
 }
 
-void x86_64_lapic_timer_poll(uint32_t ticks) {
+void x86_64_lapic_timer_setup(x86_64_lapic_timer_type_t type, bool mask_interrupt, uint8_t interrupt_vector, x86_64_lapic_timer_divisor_t divisor) {
     x86_64_lapic_timer_stop();
-    lapic_write(REG_LVT_TIMER, (1 << 16) | 0xFF);
-    lapic_write(REG_TIMER_DIV, 0);
+    lapic_write(REG_LVT_TIMER, interrupt_vector | type | (mask_interrupt ? (1 << 16) : 0));
+    lapic_write(REG_TIMER_DIV, divisor);
+}
+
+void x86_64_lapic_timer_start(uint64_t ticks) {
+    x86_64_lapic_timer_stop();
     lapic_write(REG_TIMER_INITIAL_COUNT, ticks);
-    while(lapic_read(REG_TIMER_CURRENT_COUNT) != 0);
-    x86_64_lapic_timer_stop();
 }
 
-void x86_64_lapic_timer_oneshot(uint8_t vector, uint64_t us) {
-    x86_64_lapic_timer_stop();
-    lapic_write(REG_LVT_TIMER, vector);
-    lapic_write(REG_TIMER_DIV, 0);
-    lapic_write(REG_TIMER_INITIAL_COUNT, us * (X86_64_CPU_CURRENT.lapic_timer_frequency / 1000000));
-}
-
-void x86_64_lapic_timer_stop() {
+[[clang::always_inline]] void x86_64_lapic_timer_stop() {
     lapic_write(REG_TIMER_INITIAL_COUNT, 0);
-    lapic_write(REG_LVT_TIMER, (1 << 16));
+}
+
+uint32_t x86_64_lapic_timer_read() {
+    return lapic_read(REG_TIMER_CURRENT_COUNT);
 }

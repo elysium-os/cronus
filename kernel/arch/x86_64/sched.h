@@ -2,9 +2,6 @@
 
 #include "arch/x86_64/cpu/cpu.h"
 
-/// Initialize the scheduler.
-void x86_64_sched_init();
-
 /// Initialize scheduler for CPU.
 void x86_64_sched_init_cpu(x86_64_cpu_t *cpu);
 

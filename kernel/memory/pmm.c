@@ -3,7 +3,6 @@
 #include "arch/mem.h"
 #include "arch/page.h"
 #include "common/assert.h"
-#include "lib/math.h"
 #include "lib/mem.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"
@@ -13,8 +12,13 @@
 #define BLOCK_PADDR(BLOCK) PAGE_PADDR(PAGE_FROM_BLOCK(BLOCK))
 
 pmm_zone_t g_pmm_zone_low = { .name = "LOW", .start = ARCH_PAGE_GRANULARITY, .end = ARCH_MEM_LOW_SIZE, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
-pmm_zone_t
-    g_pmm_zone_normal = { .name = "NORMAL", .start = ARCH_MEM_LOW_SIZE, .end = MATH_FLOOR(UINTPTR_MAX, ARCH_PAGE_GRANULARITY), .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
+pmm_zone_t g_pmm_zone_normal = { .name = "NORMAL",
+                                 .start = ARCH_MEM_LOW_SIZE,
+                                 .end = ((UINTPTR_MAX) / ARCH_PAGE_GRANULARITY) * ARCH_PAGE_GRANULARITY,
+                                 .total_page_count = 0,
+                                 .free_page_count = 0,
+                                 .lock = SPINLOCK_INIT,
+                                 .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
 
 static inline uint8_t pagecount_to_order(size_t pages) {
     if(pages == 1) return 0;

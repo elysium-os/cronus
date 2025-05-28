@@ -32,7 +32,6 @@ local c_flags = {
     "-Wall",
     "-Wextra",
     "-Wvla",
-    "-Wshadow",
     "-Wimplicit-fallthrough",
 
     "-D__VERSION=" .. version,

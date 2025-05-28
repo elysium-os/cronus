@@ -73,7 +73,7 @@ static x86_64_address_space_t g_initial_address_space;
 uintptr_t (*g_x86_64_ptm_phys_allocator)();
 
 static inline void invlpg(uint64_t value) {
-    LOG_DEVELOPMENT("PTM", "invlpg on CPU(%u) for %#lx", x86_64_lapic_id(), value);
+    LOG_DEVELOPMENT("PTM", "invlpg on CPU(%lu) for %#lx", X86_64_CPU_CURRENT.sequential_id, value);
     asm volatile("invlpg (%0)" : : "r"(value) : "memory");
 }
 
@@ -95,7 +95,7 @@ static uint64_t cache_to_x86_flags(vm_cache_t cache) {
 }
 
 static void tlb_shootdown(uintptr_t addr) {
-    LOG_DEVELOPMENT("PTM", "shootdown from CPU(%u) for %#lx", x86_64_lapic_id(), addr);
+    LOG_DEVELOPMENT("PTM", "shootdown from CPU(%lu) for %#lx", X86_64_CPU_CURRENT.sequential_id, addr);
     if(!x86_64_init_flag_check(X86_64_INIT_FLAG_SMP | X86_64_INIT_FLAG_SCHED)) {
         invlpg(addr);
         return;

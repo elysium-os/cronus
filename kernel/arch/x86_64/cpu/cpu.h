@@ -2,6 +2,7 @@
 
 #include "lib/container.h"
 #include "sys/cpu.h"
+#include "sys/time.h"
 
 #include "arch/x86_64/cpu/tss.h"
 #include "arch/x86_64/thread.h"
@@ -19,7 +20,9 @@ typedef struct x86_64_cpu {
     size_t sequential_id;
 
     uint32_t lapic_id;
-    uint64_t lapic_timer_frequency;
+
+    time_frequency_t lapic_timer_frequency;
+    time_frequency_t tsc_timer_frequency;
 
     x86_64_tss_t *tss;
 
@@ -28,7 +31,7 @@ typedef struct x86_64_cpu {
     cpu_t common;
 } x86_64_cpu_t;
 
-static_assert(offsetof(x86_64_cpu_t, current_thread) == 40, "current_thread in x86_64_cpu_t changed. Update arch/x86_64/syscall.asm::CURRENT_THREAD_OFFSET");
+static_assert(offsetof(x86_64_cpu_t, current_thread) == 48, "current_thread in x86_64_cpu_t changed. Update arch/x86_64/syscall.asm::CURRENT_THREAD_OFFSET");
 
 extern size_t g_x86_64_cpu_count;
 extern x86_64_cpu_t *g_x86_64_cpus;

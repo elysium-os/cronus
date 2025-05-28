@@ -19,6 +19,7 @@
 #include "sched/process.h"
 #include "sched/sched.h"
 #include "sched/thread.h"
+#include "sys/event.h"
 #include "sys/interrupt.h"
 
 #include "arch/x86_64/cpu/cpu.h"
@@ -61,7 +62,6 @@ extern x86_64_thread_t *x86_64_sched_context_switch(x86_64_thread_t *this, x86_6
 extern void x86_64_sched_userspace_init();
 
 static long g_next_tid = BOOTSTRAP_TID + 1;
-static int g_sched_vector = 0;
 
 /// @warning The prev parameter relies on the fact
 /// that sched_context_switch takes a thread "this" which
@@ -78,7 +78,7 @@ static int g_sched_vector = 0;
     sched_yield(THREAD_STATE_DESTROY);
 }
 
-[[gnu::no_instrument_function]] static void sched_entry([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
+[[gnu::no_instrument_function]] static void sched_entry([[maybe_unused]] void *data) {
     sched_yield(THREAD_STATE_READY);
 }
 
@@ -193,7 +193,7 @@ thread_t *arch_sched_thread_current() {
 }
 
 void arch_sched_preempt() {
-    x86_64_lapic_timer_oneshot(g_sched_vector, INTERVAL);
+    event_queue(1000000, sched_entry, nullptr);
 }
 
 void arch_sched_context_switch(thread_t *current, thread_t *next) {
@@ -228,10 +228,4 @@ void x86_64_sched_init_cpu(x86_64_cpu_t *cpu) {
 
     sched_switch(bootstrap_thread, X86_64_THREAD(cpu->common.sched.idle_thread));
     ASSERT_UNREACHABLE();
-}
-
-void x86_64_sched_init() {
-    int sched_vector = x86_64_interrupt_request(INTERRUPT_PRIORITY_LOW, sched_entry);
-    if(sched_vector < 0) panic("SCHED", "unable to acquire an interrupt vector for the scheduler");
-    g_sched_vector = sched_vector;
 }
