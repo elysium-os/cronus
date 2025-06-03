@@ -12,6 +12,7 @@
 #define VM_FLAG_NO_DEMAND (1 << 2)
 #define VM_FLAG_ZERO (1 << 10) /* only applies to anonymous mappings */
 
+#define VM_PROT_NONE ((vm_protection_t) {})
 #define VM_PROT_RW ((vm_protection_t) { .read = true, .write = true })
 #define VM_PROT_RWX ((vm_protection_t) { .read = true, .write = true, .exec = true })
 
@@ -53,10 +54,10 @@ typedef struct {
 typedef struct {
     vm_address_space_t *address_space;
 
-    vm_region_type_t type;
     uintptr_t base;
     size_t length;
 
+    vm_region_type_t type;
     vm_protection_t protection;
     vm_cache_t cache_behavior;
 
@@ -90,6 +91,12 @@ void *vm_map_direct(vm_address_space_t *address_space, void *hint, size_t length
 /// @param address Page aligned address
 /// @param length Page aligned length
 void vm_unmap(vm_address_space_t *address_space, void *address, size_t length);
+
+/// Rewrite protection of a region of memory.
+void vm_rewrite_prot(vm_address_space_t *address_space, void *address, size_t length, vm_protection_t prot);
+
+/// Rewrite cacheability of a region of memory.
+void vm_rewrite_cache(vm_address_space_t *address_space, void *address, size_t length, vm_cache_t cache);
 
 /// Handle a virtual memory fault
 /// @param fault Cause of the fault

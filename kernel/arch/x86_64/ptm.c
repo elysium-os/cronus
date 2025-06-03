@@ -67,15 +67,11 @@ static uint8_t g_tlb_shootdown_vector;
 static spinlock_t g_tlb_shootdown_lock;
 static size_t g_tlb_shootdown_complete;
 static uintptr_t g_tlb_shootdown_address;
+static size_t g_tlb_shootdown_length;
 
 static x86_64_address_space_t g_initial_address_space;
 
 uintptr_t (*g_x86_64_ptm_phys_allocator)();
-
-static inline void invlpg(uint64_t value) {
-    LOG_DEVELOPMENT("PTM", "invlpg on CPU(%lu) for %#lx", X86_64_CPU_CURRENT.sequential_id, value);
-    asm volatile("invlpg (%0)" : : "r"(value) : "memory");
-}
 
 static uint64_t privilege_to_x86_flags(vm_privilege_t privilege) {
     switch(privilege) {
@@ -94,21 +90,27 @@ static uint64_t cache_to_x86_flags(vm_cache_t cache) {
     ASSERT_UNREACHABLE();
 }
 
-static void tlb_shootdown(uintptr_t addr) {
-    LOG_DEVELOPMENT("PTM", "shootdown from CPU(%lu) for %#lx", X86_64_CPU_CURRENT.sequential_id, addr);
+static void invalidate(uintptr_t addr, size_t length) {
+    LOG_DEVELOPMENT("PTM", "invalidating on CPU(%lu) for %#lx - %#lx", X86_64_CPU_CURRENT.sequential_id, addr, addr + length);
+    for(; length > 0; length -= ARCH_PAGE_GRANULARITY, addr += ARCH_PAGE_GRANULARITY) asm volatile("invlpg (%0)" : : "r"(addr) : "memory");
+}
+
+static void tlb_shootdown(uintptr_t addr, size_t length) {
+    LOG_DEVELOPMENT("PTM", "shootdown from CPU(%lu) for %#lx - %#lx", X86_64_CPU_CURRENT.sequential_id, addr, addr + length);
     if(!x86_64_init_flag_check(X86_64_INIT_FLAG_SMP | X86_64_INIT_FLAG_SCHED)) {
-        invlpg(addr);
+        invalidate(addr, length);
         return;
     }
 
     interrupt_state_t previous_state = spinlock_acquire(&g_tlb_shootdown_lock);
     g_tlb_shootdown_address = addr;
+    g_tlb_shootdown_length = length;
     g_tlb_shootdown_complete = 0;
 
     for(size_t i = 0; i < g_x86_64_cpu_count; i++) {
         x86_64_cpu_t *cpu = &g_x86_64_cpus[i];
         if(cpu == X86_64_CPU_CURRENT.self) {
-            invlpg(addr);
+            invalidate(addr, length);
             __atomic_add_fetch(&g_tlb_shootdown_complete, 1, __ATOMIC_RELEASE);
             continue;
         }
@@ -130,7 +132,7 @@ static void tlb_shootdown_handler([[maybe_unused]] x86_64_interrupt_frame_t *fra
         return;
     }
 
-    invlpg(g_tlb_shootdown_address);
+    invalidate(g_tlb_shootdown_address, g_tlb_shootdown_length);
     __atomic_add_fetch(&g_tlb_shootdown_complete, 1, __ATOMIC_RELEASE);
 }
 
@@ -183,51 +185,105 @@ void arch_ptm_load_address_space(vm_address_space_t *address_space) {
     x86_64_cr3_write(X86_64_AS(address_space)->cr3);
 }
 
-void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t paddr, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global) {
+void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t paddr, size_t length, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global) {
+    ASSERT(vaddr % ARCH_PAGE_GRANULARITY == 0);
+    ASSERT(paddr % ARCH_PAGE_GRANULARITY == 0);
+    ASSERT(length % ARCH_PAGE_GRANULARITY == 0);
+
     if(!prot.read) log(LOG_LEVEL_ERROR, "PTM", "No-read mapping is not supported on x86_64");
     interrupt_state_t previous_state = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
-    uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
-    for(int i = 4; i > 1; i--) {
-        int index = VADDR_TO_INDEX(vaddr, i);
-        uint64_t entry = current_table[index];
-        if((entry & PTE_FLAG_PRESENT) == 0) {
-            entry = PTE_FLAG_PRESENT | (g_x86_64_ptm_phys_allocator() & ADDRESS_MASK);
-            if(!prot.exec) entry |= PTE_FLAG_NX;
-        } else {
-            if(prot.exec) entry &= ~PTE_FLAG_NX;
+
+    for(size_t i = 0; i < length; i += ARCH_PAGE_GRANULARITY) {
+        uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
+        for(int j = 4; j > 1; j--) {
+            int index = VADDR_TO_INDEX(vaddr + i, j);
+            uint64_t entry = current_table[index];
+            if((entry & PTE_FLAG_PRESENT) == 0) {
+                entry = PTE_FLAG_PRESENT | (g_x86_64_ptm_phys_allocator() & ADDRESS_MASK);
+                if(!prot.exec) entry |= PTE_FLAG_NX;
+            } else {
+                if(prot.exec) entry &= ~PTE_FLAG_NX;
+            }
+            if(prot.write) entry |= PTE_FLAG_RW;
+            entry |= privilege_to_x86_flags(privilege);
+            __atomic_store(&current_table[index], &entry, __ATOMIC_SEQ_CST);
+
+            current_table = (uint64_t *) HHDM(current_table[index] & ADDRESS_MASK);
         }
+        uint64_t entry = PTE_FLAG_PRESENT | ((paddr + i) & ADDRESS_MASK) | privilege_to_x86_flags(privilege) | cache_to_x86_flags(cache);
         if(prot.write) entry |= PTE_FLAG_RW;
-        entry |= privilege_to_x86_flags(privilege);
-        __atomic_store(&current_table[index], &entry, __ATOMIC_SEQ_CST);
-
-        current_table = (uint64_t *) HHDM(current_table[index] & ADDRESS_MASK);
+        if(!prot.exec) entry |= PTE_FLAG_NX;
+        if(global) entry |= PTE_FLAG_GLOBAL;
+        __atomic_store(&current_table[VADDR_TO_INDEX(vaddr + i, 1)], &entry, __ATOMIC_SEQ_CST);
     }
-    int index = VADDR_TO_INDEX(vaddr, 1);
-    uint64_t entry = PTE_FLAG_PRESENT | (paddr & ADDRESS_MASK) | privilege_to_x86_flags(privilege) | cache_to_x86_flags(cache);
-    if(prot.write) entry |= PTE_FLAG_RW;
-    if(!prot.exec) entry |= PTE_FLAG_NX;
-    if(global) entry |= PTE_FLAG_GLOBAL;
-    __atomic_store(&current_table[index], &entry, __ATOMIC_SEQ_CST);
 
-    tlb_shootdown(vaddr);
+    tlb_shootdown(vaddr, length);
 
     spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
 }
 
-void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr) {
-    interrupt_state_t previous_state = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
-    uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
-    for(int i = 4; i > 1; i--) {
-        int index = VADDR_TO_INDEX(vaddr, i);
-        if((current_table[index] & PTE_FLAG_PRESENT) == 0) {
-            spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
-            return;
-        }
-        current_table = (uint64_t *) HHDM(current_table[index] & ADDRESS_MASK);
-    }
-    __atomic_store_n(&current_table[VADDR_TO_INDEX(vaddr, 1)], 0, __ATOMIC_SEQ_CST);
+void arch_ptm_rewrite(vm_address_space_t *address_space, uintptr_t vaddr, size_t length, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global) {
+    ASSERT(vaddr % ARCH_PAGE_GRANULARITY == 0);
+    ASSERT(length % ARCH_PAGE_GRANULARITY == 0);
 
-    tlb_shootdown(vaddr);
+    if(!prot.read) log(LOG_LEVEL_ERROR, "PTM", "No-read mapping is not supported on x86_64");
+    interrupt_state_t previous_state = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
+
+    for(size_t i = 0; i < length; i += ARCH_PAGE_GRANULARITY) {
+        uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
+        for(int j = 4; j > 1; j--) {
+            int index = VADDR_TO_INDEX(vaddr + i, j);
+            uint64_t entry = current_table[index];
+            if((entry & PTE_FLAG_PRESENT) == 0) goto skip;
+            if(prot.write) entry |= PTE_FLAG_RW;
+            if(prot.exec) entry &= ~PTE_FLAG_NX;
+            current_table = (uint64_t *) HHDM(current_table[index] & ADDRESS_MASK);
+        }
+        int index = VADDR_TO_INDEX(vaddr + i, 1);
+        uint64_t entry = current_table[index] | privilege_to_x86_flags(privilege) | cache_to_x86_flags(cache);
+
+        if(prot.write)
+            entry |= PTE_FLAG_RW;
+        else
+            entry &= ~PTE_FLAG_RW;
+
+        if(!prot.exec)
+            entry |= PTE_FLAG_NX;
+        else
+            entry &= ~PTE_FLAG_NX;
+
+        if(global)
+            entry |= PTE_FLAG_GLOBAL;
+        else
+            entry &= ~PTE_FLAG_GLOBAL;
+
+        __atomic_store_n(&current_table[index], entry, __ATOMIC_SEQ_CST);
+    skip:
+    }
+
+    tlb_shootdown(vaddr, length);
+
+    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
+}
+
+void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr, size_t length) {
+    ASSERT(vaddr % ARCH_PAGE_GRANULARITY == 0);
+    ASSERT(length % ARCH_PAGE_GRANULARITY == 0);
+
+    interrupt_state_t previous_state = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
+
+    for(size_t i = 0; i < length; i += ARCH_PAGE_GRANULARITY) {
+        uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
+        for(int j = 4; j > 1; j--) {
+            int index = VADDR_TO_INDEX(vaddr + i, j);
+            if((current_table[index] & PTE_FLAG_PRESENT) == 0) goto skip;
+            current_table = (uint64_t *) HHDM(current_table[index] & ADDRESS_MASK);
+        }
+        __atomic_store_n(&current_table[VADDR_TO_INDEX(vaddr + i, 1)], 0, __ATOMIC_SEQ_CST);
+    skip:
+    }
+
+    tlb_shootdown(vaddr, length);
 
     spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
 }

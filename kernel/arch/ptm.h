@@ -12,11 +12,14 @@ vm_address_space_t *arch_ptm_address_space_create();
 /// Load a virtual address space.
 void arch_ptm_load_address_space(vm_address_space_t *address_space);
 
-/// Map a virtual address to a physical address.
-void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t paddr, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global);
+/// Map virtual addresses to physical addresses.
+void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t paddr, size_t length, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global);
 
-/// Unmap a virtual address from address space.
-void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr);
+// Rewrite flags for given addresses.
+void arch_ptm_rewrite(vm_address_space_t *address_space, uintptr_t vaddr, size_t length, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global);
+
+/// Unmap virtual addresses from address space.
+void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr, size_t length);
 
 /// Translate a virtual address to a physical address.
 /// @returns true on success
