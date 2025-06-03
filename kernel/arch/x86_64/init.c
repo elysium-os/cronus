@@ -383,7 +383,7 @@ static time_frequency_t calibrate_tsc() {
         uintptr_t end = pagecache_start + MATH_CEIL(((entry.base + entry.length) / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
         if(start > pagecache_end) pagecache_end = start;
         for(; pagecache_end < end; pagecache_end += ARCH_PAGE_GRANULARITY) {
-            arch_ptm_map(g_vm_global_address_space, pagecache_end, bootmem_alloc(), (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
+            arch_ptm_map(g_vm_global_address_space, pagecache_end, bootmem_alloc(), ARCH_PAGE_GRANULARITY, (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
         }
 
         pmm_region_add(entry.base, entry.length, (g_bootmem_base / ARCH_PAGE_GRANULARITY) - (entry.base / ARCH_PAGE_GRANULARITY));
@@ -569,19 +569,28 @@ static time_frequency_t calibrate_tsc() {
     x86_64_sched_init_cpu(X86_64_CPU_CURRENT.self);
 
 #ifdef __ENV_DEVELOPMENT
-    // Load Test Module
-    vfs_node_t *test_module_file = nullptr;
-    vfs_lookup(&VFS_ABSOLUTE_PATH("/sys/modules/test.cronmod"), &test_module_file);
-    if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup test module (%i)", res);
-    if(test_module_file == nullptr) panic("INIT", "no test module found");
+    // Find modules dir
+    vfs_node_t *modules_dir = nullptr;
+    res = vfs_lookup(&VFS_ABSOLUTE_PATH("/sys/modules"), &modules_dir);
+    if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup modules directory (%i)", res);
+    if(modules_dir == nullptr) panic("INIT", "no modules directory found");
 
-    module_t *module;
-    module_result_t mres = module_load(test_module_file, &module);
-    if(mres != MODULE_RESULT_OK) panic("INIT", "failed to load test module `%s`", module_result_stringify(mres));
+    // Run Test Modules
+    static const char *test_modules[] = { "test_pmm.cronmod", "test_vm.cronmod" };
 
-    // Run tests
-    if(module->initialize != nullptr) module->initialize();
-    if(module->uninitialize != nullptr) module->uninitialize();
+    for(size_t i = 0; i < sizeof(test_modules) / sizeof(char *); i++) {
+        vfs_node_t *test_module_file = nullptr;
+        res = vfs_lookup(&(vfs_path_t) { .root = modules_dir, .relative_path = test_modules[i] }, &test_module_file);
+        if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup `%s` module (%i)", test_modules[i], res);
+        if(test_module_file == nullptr) panic("INIT", "no `%s` module found", test_modules[i]);
+
+        module_t *module;
+        module_result_t mres = module_load(test_module_file, &module);
+        if(mres != MODULE_RESULT_OK) panic("INIT", "failed to load `%s` module `%s`", test_modules[i], module_result_stringify(mres));
+
+        if(module->initialize != nullptr) module->initialize();
+        if(module->uninitialize != nullptr) module->uninitialize();
+    }
 #endif
 
     // Schedule init threads
