@@ -18,8 +18,6 @@ static bool check_as(vm_address_space_t *as, int n, ...) {
     va_list list;
     va_start(list, n);
 
-    log(LOG_LEVEL_DEBUG, "XXX", "====================================================");
-
     uintptr_t addr = 0;
     for(int i = 0; i < n; i++) {
         as_check_t chk = va_arg(list, as_check_t);
@@ -32,7 +30,6 @@ static bool check_as(vm_address_space_t *as, int n, ...) {
 
 
         vm_region_t *region = CONTAINER_OF(node, vm_region_t, rb_node);
-        log(LOG_LEVEL_DEBUG, "XXX", "Region, %#lx, %#lx", region->base, region->length);
         if(region->base != chk.offset * ARCH_PAGE_GRANULARITY || region->length != chk.count * ARCH_PAGE_GRANULARITY) {
             va_end(list);
             return false;
@@ -40,7 +37,6 @@ static bool check_as(vm_address_space_t *as, int n, ...) {
 
         addr = region->base + region->length;
     }
-    log(LOG_LEVEL_DEBUG, "XXX", "----------------------------------------------------");
 
     rb_node_t *node = rb_search(&as->regions, addr, RB_SEARCH_TYPE_NEAREST_GTE);
     va_end(list);
