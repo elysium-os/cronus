@@ -6,7 +6,6 @@
 #include "arch/page.h"
 #include "arch/ptm.h"
 #include "arch/sched.h"
-#include "arch/time.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "common/panic.h"
@@ -56,6 +55,7 @@
 #include "arch/x86_64/ptm.h"
 #include "arch/x86_64/sched.h"
 #include "arch/x86_64/syscall.h"
+#include "arch/x86_64/tlb.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -337,6 +337,8 @@ static time_frequency_t calibrate_tsc() {
     uint64_t cr4 = x86_64_cr4_read();
     cr4 |= 1 << 7; /* CR4.PGE */
     x86_64_cr4_write(cr4);
+
+    x86_64_tlb_init_ipis();
 
     g_vm_global_address_space = x86_64_ptm_init();
     x86_64_interrupt_set(0xE, x86_64_ptm_page_fault_handler);
