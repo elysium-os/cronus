@@ -28,7 +28,7 @@ typedef struct {
     size_t free_page_count;
 } pmm_zone_t;
 
-typedef struct [[gnu::packed]] pmm_block {
+typedef struct pmm_block {
     list_node_t list_node; /* unallocated = used by pmm */
     uint8_t order     : 3;
     uint8_t max_order : 3;

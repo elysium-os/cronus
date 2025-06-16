@@ -9,7 +9,7 @@
 
 #define PAGE_FROM_BLOCK(BLOCK) (CONTAINER_OF((BLOCK), page_t, block))
 
-typedef struct [[gnu::packed]] {
+typedef struct {
     pmm_block_t block;
 } page_t;
 
