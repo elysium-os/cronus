@@ -78,13 +78,15 @@ static long g_next_tid = BOOTSTRAP_TID + 1;
 }
 
 [[gnu::no_instrument_function]] static void sched_entry([[maybe_unused]] void *data) {
-    sched_yield(THREAD_STATE_READY);
+    interrupt_state_t previous_state = interrupt_state_mask();
+    if(arch_cpu_current()->sched.preemption_enabled) sched_yield(THREAD_STATE_READY);
+    interrupt_state_restore(previous_state);
 }
 
 [[noreturn]] static void sched_idle() {
     while(true) {
         __builtin_ia32_pause();
-        arch_cpu_halt();
+        asm volatile("hlt");
     }
     ASSERT_UNREACHABLE();
 }

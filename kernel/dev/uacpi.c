@@ -1,16 +1,17 @@
 #include "arch/cpu.h"
+#include "arch/page.h"
 #include "arch/sched.h"
 #include "arch/time.h"
 #include "common/assert.h"
 #include "common/lock/mutex.h"
 #include "common/log.h"
 #include "common/panic.h"
-#include "dev/acpi/acpi.h"
+#include "dev/acpi.h"
 #include "dev/pci.h"
+#include "lib/math.h"
 #include "lib/mem.h"
 #include "lib/string.h"
 #include "memory/heap.h"
-#include "memory/hhdm.h"
 #include "sys/time.h"
 
 #include <uacpi/kernel_api.h>
@@ -34,6 +35,7 @@ typedef struct {
     uacpi_handle ctx;
 } interrupt_handler_t;
 
+
 /*Convenience initialization / deinitialization hooks that will be called by *uACPI automatically when appropriate if compiled -
     in.*/
 #ifdef UACPI_KERNEL_INITIALIZATION
@@ -53,8 +55,8 @@ void uacpi_kernel_deinitialize(void);
 #endif
 
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
-    if(acpi_rsdp() == 0) return UACPI_STATUS_NOT_FOUND;
-    *out_rsdp_address = acpi_rsdp();
+    if(g_acpi_rsdp == 0) return UACPI_STATUS_NOT_FOUND;
+    *out_rsdp_address = g_acpi_rsdp;
     return UACPI_STATUS_OK;
 }
 
@@ -83,11 +85,13 @@ uacpi_status uacpi_kernel_pci_read8(uacpi_handle handle, uacpi_size offset, uacp
     *out_value = pci_config_read_byte(device, offset);
     return UACPI_STATUS_OK;
 }
+
 uacpi_status uacpi_kernel_pci_read16(uacpi_handle handle, uacpi_size offset, uacpi_u16 *out_value) {
     pci_device_t *device = (pci_device_t *) handle;
     *out_value = pci_config_read_word(device, offset);
     return UACPI_STATUS_OK;
 }
+
 uacpi_status uacpi_kernel_pci_read32(uacpi_handle handle, uacpi_size offset, uacpi_u32 *out_value) {
     pci_device_t *device = (pci_device_t *) handle;
     *out_value = pci_config_read_double(device, offset);
@@ -99,11 +103,13 @@ uacpi_status uacpi_kernel_pci_write8(uacpi_handle handle, uacpi_size offset, uac
     pci_config_write_byte(device, offset, in_value);
     return UACPI_STATUS_OK;
 }
+
 uacpi_status uacpi_kernel_pci_write16(uacpi_handle handle, uacpi_size offset, uacpi_u16 in_value) {
     pci_device_t *device = (pci_device_t *) handle;
     pci_config_write_word(device, offset, in_value);
     return UACPI_STATUS_OK;
 }
+
 uacpi_status uacpi_kernel_pci_write32(uacpi_handle handle, uacpi_size offset, uacpi_u32 in_value) {
     pci_device_t *device = (pci_device_t *) handle;
     pci_config_write_double(device, offset, in_value);
@@ -170,11 +176,15 @@ uacpi_status uacpi_kernel_io_write32(uacpi_handle handle, uacpi_size offset, uac
 }
 
 /* Virtual Memory */
-void *uacpi_kernel_map(uacpi_phys_addr addr, [[maybe_unused]] uacpi_size len) {
-    return (void *) HHDM(addr);
+void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
+    size_t offset = addr % ARCH_PAGE_GRANULARITY;
+    uintptr_t ret = (uintptr_t) vm_map_direct(g_vm_global_address_space, nullptr, MATH_CEIL(len + offset, ARCH_PAGE_GRANULARITY), VM_PROT_RW, VM_CACHE_NONE, MATH_FLOOR(addr, ARCH_PAGE_GRANULARITY), VM_FLAG_NONE);
+    return (void *) (ret + offset);
 }
 
-void uacpi_kernel_unmap([[maybe_unused]] void *addr, [[maybe_unused]] uacpi_size len) { /* no-op */ }
+void uacpi_kernel_unmap(void *addr, uacpi_size len) {
+    vm_unmap(g_vm_global_address_space, (void *) MATH_FLOOR((uintptr_t) addr, ARCH_PAGE_GRANULARITY), MATH_CEIL(len + (uintptr_t) addr % ARCH_PAGE_GRANULARITY, ARCH_PAGE_GRANULARITY));
+}
 
 /* Heap */
 void *uacpi_kernel_alloc(uacpi_size size) {
@@ -273,7 +283,8 @@ void uacpi_kernel_release_mutex(uacpi_handle handle) {
 
 /* Scheduling */
 uacpi_thread_id uacpi_kernel_get_thread_id() {
-    return (uacpi_thread_id *) arch_sched_thread_current()->id;
+    // return (uacpi_thread_id *) arch_sched_thread_current()->id;
+    return (uacpi_thread_id *) 0; // TODO: use thread ids, but this is called before scheduling is initialized
 }
 
 /* Firmware Request */

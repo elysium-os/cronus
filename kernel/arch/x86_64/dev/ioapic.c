@@ -1,7 +1,11 @@
 #include "ioapic.h"
 
 #include "arch/mmio.h"
-#include "memory/hhdm.h"
+#include "arch/page.h"
+#include "lib/math.h"
+#include "memory/mmio.h"
+
+#include <uacpi/acpi.h>
 
 #define VER 0x1
 #define VER_MAX_REDIRECTION_ENTRY(val) (((val) >> 16) & 0xFF)
@@ -19,63 +23,6 @@
 #define LEGACY_POLARITY_LOW 0b11
 #define LEGACY_TRIGGER_EDGE (0b1 << 2)
 #define LEGACY_TRIGGER_LEVEL (0b11 << 2)
-
-typedef enum {
-    MADT_RECORD_TYPE_LAPIC = 0,
-    MADT_RECORD_TYPE_IOAPIC,
-    MADT_RECORD_TYPE_SOURCE_OVERRIDE,
-    MADT_RECORD_TYPE_NMI_SOURCE,
-    MADT_RECORD_TYPE_NMI,
-    MADT_RECORD_TYPE_LAPIC_ADDRESS,
-    MADT_RECORD_TYPE_LX2APIC = 9
-} madt_record_type_t;
-
-typedef struct [[gnu::packed]] {
-    acpi_sdt_header_t sdt_header;
-    uint32_t local_apic_address;
-    uint32_t flags;
-} madt_header_t;
-
-typedef struct [[gnu::packed]] {
-    uint8_t type;
-    uint8_t length;
-} madt_record_t;
-
-typedef struct [[gnu::packed]] {
-    madt_record_t base;
-    uint8_t acpi_processor_id;
-    uint8_t apic_id;
-    uint32_t flags;
-} madt_record_lapic_t;
-
-typedef struct [[gnu::packed]] {
-    madt_record_t base;
-    uint8_t ioapic_id;
-    uint8_t rsv0;
-    uint32_t ioapic_address;
-    uint32_t global_system_interrupt_base;
-} madt_record_ioapic_t;
-
-typedef struct [[gnu::packed]] {
-    madt_record_t base;
-    uint16_t rsv0;
-    uint64_t lapic_address;
-} madt_record_lapic_address_t;
-
-typedef struct [[gnu::packed]] {
-    madt_record_t base;
-    uint8_t bus_source;
-    uint8_t irq_source;
-    uint32_t global_system_interrupt;
-    uint16_t flags;
-} madt_record_source_override_t;
-
-typedef struct [[gnu::packed]] {
-    madt_record_ioapic_t base;
-    uint8_t acpi_processor_id;
-    uint16_t flags;
-    uint8_t lint;
-} madt_record_nmi_t;
 
 typedef struct {
     uint8_t gsi;
@@ -104,38 +51,34 @@ static legacy_irq_translation_t g_legacy_irq_map[16] = {
 static volatile uint32_t *g_ioapic;
 
 static void ioapic_write(uint32_t index, uint32_t data) {
-    mmio_write32(g_ioapic, index & 0xFF);
-    mmio_write32(&g_ioapic[4], data);
+    arch_mmio_write32(g_ioapic, index & 0xFF);
+    arch_mmio_write32(&g_ioapic[4], data);
 }
 
 static uint32_t ioapic_read(uint32_t index) {
-    mmio_write32(g_ioapic, index & 0xFF);
-    return mmio_read32(&g_ioapic[4]);
+    arch_mmio_write32(g_ioapic, index & 0xFF);
+    return arch_mmio_read32(&g_ioapic[4]);
 }
 
-void x86_64_ioapic_init(acpi_sdt_header_t *apic_header) {
-    madt_header_t *madt = (madt_header_t *) apic_header;
+void x86_64_ioapic_init(struct acpi_madt *apic_table) {
     uintptr_t ioapic_address = 0;
 
-    uint32_t nbytes = madt->sdt_header.length - sizeof(madt_header_t);
-    madt_record_t *current_record = (madt_record_t *) ((uintptr_t) madt + sizeof(madt_header_t));
+    uint32_t nbytes = apic_table->hdr.length - offsetof(struct acpi_madt, entries);
+    struct acpi_entry_hdr *current_record = apic_table->entries; // (madt_record_t *) ((uintptr_t) apic_table->virt_addr + sizeof(struct acpi_sdt_hdr) + sizeof(madt_header_t));
     while(nbytes > 0) {
         switch(current_record->type) {
-            case MADT_RECORD_TYPE_IOAPIC:
-                madt_record_ioapic_t *ioapic_record = (madt_record_ioapic_t *) current_record;
-                ioapic_address = ioapic_record->ioapic_address;
-                break;
-            case MADT_RECORD_TYPE_SOURCE_OVERRIDE:
-                madt_record_source_override_t *override_record = (madt_record_source_override_t *) current_record;
-                g_legacy_irq_map[override_record->irq_source].gsi = override_record->global_system_interrupt;
-                g_legacy_irq_map[override_record->irq_source].flags = override_record->flags;
+            case ACPI_MADT_ENTRY_TYPE_IOAPIC: ioapic_address = ((struct acpi_madt_ioapic *) current_record)->address; break;
+            case ACPI_MADT_ENTRY_TYPE_INTERRUPT_SOURCE_OVERRIDE:
+                struct acpi_madt_interrupt_source_override *override_record = (struct acpi_madt_interrupt_source_override *) current_record;
+                g_legacy_irq_map[override_record->source].gsi = override_record->gsi;
+                g_legacy_irq_map[override_record->source].flags = override_record->flags;
                 break;
         }
         nbytes -= current_record->length;
-        current_record = (madt_record_t *) ((uintptr_t) current_record + current_record->length);
+        current_record = (struct acpi_entry_hdr *) ((uintptr_t) current_record + current_record->length);
     }
 
-    g_ioapic = (uint32_t *) HHDM(ioapic_address);
+    g_ioapic = mmio_map(ioapic_address, 4096);
 }
 
 void x86_64_ioapic_map_gsi(uint8_t gsi, uint8_t lapic_id, bool low_polarity, bool trigger_mode, uint8_t vector) {

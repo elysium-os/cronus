@@ -1,12 +1,11 @@
 #pragma once
 
-#include "dev/acpi/acpi.h"
-
 #include <stdint.h>
+#include <uacpi/acpi.h>
 
 /// Initialize IOAPIC.
-/// @param apic_header MADT header
-void x86_64_ioapic_init(acpi_sdt_header_t *apic_header);
+/// @param apic_table MADT table
+void x86_64_ioapic_init(struct acpi_madt *apic_table);
 
 /// Map GSI to interrupt vector.
 /// @param gsi Global system interrupt (IRQ)

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "dev/acpi/acpi.h"
 #include "sys/time.h"
 
+#include <uacpi/acpi.h>
+
 /// Initialize HPET.
-/// @param header "HPET" header
-void x86_64_hpet_init(acpi_sdt_header_t *header);
+void x86_64_hpet_init(struct acpi_hpet *header);
 
 /// Get the current time using the HPET MCR.
 time_t hpet_current_time();

@@ -9,7 +9,7 @@
 
 #define VM_FLAG_NONE 0
 #define VM_FLAG_FIXED (1 << 1)
-#define VM_FLAG_NO_DEMAND (1 << 2)
+#define VM_FLAG_DYNAMICALLY_BACKED (1 << 2)
 #define VM_FLAG_ZERO (1 << 10) /* only applies to anonymous mappings */
 
 #define VM_PROT_NONE ((vm_protection_t) {})
@@ -61,6 +61,8 @@ typedef struct {
     vm_protection_t protection;
     vm_cache_t cache_behavior;
 
+    bool dynamically_backed : 1;
+
     rb_node_t rb_node; /* Used for regions list */
     list_node_t list_node; /* Used for region cache */
 
@@ -68,7 +70,6 @@ typedef struct {
         struct {
             bool back_zeroed;
         } anon;
-
         struct {
             uintptr_t physical_address;
         } direct;

@@ -4,8 +4,6 @@
 
 #include "arch/x86_64/interrupt.h"
 
-extern uintptr_t (*g_x86_64_ptm_phys_allocator)();
-
 /// Initialize page table manager.
 vm_address_space_t *x86_64_ptm_init();
 

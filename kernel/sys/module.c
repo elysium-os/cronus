@@ -102,7 +102,7 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
                 if((shdrs[i].flags & ELF64_SHF_EXECINSTR) != 0) prot.exec = true;
 
                 size_t aligned_size = MATH_CEIL(shdrs[i].size, ARCH_PAGE_GRANULARITY);
-                void *addr = vm_map_anon(g_vm_global_address_space, nullptr, aligned_size, prot, VM_CACHE_STANDARD, VM_FLAG_NO_DEMAND);
+                void *addr = vm_map_anon(g_vm_global_address_space, nullptr, aligned_size, prot, VM_CACHE_STANDARD, VM_FLAG_NONE);
                 if(addr == nullptr) return MODULE_RESULT_ERR_VM;
 
                 module_region_t *region = heap_alloc(sizeof(module_region_t));

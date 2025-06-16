@@ -8,6 +8,8 @@ typedef struct sched {
     spinlock_t lock;
     list_t thread_queue;
 
+    bool preemption_enabled;
+
     struct thread *idle_thread;
 } sched_t;
 

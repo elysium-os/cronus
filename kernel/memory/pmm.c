@@ -25,8 +25,7 @@ static inline uint8_t pagecount_to_order(size_t pages) {
     return (uint8_t) ((sizeof(unsigned long long) * 8) - __builtin_clzll(pages - 1));
 }
 
-void pmm_region_add(uintptr_t base, size_t size, size_t used) {
-    ASSERT(base >= ARCH_PAGE_GRANULARITY);
+void pmm_region_add(uintptr_t base, size_t size, bool used) {
     pmm_zone_t *zones[] = { &g_pmm_zone_low, &g_pmm_zone_normal };
     for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
         pmm_zone_t *zone = zones[i];
@@ -44,17 +43,13 @@ void pmm_region_add(uintptr_t base, size_t size, size_t used) {
         size_t page_count = local_size / ARCH_PAGE_GRANULARITY;
 
         zone->total_page_count += page_count;
-        zone->free_page_count += page_count - used;
+        if(!used) zone->free_page_count += page_count;
 
         for(size_t j = 0; j < page_count; j++) {
-            g_page_cache[index_offset + j].block = (pmm_block_t) { .free = true, .order = 0 };
+            g_page_cache[index_offset + j].block = (pmm_block_t) { .free = !used, .order = 0 };
         }
 
-        for(size_t j = 0; j < used; j++) {
-            g_page_cache[index_offset + j].block.free = false;
-        }
-
-        for(size_t j = used; j < page_count;) {
+        for(size_t j = 0; j < page_count;) {
             pmm_order_t order = pagecount_to_order(page_count - j);
             if(order > PMM_MAX_ORDER) order = PMM_MAX_ORDER;
             while(PMM_ORDER_TO_PAGECOUNT(order) > (page_count - j) || ((local_base + j * ARCH_PAGE_GRANULARITY) & (PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY - 1)) != 0) {
@@ -68,12 +63,6 @@ void pmm_region_add(uintptr_t base, size_t size, size_t used) {
             list_push(&zone->lists[order], &page->block.list_node);
 
             j += PMM_ORDER_TO_PAGECOUNT(order);
-        }
-
-        if(used > page_count) {
-            used -= page_count;
-        } else {
-            used = 0;
         }
     }
 }

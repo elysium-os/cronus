@@ -9,7 +9,7 @@
 #include "common/assert.h"
 #include "common/log.h"
 #include "common/panic.h"
-#include "dev/acpi/acpi.h"
+#include "dev/acpi.h"
 #include "dev/pci.h"
 #include "fs/rdsk.h"
 #include "fs/tmpfs.h"
@@ -57,9 +57,10 @@
 #include "arch/x86_64/syscall.h"
 #include "arch/x86_64/tlb.h"
 
+#include <elyboot.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <tartarus.h>
+#include <uacpi/tables.h>
 #include <uacpi/uacpi.h>
 
 #define ADJUST_STACK(OFFSET) asm volatile("mov %%rsp, %%rax\nadd %0, %%rax\nmov %%rax, %%rsp\nmov %%rbp, %%rax\nadd %0, %%rax\nmov %%rax, %%rbp" : : "rm"(OFFSET) : "rax", "memory")
@@ -75,7 +76,8 @@ framebuffer_t g_framebuffer;
 page_t *g_page_cache;
 size_t g_page_cache_size;
 
-static volatile size_t g_init_cpu_id_counter = 0;
+static volatile bool g_init_ap_finished = false;
+static uint64_t g_init_ap_cpu_id = 0;
 
 static size_t g_init_flags = 0;
 
@@ -83,37 +85,15 @@ static vm_region_t g_hhdm_region, g_kernel_region, g_page_cache_region;
 
 static x86_64_cpu_t g_early_bsp;
 
-static uintptr_t g_bootmem_base;
-static size_t g_bootmem_size;
-
 static bool g_hpet_initialized = false;
 
 static int g_event_interrupt_vector = -1;
 
-static uintptr_t bootmem_alloc() {
-    if(g_bootmem_size == 0) panic("BOOTMEM", "out of memory");
-    uintptr_t address = g_bootmem_base;
-    g_bootmem_base += ARCH_PAGE_GRANULARITY;
-    g_bootmem_size -= ARCH_PAGE_GRANULARITY;
-    memclear((void *) HHDM(address), ARCH_PAGE_GRANULARITY);
-    return address;
-}
-
-static uintptr_t proper_alloc() {
-    return PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_ZERO)));
-}
-
 static void thread_init() {
     // OPTIMIZE: we can mask interrupts for uacpi perf lol
 
-    uacpi_status ret = uacpi_initialize(0);
-    if(uacpi_unlikely_error(ret)) {
-        log(LOG_LEVEL_WARN, "UACPI", "initialization failed (%s)", uacpi_status_to_string(ret));
-    } else {
-        ret = uacpi_namespace_load();
-        if(uacpi_unlikely_error(ret)) log(LOG_LEVEL_WARN, "UACPI", "namespace load failed (%s)", uacpi_status_to_string(ret));
-    }
-
+    uacpi_status ret = uacpi_namespace_load();
+    if(uacpi_unlikely_error(ret)) log(LOG_LEVEL_WARN, "UACPI", "namespace load failed (%s)", uacpi_status_to_string(ret));
     log(LOG_LEVEL_INFO, "UACPI", "Setup Done");
 }
 
@@ -172,7 +152,7 @@ static time_frequency_t calibrate_tsc() {
 }
 
 [[noreturn]] static void init_ap() {
-    log(LOG_LEVEL_INFO, "INIT", "Initializing AP %lu", g_init_cpu_id_counter);
+    log(LOG_LEVEL_INFO, "INIT", "Initializing AP %lu", g_init_ap_cpu_id);
 
     x86_64_gdt_init();
 
@@ -187,9 +167,9 @@ static time_frequency_t calibrate_tsc() {
     arch_ptm_load_address_space(g_vm_global_address_space);
 
     // Init CPU local immediately after address space load
-    x86_64_cpu_t *cpu = &g_x86_64_cpus[g_init_cpu_id_counter];
+    x86_64_cpu_t *cpu = &g_x86_64_cpus[g_init_ap_cpu_id];
     cpu->self = cpu;
-    cpu->sequential_id = g_init_cpu_id_counter;
+    cpu->sequential_id = g_init_ap_cpu_id;
     x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
 
     // Interrupts
@@ -228,50 +208,56 @@ static time_frequency_t calibrate_tsc() {
     // Initialize scheduler
     x86_64_sched_init_cpu(cpu);
 
-    log(LOG_LEVEL_DEBUG, "INIT", "AP %lu (Lapic ID: %i) init exit", g_init_cpu_id_counter, x86_64_lapic_id());
-    __atomic_add_fetch(&g_init_cpu_id_counter, 1, __ATOMIC_SEQ_CST);
+    log(LOG_LEVEL_DEBUG, "INIT", "AP %lu (Lapic ID: %i) init exit", g_init_ap_cpu_id, x86_64_lapic_id());
+    __atomic_add_fetch(&g_init_ap_finished, true, __ATOMIC_SEQ_CST);
 
     x86_64_sched_handoff_cpu(cpu, false);
     ASSERT_UNREACHABLE();
 }
 
-[[noreturn]] void init(tartarus_boot_info_t *boot_info) {
-    g_hhdm_offset = boot_info->hhdm.offset;
-    g_hhdm_size = boot_info->hhdm.size;
+[[noreturn]] void init(elyboot_t *boot_info) {
+#ifdef __ENV_DEVELOPMENT
+    x86_64_qemu_debug_putc('\n');
+    log_sink_add(&g_x86_64_qemu_debug_sink);
+#endif
+    log_sink_add(&g_ring_buffer_sink);
+
+    g_hhdm_offset = boot_info->hhdm_base;
+    g_hhdm_size = boot_info->hhdm_size;
+    ASSERT(g_hhdm_offset % ARCH_PAGE_GRANULARITY == 0 && g_hhdm_size % ARCH_PAGE_GRANULARITY == 0);
+
+    g_page_cache = (page_t *) boot_info->page_cache_base;
+    g_page_cache_size = boot_info->page_cache_size;
+    ASSERT((uintptr_t) g_page_cache % ARCH_PAGE_GRANULARITY == 0 && g_page_cache_size % ARCH_PAGE_GRANULARITY == 0);
 
     if(boot_info->framebuffer_count == 0) panic("INIT", "no framebuffer provided");
-    tartarus_framebuffer_t *framebuffer = &boot_info->framebuffers[0];
-    g_framebuffer.physical_address = HHDM_TO_PHYS(framebuffer->address);
+    elyboot_framebuffer_t *framebuffer = &boot_info->framebuffers[0];
+    g_framebuffer.physical_address = framebuffer->paddr;
     g_framebuffer.size = framebuffer->size;
     g_framebuffer.width = framebuffer->width;
     g_framebuffer.height = framebuffer->height;
     g_framebuffer.pitch = framebuffer->pitch;
     // TODO: handle pixel format
 
-    size_t bsp_seq_id = 0;
-    for(size_t i = 0; i < boot_info->cpu_count; i++) {
-        if(boot_info->cpus[i].initialization_failed) continue;
-        if(i == boot_info->bsp_index) bsp_seq_id = g_x86_64_cpu_count;
+    uint32_t highest_seqid = 0;
+    g_x86_64_cpu_count = 0;
+    for(elyboot_uint_t i = 0; i < boot_info->cpu_count; i++) {
+        if(boot_info->cpus[i].init_state == ELYBOOT_CPU_STATE_FAIL) continue;
+        if(boot_info->cpus[i].sequential_id > highest_seqid) highest_seqid = boot_info->cpus[i].sequential_id;
         g_x86_64_cpu_count++;
     }
+    if(g_x86_64_cpu_count - 1 != highest_seqid) panic("INIT", "Highest sequential id to cpu count mismatch");
 
     memclear(&g_early_bsp, sizeof(g_early_bsp));
     g_early_bsp.self = &g_early_bsp;
-    g_early_bsp.sequential_id = bsp_seq_id;
+    g_early_bsp.sequential_id = boot_info->cpus[boot_info->bsp_index].sequential_id;
     x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
-
-#ifdef __ENV_DEVELOPMENT
-    x86_64_qemu_debug_putc('\n');
-    log_sink_add(&g_x86_64_qemu_debug_sink);
-#endif
-
-    log_sink_add(&g_ring_buffer_sink);
-    log_sink_add(&g_terminal_sink);
 
     log(LOG_LEVEL_DEBUG, "INIT", "Counted %lu working CPUs", g_x86_64_cpu_count);
     ASSERT(g_x86_64_cpu_count > 0);
 
     draw_rect(&g_framebuffer, 0, 0, g_framebuffer.width, g_framebuffer.height, draw_color(14, 14, 15));
+    log_sink_add(&g_terminal_sink);
     log(LOG_LEVEL_INFO, "INIT", "Elysium " MACROS_STRINGIFY(__ARCH) " " MACROS_STRINGIFY(__VERSION) " (" __DATE__ " " __TIME__ ")");
 
     char brand1[12];
@@ -288,9 +274,9 @@ static time_frequency_t calibrate_tsc() {
     }
     log(LOG_LEVEL_INFO, "INIT", "Running on %.*s (%.*s)", 12, brand1, 48, brand2);
 
-    log(LOG_LEVEL_DEBUG, "INIT", "Enumerating %u modules", boot_info->module_count);
+    log(LOG_LEVEL_DEBUG, "INIT", "Enumerating %lu modules", boot_info->module_count);
     for(uint16_t i = 0; i < boot_info->module_count; i++) {
-        tartarus_module_t *module = &boot_info->modules[i];
+        elyboot_module_t *module = &boot_info->modules[i];
         log(LOG_LEVEL_DEBUG, "INIT", "| Module found: `%s`", module->name);
 
         if(!string_eq("kernel.ksym", module->name)) continue;
@@ -311,27 +297,34 @@ static time_frequency_t calibrate_tsc() {
         }
     }
 
-    // Initialize early physical memory
-    size_t early_mem_index = ({
-        size_t largest_index = 0;
-        size_t largest_size = 0;
-        for(int i = 0; i < boot_info->memory_map.size; i++) {
-            tartarus_memory_map_entry_t entry = boot_info->memory_map.entries[i];
-            if(entry.type != TARTARUS_MEMORY_MAP_TYPE_USABLE) continue;
-            if(entry.length < largest_size) continue;
-            largest_index = i;
-            largest_size = entry.length;
+    // Initialize physical memory
+    log(LOG_LEVEL_DEBUG, "INIT", "Physical Memory Map");
+    pmm_zone_t *zones[] = { &g_pmm_zone_low, &g_pmm_zone_normal };
+    for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
+        pmm_zone_t *zone = zones[i];
+        log(LOG_LEVEL_DEBUG, "INIT", "» %-6s %#-18lx -> %#-18lx %lu/%lu pages", zone->name, zone->start, zone->end, zone->free_page_count, zone->total_page_count);
+    }
+
+    for(size_t i = 0; i < boot_info->mm_entry_count; i++) {
+        elyboot_mm_entry_t *entry = &boot_info->mm_entries[i];
+        bool used = true;
+        switch(entry->type) {
+            case ELYBOOT_MM_TYPE_FREE:                   used = false; break;
+            case ELYBOOT_MM_TYPE_BOOTLOADER_RECLAIMABLE: break;
+            case ELYBOOT_MM_TYPE_EFI_RECLAIMABLE:        break;
+            case ELYBOOT_MM_TYPE_ACPI_RECLAIMABLE:       break;
+            default:                                     continue;
         }
-        largest_index;
-    });
-    g_bootmem_base = boot_info->memory_map.entries[early_mem_index].base;
-    g_bootmem_size = boot_info->memory_map.entries[early_mem_index].length;
-    log(LOG_LEVEL_DEBUG, "INIT", "bootmem region (base: %#lx, size: %#lx)", g_bootmem_base, g_bootmem_size);
+        ASSERT(entry->address % ARCH_PAGE_GRANULARITY == 0 && entry->length % ARCH_PAGE_GRANULARITY == 0);
 
-    g_x86_64_ptm_phys_allocator = bootmem_alloc;
-    x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_PHYS_EARLY);
+        log(LOG_LEVEL_DEBUG, "INIT", ">> %#lx -> %#lx", entry->address, entry->address + entry->length);
 
-    // Initialize Virtual Memory
+        pmm_region_add(entry->address, entry->length, used);
+    }
+
+    x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_PHYS);
+
+    // Initialize Early Virtual Memory
     pat_init();
 
     uint64_t cr4 = x86_64_cr4_read();
@@ -343,83 +336,84 @@ static time_frequency_t calibrate_tsc() {
     g_vm_global_address_space = x86_64_ptm_init();
     x86_64_interrupt_set(0xE, x86_64_ptm_page_fault_handler);
 
+    // Protect page cache
+    ASSERT(boot_info->page_cache_base % ARCH_PAGE_GRANULARITY == 0);
+    ASSERT(g_page_cache_size % ARCH_PAGE_GRANULARITY == 0);
+    g_page_cache_region.address_space = g_vm_global_address_space;
+    g_page_cache_region.base = boot_info->page_cache_base;
+    g_page_cache_region.length = g_page_cache_size;
+    g_page_cache_region.protection = VM_PROT_RW;
+    g_page_cache_region.cache_behavior = VM_CACHE_STANDARD;
+    g_page_cache_region.type = VM_REGION_TYPE_ANON;
+    g_page_cache_region.dynamically_backed = false;
+    g_page_cache_region.type_data.anon.back_zeroed = false;
+    rb_insert(&g_vm_global_address_space->regions, &g_page_cache_region.rb_node);
+    log(LOG_LEVEL_DEBUG, "INIT", "Global Region: Page Cache (base: %#lx, size: %#lx)", g_page_cache_region.base, g_page_cache_region.length);
+
+    // Map HHDM
+    log(LOG_LEVEL_DEBUG, "INIT", "Mapping HHDM (base: %#lx, size: %#lx)", g_hhdm_offset, g_hhdm_size);
+    ASSERT(g_hhdm_offset % ARCH_PAGE_GRANULARITY == 0 && g_hhdm_size % ARCH_PAGE_GRANULARITY == 0);
+
     g_hhdm_region.address_space = g_vm_global_address_space;
-    g_hhdm_region.base = MATH_FLOOR(g_hhdm_offset, ARCH_PAGE_GRANULARITY);
-    g_hhdm_region.length = MATH_CEIL(g_hhdm_size, ARCH_PAGE_GRANULARITY);
-    g_hhdm_region.protection = (vm_protection_t) { .read = true, .write = true };
+    g_hhdm_region.base = g_hhdm_offset;
+    g_hhdm_region.length = g_hhdm_size;
+    g_hhdm_region.protection = VM_PROT_RW;
     g_hhdm_region.cache_behavior = VM_CACHE_STANDARD;
     g_hhdm_region.type = VM_REGION_TYPE_DIRECT;
     g_hhdm_region.type_data.direct.physical_address = 0;
     rb_insert(&g_vm_global_address_space->regions, &g_hhdm_region.rb_node);
-    log(LOG_LEVEL_DEBUG, "INIT", "HHDM (base: %#lx, size: %#lx)", g_hhdm_region.base, g_hhdm_region.length);
+    log(LOG_LEVEL_DEBUG, "INIT", "Global Region: HHDM (base: %#lx, size: %#lx)", g_hhdm_region.base, g_hhdm_region.length);
 
-    g_kernel_region.address_space = g_vm_global_address_space;
-    g_kernel_region.base = MATH_FLOOR(boot_info->kernel.vaddr, ARCH_PAGE_GRANULARITY);
-    g_kernel_region.length = MATH_CEIL(boot_info->kernel.size, ARCH_PAGE_GRANULARITY);
-    g_kernel_region.protection = (vm_protection_t) { .read = true, .write = true };
-    g_kernel_region.cache_behavior = VM_CACHE_STANDARD;
-    g_kernel_region.type = VM_REGION_TYPE_ANON;
-    rb_insert(&g_vm_global_address_space->regions, &g_kernel_region.rb_node);
-    log(LOG_LEVEL_DEBUG, "INIT", "Kernel (base: %#lx, size: %#lx)", g_kernel_region.base, g_kernel_region.length);
+    // for(size_t i = 0; i < boot_info->memory_map.size; i++) {
+    //     tartarus_memory_map_entry_t *entry = &boot_info->memory_map.entries[i];
+    //     if(entry->type != TARTARUS_MEMORY_MAP_TYPE_USABLE) continue;
 
-    ADJUST_STACK(g_hhdm_offset);
+    //     ASSERT(entry->base + entry->length <= g_hhdm_size);
+    //     arch_ptm_map(g_vm_global_address_space, entry->base + g_hhdm_offset, entry->base, entry->length, VM_PROT_RW, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
+    // }
+
+    // Map the kernel
+    log(LOG_LEVEL_DEBUG, "INIT", "Mapping Kernel (base: %#lx, size: %#lx)", g_kernel_region.base, g_kernel_region.length);
+    for(uint64_t i = 0; i < boot_info->kernel_segment_count; i++) {
+        elyboot_kernel_segment_t *segment = &boot_info->kernel_segments[i];
+        log(LOG_LEVEL_DEBUG,
+            "INIT",
+            "| Mapping Kernel Segment { %#lx -> %#lx [%c%c%c] }",
+            segment->vaddr,
+            segment->vaddr + segment->size,
+            (segment->flags & ELYBOOT_KERNEL_SEGMENT_FLAG_READ) != 0 ? 'R' : ' ',
+            (segment->flags & ELYBOOT_KERNEL_SEGMENT_FLAG_WRITE) != 0 ? 'W' : ' ',
+            (segment->flags & ELYBOOT_KERNEL_SEGMENT_FLAG_EXECUTE) != 0 ? 'X' : ' ');
+
+        ASSERT(segment->vaddr % ARCH_PAGE_GRANULARITY == 0 && segment->size % ARCH_PAGE_GRANULARITY == 0);
+
+        vm_map_direct(
+            g_vm_global_address_space,
+            (void *) segment->vaddr,
+            segment->size,
+            (vm_protection_t) {
+                .read = (segment->flags & ELYBOOT_KERNEL_SEGMENT_FLAG_READ) != 0,
+                .write = (segment->flags & ELYBOOT_KERNEL_SEGMENT_FLAG_WRITE) != 0,
+                .exec = (segment->flags & ELYBOOT_KERNEL_SEGMENT_FLAG_EXECUTE) != 0,
+            },
+            VM_CACHE_STANDARD,
+            segment->paddr,
+            VM_FLAG_FIXED
+        );
+    }
+
+    // Load the new address space
+    log(LOG_LEVEL_DEBUG, "INIT", "Loading global address space...");
     arch_ptm_load_address_space(g_vm_global_address_space);
     x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_VIRT);
 
-    // Initialize physical memory
-    uintptr_t early_mem_base = g_bootmem_base;
-    size_t early_mem_size = g_bootmem_size;
-
-    uintptr_t pagecache_start = boot_info->hhdm.offset + boot_info->hhdm.size;
-    size_t pagecache_end = pagecache_start;
-    g_page_cache = (page_t *) pagecache_start;
-
-    for(size_t i = 0; i < boot_info->memory_map.size; i++) {
-        tartarus_memory_map_entry_t entry = boot_info->memory_map.entries[i];
-        if(entry.type != TARTARUS_MEMORY_MAP_TYPE_USABLE) continue;
-
-        g_bootmem_base = early_mem_index == i ? early_mem_base : entry.base;
-        g_bootmem_size = early_mem_index == i ? early_mem_size : entry.length;
-
-        uintptr_t start = pagecache_start + MATH_FLOOR((entry.base / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
-        uintptr_t end = pagecache_start + MATH_CEIL(((entry.base + entry.length) / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
-        if(start > pagecache_end) pagecache_end = start;
-        for(; pagecache_end < end; pagecache_end += ARCH_PAGE_GRANULARITY) {
-            arch_ptm_map(g_vm_global_address_space, pagecache_end, bootmem_alloc(), ARCH_PAGE_GRANULARITY, (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
-        }
-
-        pmm_region_add(entry.base, entry.length, (g_bootmem_base / ARCH_PAGE_GRANULARITY) - (entry.base / ARCH_PAGE_GRANULARITY));
-    }
-    g_page_cache_size = pagecache_end - pagecache_start;
-
-    ASSERT(pagecache_start % ARCH_PAGE_GRANULARITY == 0);
-    ASSERT(g_page_cache_size % ARCH_PAGE_GRANULARITY == 0);
-    g_page_cache_region.address_space = g_vm_global_address_space;
-    g_page_cache_region.base = pagecache_start;
-    g_page_cache_region.length = g_page_cache_size;
-    g_page_cache_region.protection = (vm_protection_t) { .read = true, .write = true };
-    g_page_cache_region.cache_behavior = VM_CACHE_STANDARD;
-    g_page_cache_region.type = VM_REGION_TYPE_ANON; // TODO: this is a lie
-    g_page_cache_region.type_data.anon.back_zeroed = false;
-    rb_insert(&g_vm_global_address_space->regions, &g_page_cache_region.rb_node);
-    log(LOG_LEVEL_DEBUG, "INIT", "Page Cache (base: %#lx, size: %#lx)", pagecache_start, g_page_cache_size);
-
-    g_x86_64_ptm_phys_allocator = proper_alloc;
-    x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_PHYS);
-
-    log(LOG_LEVEL_DEBUG, "INIT", "Physical Memory Map");
-    pmm_zone_t *zones[] = { &g_pmm_zone_low, &g_pmm_zone_normal };
-    for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
-        pmm_zone_t *zone = zones[i];
-        log(LOG_LEVEL_DEBUG, "INIT", "» %-6s %#-18lx -> %#-18lx %lu/%lu pages", zone->name, zone->start, zone->end, zone->free_page_count, zone->total_page_count);
-    }
-
     // Initialize interrupts
+    log(LOG_LEVEL_DEBUG, "INIT", "Initializing interrupts");
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
     // TODO: fails ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_ARAT));
 
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_TSC));
-    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_TSC_INVARIANT));
+    // ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_TSC_INVARIANT)); // TODO: doesnt work on tcg
 
     x86_64_pic8259_remap();
     x86_64_pic8259_disable();
@@ -429,6 +423,7 @@ static time_frequency_t calibrate_tsc() {
     x86_64_init_flag_set(X86_64_INIT_FLAG_INTERRUPTS);
 
     // Initialize HEAP
+    log(LOG_LEVEL_DEBUG, "INIT", "Initializing slab & heap");
     slab_init();
     heap_initialize();
 
@@ -437,24 +432,36 @@ static time_frequency_t calibrate_tsc() {
     x86_64_fpu_init_cpu();
 
     // Initialize ACPI
-    log(LOG_LEVEL_DEBUG, "INIT", "RSDP at %#lx", boot_info->acpi_rsdp_address);
-    acpi_init(boot_info->acpi_rsdp_address);
+    log(LOG_LEVEL_DEBUG, "INIT", "RSDP at %#lx", boot_info->acpi_rsdp);
+    g_acpi_rsdp = boot_info->acpi_rsdp;
+
+    uacpi_status ret = uacpi_initialize(0);
+    if(uacpi_unlikely_error(ret)) panic("INIT", "UACPI initialization failed (%s)", uacpi_status_to_string(ret));
 
     // Initialize IOAPIC
-    acpi_sdt_header_t *madt = acpi_find_table((uint8_t *) "APIC");
-    if(madt != nullptr) x86_64_ioapic_init(madt);
+    uacpi_table madt;
+    ret = uacpi_table_find_by_signature(ACPI_MADT_SIGNATURE, &madt);
+    if(uacpi_likely_success(ret)) {
+        x86_64_ioapic_init((struct acpi_madt *) madt.hdr);
+        uacpi_table_unref(&madt);
+    }
 
     // Initialize PCI
-    acpi_sdt_header_t *mcfg = acpi_find_table((uint8_t *) "MCFG");
-    pci_enumerate(mcfg);
+    uacpi_table mcfg;
+    ret = uacpi_table_find_by_signature(ACPI_MCFG_SIGNATURE, &mcfg);
+    if(uacpi_likely_success(ret)) {
+        pci_enumerate((struct acpi_mcfg *) mcfg.hdr);
+        uacpi_table_unref(&mcfg);
+    }
 
     // Initialize timer
-    acpi_sdt_header_t *hpet_header = acpi_find_table((uint8_t *) "HPET");
-    if(hpet_header == nullptr) {
-        panic("INIT", "no viable time source found");
+    uacpi_table hpet;
+    ret = uacpi_table_find_by_signature(ACPI_HPET_SIGNATURE, &hpet);
+    if(uacpi_likely_success(ret)) {
+        x86_64_hpet_init((struct acpi_hpet *) hpet.hdr);
+        uacpi_table_unref(&hpet);
+        g_hpet_initialized = true;
     }
-    x86_64_hpet_init(hpet_header);
-    g_hpet_initialized = true;
 
     time_frequency_t lapic_timer_freq = calibrate_lapic_timer();
     time_frequency_t tsc_timer_freq = calibrate_tsc();
@@ -475,18 +482,16 @@ static time_frequency_t calibrate_tsc() {
     tss->iomap_base = sizeof(x86_64_tss_t);
     x86_64_gdt_load_tss(tss);
 
-    log(LOG_LEVEL_DEBUG, "INIT", "> BSP(%u)", boot_info->bsp_index);
+    log(LOG_LEVEL_DEBUG, "INIT", "> BSP(%lu)", boot_info->bsp_index);
 
     x86_64_cpu_t *cpu = nullptr;
     for(size_t i = 0; i < boot_info->cpu_count; i++) {
-        if(boot_info->cpus[i].initialization_failed) continue;
+        if(boot_info->cpus[i].init_state == ELYBOOT_CPU_STATE_FAIL) continue;
 
         if(i == boot_info->bsp_index) {
-            cpu = &g_x86_64_cpus[g_init_cpu_id_counter];
-            *cpu = g_early_bsp;
+            cpu = &g_x86_64_cpus[boot_info->cpus[i].sequential_id];
             cpu->self = cpu;
-            cpu->sequential_id = g_init_cpu_id_counter;
-            ASSERT(g_init_cpu_id_counter == bsp_seq_id);
+            cpu->sequential_id = boot_info->cpus[i].sequential_id;
             cpu->lapic_id = x86_64_lapic_id();
             cpu->lapic_timer_frequency = lapic_timer_freq;
             cpu->tsc_timer_frequency = tsc_timer_freq;
@@ -494,18 +499,18 @@ static time_frequency_t calibrate_tsc() {
             cpu->common.events = event_queue_make();
             cpu->current_thread = nullptr;
             x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
-            g_init_cpu_id_counter++;
             continue;
         }
 
-        size_t previous_count = g_init_cpu_id_counter;
+        g_init_ap_cpu_id = boot_info->cpus[i].sequential_id;
+        g_init_ap_finished = false;
+
         __atomic_store_n(boot_info->cpus[i].wake_on_write, (uintptr_t) init_ap, __ATOMIC_RELEASE);
-        while(previous_count >= g_init_cpu_id_counter);
+        while(!g_init_ap_finished);
     }
     ASSERT(cpu != nullptr);
-    ASSERT(g_init_cpu_id_counter == g_x86_64_cpu_count);
 
-    log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%lu/%i cpus initialized)", g_init_cpu_id_counter, boot_info->cpu_count);
+    log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%lu/%lu cpus initialized)", g_x86_64_cpu_count, boot_info->cpu_count);
     log(LOG_LEVEL_DEBUG, "INIT", "BSP seqid is %lu", X86_64_CPU_CURRENT.sequential_id);
     x86_64_init_flag_set(X86_64_INIT_FLAG_SMP);
 
@@ -524,9 +529,9 @@ static time_frequency_t calibrate_tsc() {
     arch_event_timer_setup(g_event_interrupt_vector);
 
     // Initialize VFS
-    tartarus_module_t *sysroot_module = nullptr;
+    elyboot_module_t *sysroot_module = nullptr;
     for(uint16_t i = 0; i < boot_info->module_count; i++) {
-        tartarus_module_t *module = &boot_info->modules[i];
+        elyboot_module_t *module = &boot_info->modules[i];
         if(!string_eq(module->name, "root.rdk")) continue;
         sysroot_module = module;
         break;

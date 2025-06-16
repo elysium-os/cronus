@@ -1,8 +1,7 @@
 #include "lapic.h"
 
-#include "arch/mmio.h"
 #include "common/assert.h"
-#include "memory/vm.h"
+#include "memory/mmio.h"
 
 #include "arch/x86_64/cpu/msr.h"
 
@@ -24,16 +23,16 @@ static uintptr_t g_common_paddr = 0;
 static void *g_common_vaddr = nullptr;
 
 [[clang::always_inline]] static void lapic_write(uint32_t reg, uint32_t data) {
-    mmio_write32((void *) ((uintptr_t) g_common_vaddr + reg), data);
+    arch_mmio_write32((void *) ((uintptr_t) g_common_vaddr + reg), data);
 }
 
 [[clang::always_inline]] static uint32_t lapic_read(uint32_t reg) {
-    return mmio_read32((void *) ((uintptr_t) g_common_vaddr + reg));
+    return arch_mmio_read32((void *) ((uintptr_t) g_common_vaddr + reg));
 }
 
 void x86_64_lapic_init() {
     g_common_paddr = x86_64_msr_read(X86_64_MSR_APIC_BASE) & BASE_ADDR_MASK;
-    g_common_vaddr = vm_map_direct(g_vm_global_address_space, nullptr, 4096, VM_PROT_RW, VM_CACHE_NONE, g_common_paddr, VM_FLAG_NO_DEMAND);
+    g_common_vaddr = mmio_map(g_common_paddr, 4096);
     ASSERT(g_common_vaddr != nullptr);
     ASSERT(g_common_paddr != 0 && (g_common_paddr & BASE_ADDR_MASK) == g_common_paddr);
 }

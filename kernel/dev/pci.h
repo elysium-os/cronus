@@ -1,10 +1,11 @@
 #pragma once
 
 #include "common/lock/spinlock.h"
-#include "dev/acpi/acpi.h"
+#include "dev/acpi.h"
 #include "lib/list.h"
 
 #include <stdint.h>
+#include <uacpi/acpi.h>
 
 #define PCI_DRIVER_MATCH_CLASS (1 << 0)
 #define PCI_DRIVER_MATCH_SUBCLASS (1 << 1)
@@ -37,7 +38,7 @@ extern list_t g_pci_devices;
 
 /// Enumerate PCI devices.
 /// @param mcfg MCFG table or nullptr
-void pci_enumerate(acpi_sdt_header_t *mcfg);
+void pci_enumerate(struct acpi_mcfg *mcfg);
 
 /// Read byte from device config.
 uint8_t pci_config_read_byte(pci_device_t *device, uint8_t offset);

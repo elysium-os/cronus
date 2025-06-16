@@ -18,7 +18,7 @@ uintptr_t x86_64_sysv_stack_setup(vm_address_space_t *address_space, size_t stac
         ASSERT(copyto_count == 4);                                       \
     }
 
-    void *stack_ptr = vm_map_anon(address_space, nullptr, stack_size, (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_FLAG_NONE);
+    void *stack_ptr = vm_map_anon(address_space, nullptr, stack_size, (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_FLAG_DYNAMICALLY_BACKED);
     ASSERT(stack_ptr != nullptr);
     uintptr_t stack = (uintptr_t) stack_ptr + stack_size - 1;
     stack &= ~0xF;

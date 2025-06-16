@@ -114,11 +114,11 @@ elf_result_t elf_load(elf_file_t *elf_file, vm_address_space_t *as) {
                 uintptr_t aligned_vaddr = MATH_FLOOR(phdr->vaddr, ARCH_PAGE_GRANULARITY);
                 size_t length = MATH_CEIL(phdr->memsz + (phdr->vaddr - aligned_vaddr), ARCH_PAGE_GRANULARITY);
 
-                void *ptr = vm_map_anon(as, (void *) aligned_vaddr, length, prot, VM_CACHE_STANDARD, VM_FLAG_FIXED | VM_FLAG_ZERO);
+                void *ptr = vm_map_anon(as, (void *) aligned_vaddr, length, prot, VM_CACHE_STANDARD, VM_FLAG_FIXED | VM_FLAG_ZERO | VM_FLAG_DYNAMICALLY_BACKED);
                 ASSERT(ptr != nullptr);
                 if(phdr->filesz > 0) {
                     size_t buffer_size = MATH_CEIL(phdr->filesz, ARCH_PAGE_GRANULARITY);
-                    void *buffer = vm_map_anon(g_vm_global_address_space, nullptr, buffer_size, VM_PROT_RW, VM_CACHE_STANDARD, VM_FLAG_NO_DEMAND);
+                    void *buffer = vm_map_anon(g_vm_global_address_space, nullptr, buffer_size, VM_PROT_RW, VM_CACHE_STANDARD, VM_FLAG_NONE);
                     ASSERT(buffer != nullptr);
 
                     size_t read_count;

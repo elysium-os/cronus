@@ -28,7 +28,7 @@ typedef struct {
     size_t free_page_count;
 } pmm_zone_t;
 
-typedef struct pmm_block {
+typedef struct [[gnu::packed]] pmm_block {
     list_node_t list_node; /* unallocated = used by pmm */
     uint8_t order     : 3;
     uint8_t max_order : 3;
@@ -41,8 +41,7 @@ extern pmm_zone_t g_pmm_zone_low;
 /// Adds a block of memory to be managed by the PMM.
 /// @param base Region base address
 /// @param size Region size in bytes
-/// @param used Count of pages already used
-void pmm_region_add(uintptr_t base, size_t size, size_t used);
+void pmm_region_add(uintptr_t base, size_t size, bool used);
 
 /// Allocates a block of size order^2 pages.
 pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags);

@@ -109,6 +109,7 @@ static bool regions_mergeable(vm_region_t *left, vm_region_t *right) {
     if(left->base + left->length != right->base) return false;
     if(!PROT_EQUALS(&left->protection, &right->protection)) return false;
     if(left->cache_behavior != right->cache_behavior) return false;
+    if(left->dynamically_backed != right->dynamically_backed) return false;
 
     switch(left->type) {
         case VM_REGION_TYPE_ANON:
@@ -143,6 +144,7 @@ static vm_region_t *region_alloc(bool global_lock_acquired) {
         region[0].length = ARCH_PAGE_GRANULARITY;
         region[0].protection = VM_PROT_RW;
         region[0].cache_behavior = VM_CACHE_STANDARD;
+        region[0].dynamically_backed = false;
 
         region_insert(g_vm_global_address_space, &region[0]);
         if(!global_lock_acquired) spinlock_primitive_release(&g_vm_global_address_space->lock);
@@ -170,6 +172,7 @@ static vm_region_t *clone_to(bool global_lock_acquired, uintptr_t base, size_t l
     region->address_space = from->address_space;
     region->cache_behavior = from->cache_behavior;
     region->protection = from->protection;
+    region->dynamically_backed = from->dynamically_backed;
 
     switch(from->type) {
         case VM_REGION_TYPE_ANON: region->type_data.anon.back_zeroed = from->type_data.anon.back_zeroed; break;
@@ -230,7 +233,7 @@ static vm_region_t *addr_to_region(vm_address_space_t *address_space, uintptr_t 
 
 static bool address_space_fix_page(vm_address_space_t *address_space, uintptr_t vaddr) {
     vm_region_t *region = addr_to_region(address_space, vaddr);
-    if(region == nullptr) return false;
+    if(region == nullptr || !region->dynamically_backed) return false;
     region_map(region, MATH_FLOOR(vaddr, ARCH_PAGE_GRANULARITY), ARCH_PAGE_GRANULARITY);
     return true;
 }
@@ -281,6 +284,7 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
     region->length = length;
     region->protection = prot;
     region->cache_behavior = cache;
+    region->dynamically_backed = (flags & VM_FLAG_DYNAMICALLY_BACKED) != 0;
 
     switch(region->type) {
         case VM_REGION_TYPE_ANON: region->type_data.anon.back_zeroed = (flags & VM_FLAG_ZERO) != 0; break;
@@ -290,7 +294,7 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
             break;
     }
 
-    if((flags & VM_FLAG_NO_DEMAND) != 0) region_map(region, region->base, region->length);
+    if(!region->dynamically_backed) region_map(region, region->base, region->length);
 
     region_insert(address_space, region);
 
@@ -454,7 +458,7 @@ size_t vm_copy_to(vm_address_space_t *dest_as, uintptr_t dest_addr, void *src, s
         }
 
         size_t len = MATH_MIN(count - i, ARCH_PAGE_GRANULARITY - offset);
-        memcpy((void *) HHDM(phys + offset), src, len);
+        memcpy((void *) HHDM(phys), src, len);
         i += len;
         src += len;
     }
@@ -474,7 +478,7 @@ size_t vm_copy_from(void *dest, vm_address_space_t *src_as, uintptr_t src_addr, 
         }
 
         size_t len = MATH_MIN(count - i, ARCH_PAGE_GRANULARITY - offset);
-        memcpy(dest, (void *) HHDM(phys + offset), len);
+        memcpy(dest, (void *) HHDM(phys), len);
         i += len;
         dest += len;
     }
