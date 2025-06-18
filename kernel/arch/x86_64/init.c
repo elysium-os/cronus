@@ -25,7 +25,6 @@
 #include "memory/pmm.h"
 #include "memory/slab.h"
 #include "memory/vm.h"
-#include "ring_buffer.h"
 #include "sched/process.h"
 #include "sched/reaper.h"
 #include "sched/sched.h"
@@ -220,7 +219,6 @@ static time_frequency_t calibrate_tsc() {
     x86_64_qemu_debug_putc('\n');
     log_sink_add(&g_x86_64_qemu_debug_sink);
 #endif
-    log_sink_add(&g_ring_buffer_sink);
 
     g_hhdm_offset = boot_info->hhdm_base;
     g_hhdm_size = boot_info->hhdm_size;
@@ -558,19 +556,6 @@ static time_frequency_t calibrate_tsc() {
     if(res != VFS_RESULT_OK) panic("INIT", "failed to mount /tmp (%i)", res);
 
     x86_64_init_flag_set(X86_64_INIT_FLAG_VFS);
-
-    // Flush ring buffer
-    vfs_node_t *log_node;
-    res = vfs_mkfile(&VFS_ABSOLUTE_PATH("/tmp"), "kernel.log", &log_node);
-    if(res != VFS_RESULT_OK) panic("INIT", "failed to make log file (%i)", res);
-
-    size_t count;
-    res = log_node->ops->rw(log_node, &(vfs_rw_t) { .rw = VFS_RW_WRITE, .size = g_ring_buffer.size - g_ring_buffer.index, .offset = 0, .buffer = &g_ring_buffer.buffer[g_ring_buffer.index] }, &count);
-    if(res != VFS_RESULT_OK || count != g_ring_buffer.size - g_ring_buffer.index) panic("INIT", "failed to flush ring buffer");
-    if(g_ring_buffer.full) {
-        res = log_node->ops->rw(log_node, &(vfs_rw_t) { .rw = VFS_RW_WRITE, .size = g_ring_buffer.index, .offset = g_ring_buffer.size - g_ring_buffer.index, .buffer = &g_ring_buffer.buffer }, &count);
-        if(res != VFS_RESULT_OK || count != g_ring_buffer.index) panic("INIT", "failed to flush ring buffer");
-    }
 
     // Initialize sched
     x86_64_sched_init_cpu(X86_64_CPU_CURRENT.self);
