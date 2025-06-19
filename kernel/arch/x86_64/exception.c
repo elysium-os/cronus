@@ -7,40 +7,18 @@
 #include "arch/x86_64/cpu/cr.h"
 #include "arch/x86_64/debug.h"
 
-static char *g_exception_messages[] = { "Division by Zero",
-                                        "Debug",
-                                        "Non-Maskable Interrupt",
-                                        "Breakpoint",
-                                        "Overflow",
-                                        "Out of Bounds",
-                                        "Invalid Opcode",
-                                        "No Coprocessor",
-                                        "Double Fault",
-                                        "Coprocessor Segment Overrun",
-                                        "Bad TSS",
-                                        "Segment not Present",
-                                        "Stack Fault",
-                                        "General Protection Fault",
-                                        "Page Fault",
-                                        "Unknown Interrupt",
-                                        "Coprocessor Fault",
-                                        "Alignment Check",
-                                        "Reserved",
-                                        "Reserved",
-                                        "Reserved",
-                                        "Reserved",
-                                        "Reserved",
-                                        "Reserved",
-                                        "Reserved",
-                                        "Reserved",
-                                        "Reserved",
-                                        "Reserved",
-                                        "Reserved",
-                                        "Reserved",
-                                        "Reserved" };
+static char *g_exception_messages[] = {
+    "Division by Zero",    "Debug",       "Non-Maskable Interrupt",   "Breakpoint", "Overflow",          "Out of Bounds",     "Invalid Opcode",  "No Coprocessor", "Double Fault", "Coprocessor Segment Overrun", "Bad TSS",
+    "Segment not Present", "Stack Fault", "General Protection Fault", "Page Fault", "Unknown Interrupt", "Coprocessor Fault", "Alignment Check",
+};
+
+static const char *get_message(uint8_t int_no) {
+    if(int_no >= (sizeof(g_exception_messages) / sizeof(const char *))) return "Reserved";
+    return g_exception_messages[int_no];
+}
 
 [[noreturn]] void x86_64_exception_unhandled(x86_64_interrupt_frame_t *frame) {
-    log(LOG_LEVEL_FATAL, "EXCEPTION", "Unhandled Exception `%s` [CPU SEQID: %lu]", g_exception_messages[frame->int_no], arch_cpu_id());
+    log(LOG_LEVEL_FATAL, "EXCEPTION", "Unhandled Exception `%s` [CPU SEQID: %lu]", get_message(frame->int_no), arch_cpu_id());
 
     x86_64_debug_stack_frame_t initial_stack_frame;
     initial_stack_frame.rbp = (x86_64_debug_stack_frame_t *) frame->rbp;
