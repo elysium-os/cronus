@@ -6,6 +6,7 @@
 #include "arch/page.h"
 #include "arch/ptm.h"
 #include "arch/sched.h"
+#include "arch/time.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "common/panic.h"
@@ -28,6 +29,7 @@
 #include "sched/process.h"
 #include "sched/reaper.h"
 #include "sched/sched.h"
+#include "sys/dw.h"
 #include "sys/event.h"
 #include "sys/kernel_symbol.h"
 #include "sys/module.h"
@@ -188,6 +190,9 @@ static time_frequency_t calibrate_tsc() {
     cpu->tss = tss;
     cpu->current_thread = nullptr;
     cpu->common.events = event_queue_make();
+    cpu->common.dw_items = LIST_INIT;
+    cpu->common.flags.in_interrupt_hard = false;
+    cpu->common.flags.in_interrupt_soft = false;
 
     // Initialize FPU
     x86_64_fpu_init_cpu();
@@ -494,8 +499,11 @@ static time_frequency_t calibrate_tsc() {
             cpu->lapic_timer_frequency = lapic_timer_freq;
             cpu->tsc_timer_frequency = tsc_timer_freq;
             cpu->tss = tss;
-            cpu->common.events = event_queue_make();
             cpu->current_thread = nullptr;
+            cpu->common.events = event_queue_make();
+            cpu->common.dw_items = LIST_INIT;
+            cpu->common.flags.in_interrupt_hard = false;
+            cpu->common.flags.in_interrupt_soft = false;
             x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
             continue;
         }
@@ -519,6 +527,9 @@ static time_frequency_t calibrate_tsc() {
     x86_64_interrupt_set_ist(18, 2); // Machine check
 
     x86_64_init_flag_set(X86_64_INIT_FLAG_TIME);
+
+    // Initialize Deferred Work.
+    dw_init();
 
     // Initialize syscalls
     x86_64_syscall_init_cpu();

@@ -70,16 +70,15 @@ static long g_next_tid = BOOTSTRAP_TID + 1;
     internal_sched_thread_drop(&prev->common);
     arch_interrupt_enable();
     arch_sched_preempt();
-    events_process();
 }
 
 [[gnu::no_instrument_function]] static void kernel_thread_exit() {
     sched_yield(THREAD_STATE_DESTROY);
 }
 
-[[gnu::no_instrument_function]] static void sched_entry([[maybe_unused]] void *data) {
+static void sched_entry([[maybe_unused]] void *data) {
     interrupt_state_t previous_state = interrupt_state_mask();
-    if(arch_cpu_current()->sched.preemption_enabled) sched_yield(THREAD_STATE_READY);
+    arch_cpu_current()->sched.status.yield_immediately = true;
     interrupt_state_restore(previous_state);
 }
 
@@ -211,7 +210,12 @@ void x86_64_sched_init_cpu(x86_64_cpu_t *cpu) {
 
     x86_64_thread_t *idle_thread = create_thread(nullptr, IDLE_TID, &cpu->common.sched, kernel_stack, (uintptr_t) init_stack);
 
-    cpu->common.sched = (sched_t) { .lock = SPINLOCK_INIT, .thread_queue = LIST_INIT, .idle_thread = &idle_thread->common };
+    cpu->common.sched = (sched_t) {
+        .lock = SPINLOCK_INIT,
+        .thread_queue = LIST_INIT,
+        .status = { .preempt = true, .yield_immediately = false },
+        .idle_thread = &idle_thread->common
+    };
 }
 
 [[gnu::no_instrument_function]] [[noreturn]] void x86_64_sched_handoff_cpu(x86_64_cpu_t *cpu, bool release) {

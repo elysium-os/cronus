@@ -4,15 +4,22 @@
 #include "arch/event.h"
 #include "arch/time.h"
 #include "common/assert.h"
-#include "common/panic.h"
+#include "common/log.h"
 #include "lib/container.h"
 #include "memory/heap.h"
+#include "sys/dw.h"
 #include "sys/interrupt.h"
 
 static_assert(sizeof(rb_value_t) >= sizeof(time_t));
 
 static rb_value_t rbnode_value(rb_node_t *node) {
     return (rb_value_t) CONTAINER_OF(node, event_t, rb_node)->deadline;
+}
+
+static void deferred_event_process(void *data) {
+    event_t *event = (event_t *) data;
+    event->handler(event->data);
+    heap_free(event, sizeof(event_t));
 }
 
 void events_process() {
@@ -31,8 +38,7 @@ void events_process() {
         }
         rb_remove(events, node);
 
-        event->handler(event->data);
-        heap_free(event, sizeof(event_t));
+        dw_queue(deferred_event_process, event);
     }
 
     interrupt_state_restore(interrupt_state);

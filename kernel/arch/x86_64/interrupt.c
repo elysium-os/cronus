@@ -1,7 +1,9 @@
 #include "interrupt.h"
 
 #include "arch/interrupt.h"
+#include "sys/dw.h"
 
+#include "arch/x86_64/cpu/cpu.h"
 #include "arch/x86_64/cpu/gdt.h"
 
 #define FLAGS_NORMAL 0x8E
@@ -65,12 +67,32 @@ void arch_interrupt_disable() {
 }
 
 void x86_64_interrupt_handler(x86_64_interrupt_frame_t *frame) {
+    X86_64_CPU_CURRENT.common.flags.in_interrupt_hard = true;
     switch(g_entries[frame->int_no].type) {
         case HANDLER_TYPE_X86_64: g_entries[frame->int_no].x86_64_handler(frame); break;
         case HANDLER_TYPE_ARCH:   g_entries[frame->int_no].arch_handler(); break;
         case HANDLER_TYPE_NONE:   break;
     }
     if(frame->int_no >= 32) g_x86_64_interrupt_irq_eoi(frame->int_no);
+    X86_64_CPU_CURRENT.common.flags.in_interrupt_hard = false;
+
+    // If we are already in a soft interrupt it means this is a nested handler.
+    if(!X86_64_CPU_CURRENT.common.flags.in_interrupt_soft) {
+        // At this point the HardINT is handled, so we can:
+        // - disable preemption
+        // - enable interrupts
+        // - handle deferred work
+
+        sched_preempt_state_t prev_pstate = sched_preempt_disable();
+        X86_64_CPU_CURRENT.common.flags.in_interrupt_soft = true;
+
+        arch_interrupt_enable();
+        dw_process();
+        arch_interrupt_disable();
+
+        X86_64_CPU_CURRENT.common.flags.in_interrupt_soft = false;
+        sched_preempt_restore(prev_pstate);
+    }
 }
 
 void x86_64_interrupt_init() {
