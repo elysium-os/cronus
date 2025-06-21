@@ -2,7 +2,10 @@
 
 #include "arch/interrupt.h"
 
-typedef bool interrupt_state_t;
+typedef enum : bool {
+    INTERRUPT_STATE_DISABLED = false,
+    INTERRUPT_STATE_ENABLED = true
+} interrupt_state_t;
 
 typedef enum interrupt_priority {
     INTERRUPT_PRIORITY_LOW,
@@ -23,7 +26,7 @@ static inline void interrupt_state_restore(interrupt_state_t state) {
     interrupt_state_t current_state = arch_interrupt_state();
     if(current_state == state) return;
 
-    if(state) {
+    if(state == INTERRUPT_STATE_ENABLED) {
         arch_interrupt_enable();
     } else {
         arch_interrupt_disable();
