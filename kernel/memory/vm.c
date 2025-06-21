@@ -91,7 +91,7 @@ static void region_map(vm_region_t *region, uintptr_t address, uintptr_t length)
 
 static void region_unmap(vm_region_t *region, uintptr_t address, uintptr_t length) {
     ASSERT(address % ARCH_PAGE_GRANULARITY == 0 && length % ARCH_PAGE_GRANULARITY == 0);
-    ASSERT(address < region->base || address + length >= region->base); // TODO: wtf this assert is all fucky wucky
+    ASSERT(address >= region->base && address + length <= region->base + region->length);
 
     switch(region->type) {
         case VM_REGION_TYPE_ANON:
