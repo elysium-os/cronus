@@ -5,8 +5,8 @@
 #include "sched/thread.h"
 
 typedef enum : bool {
-    SCHED_PREEMPT_STATE_ENABLED = true,
-    SCHED_PREEMPT_STATE_DISABLED = false
+    SCHED_PREEMPT_STATE_DISABLED = false,
+    SCHED_PREEMPT_STATE_ENABLED = true
 } sched_preempt_state_t;
 
 typedef struct sched {
