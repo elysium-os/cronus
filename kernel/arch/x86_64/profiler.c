@@ -70,22 +70,19 @@ static rb_value_t record_value(rb_node_t *node) {
         }
     }
 
-    log(LOG_LEVEL_DEBUG, "PROFILER", "Profiler results for `%s` (%lu):", name, record_count);
+    log(LOG_LEVEL_DEBUG, "PROFILER", "Profiler results for `%s`, thread id %lu (%lu records):", name, thread->common.id, record_count);
+    log(LOG_LEVEL_DEBUG, "PROFILER", "#   | Total Time   | Average Time | Calls        | Function Name");
+    log(LOG_LEVEL_DEBUG, "PROFILER", "----|--------------|--------------|--------------|--------------");
     for(size_t i = 0; i < record_count; i++) {
         kernel_symbol_t symbol;
+
+        const char *fn_name;
         if(kernel_symbol_lookup_by_address((uintptr_t) records[i]->function, &symbol) && symbol.address == (uintptr_t) records[i]->function) {
-            log(LOG_LEVEL_DEBUG,
-                "PROFILE",
-                "%lu. %s <%#lx>: %lu (calls: %lu, average: %lu)",
-                i + 1,
-                symbol.name,
-                (uintptr_t) records[i]->function,
-                records[i]->total_time,
-                records[i]->calls,
-                (records[i]->total_time + (records[i]->calls / 2)) / records[i]->calls);
+            fn_name = symbol.name;
         } else {
-            log(LOG_LEVEL_DEBUG, "PROFILE", "%lu. %#lx: %lu (calls: %lu, average: %lu)", i + 1, (uintptr_t) records[i]->function, records[i]->total_time, records[i]->calls, (records[i]->total_time + (records[i]->calls / 2)) / records[i]->calls);
+            fn_name = "unknown";
         }
+        log(LOG_LEVEL_DEBUG, "PROFILER", "%-3lu | %-12lu | %-12lu | %-12lu | %s", i, records[i]->total_time, records[i]->total_time / records[i]->calls, records[i]->calls, fn_name);
     }
     heap_free(records, sizeof(x86_64_profiler_record_t *) * record_count);
 }
