@@ -3,7 +3,7 @@
 #include "lib/container.h"
 #include "sched/thread.h"
 
-#include "arch/x86_64/debug.h"
+#include "arch/x86_64/profiler.h"
 
 #include <stddef.h>
 
@@ -27,8 +27,13 @@ typedef struct {
     bool in_interrupt_handler;
 
 #ifdef __ENV_DEVELOPMENT
-    x86_64_debug_prof_call_frame_t prof_call_frames[X86_64_DEBUG_PROF_MAX_FRAMES];
-    size_t prof_current_call_frame;
+    struct {
+        bool active;
+        bool in_profiler;
+        size_t current_frame;
+        x86_64_profiler_frame_t frames[X86_64_PROFILER_FRAMES];
+        rb_tree_t records;
+    } profiler;
 #endif
 
     thread_t common;

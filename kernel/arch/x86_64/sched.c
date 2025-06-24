@@ -26,6 +26,7 @@
 #include "arch/x86_64/cpu/fpu.h"
 #include "arch/x86_64/cpu/msr.h"
 #include "arch/x86_64/init.h"
+#include "arch/x86_64/profiler.h"
 #include "arch/x86_64/thread.h"
 
 #include <stddef.h>
@@ -137,8 +138,10 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
     thread->state.fs = 0;
     thread->state.gs = 0;
     thread->state.fpu_area = (void *) HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(MATH_DIV_CEIL(g_x86_64_fpu_area_size, ARCH_PAGE_GRANULARITY), PMM_FLAG_ZERO)))); // TODO: wasting a page here...
+    thread->in_interrupt_handler = false;
+
 #ifdef __ENV_DEVELOPMENT
-    thread->prof_current_call_frame = 0;
+    thread->profiler.records = x86_64_profiler_records();
 #endif
 
     log(LOG_LEVEL_DEBUG, "SCHED", "created tid %lu", thread->common.id);

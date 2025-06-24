@@ -153,7 +153,7 @@ static time_frequency_t calibrate_tsc() {
     ASSERT_UNREACHABLE();
 }
 
-[[noreturn]] static void init_ap() {
+[[gnu::no_instrument_function]] [[noreturn]] static void init_ap() {
     x86_64_cpu_t *cpu = &g_x86_64_cpus[g_init_ap_cpu_id];
     cpu->self = cpu;
     cpu->sequential_id = g_init_ap_cpu_id;
@@ -223,7 +223,7 @@ static time_frequency_t calibrate_tsc() {
     ASSERT_UNREACHABLE();
 }
 
-[[noreturn]] void init(elyboot_t *boot_info) {
+[[gnu::no_instrument_function]] [[noreturn]] void init(elyboot_t *boot_info) {
     memclear(&g_early_bsp, sizeof(g_early_bsp));
     g_early_bsp.self = &g_early_bsp;
     g_early_bsp.sequential_id = boot_info->cpus[boot_info->bsp_index].sequential_id;
