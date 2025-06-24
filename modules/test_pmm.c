@@ -7,7 +7,7 @@
 #include "memory/pmm.h"
 
 void __module_initialize() {
-    log(LOG_LEVEL_INFO, "TEST_MODULE", "Running PMM tests");
+    log(LOG_LEVEL_INFO, "TEST_PMM", "Running PMM tests");
 
     pmm_block_t *block = pmm_alloc(0, PMM_FLAG_NONE);
     ASSERT(block->order == 0);
