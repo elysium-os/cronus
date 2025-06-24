@@ -92,8 +92,6 @@ static bool g_hpet_initialized = false;
 static int g_event_interrupt_vector = -1;
 
 static void thread_init() {
-    // OPTIMIZE: we can mask interrupts for uacpi perf lol
-
     uacpi_status ret = uacpi_namespace_load();
     if(uacpi_unlikely_error(ret)) log(LOG_LEVEL_WARN, "UACPI", "namespace load failed (%s)", uacpi_status_to_string(ret));
     log(LOG_LEVEL_INFO, "UACPI", "Setup Done");
