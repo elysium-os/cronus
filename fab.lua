@@ -33,6 +33,7 @@ local c_flags = {
     "-Wextra",
     "-Wvla",
     "-Wimplicit-fallthrough",
+    "-Wmissing-field-initializers",
 
     "-D__VERSION=" .. version,
     "-D__ARCH_" .. opt_arch:upper(),
