@@ -5,10 +5,10 @@
 #include <stdarg.h>
 #include <stddef.h>
 
-#ifdef __ENV_DEVELOPMENT
-#define LOG_DEVELOPMENT(TAG, FMT, ...) log(LOG_LEVEL_DEVONLY, TAG, FMT, __VA_ARGS__)
+#ifdef TRACE
+#define LOG_TRACE(TAG, FMT, ...) log(LOG_LEVEL_DEVONLY, TAG, FMT, __VA_ARGS__)
 #else
-#define LOG_DEVELOPMENT(TAG, FMT, ...)
+#define LOG_TRACE(TAG, FMT, ...)
 #endif
 
 typedef enum {
@@ -17,7 +17,7 @@ typedef enum {
     LOG_LEVEL_WARN,
     LOG_LEVEL_INFO,
     LOG_LEVEL_DEBUG,
-    LOG_LEVEL_DEVONLY
+    LOG_LEVEL_TRACE
 } log_level_t;
 
 typedef struct {
