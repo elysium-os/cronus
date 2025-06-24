@@ -2,8 +2,7 @@
 
 #include <stddef.h>
 
-#define RB_TREE_INIT(VALUE_FN) ((rb_tree_t) { .value = (VALUE_FN), .root = nullptr })
-#define RB_TREE_EMPTY(TREE) ((TREE)->root == nullptr)
+#define RB_TREE_INIT(VALUE_FN) ((rb_tree_t) { .value = (VALUE_FN), .root = nullptr, .count = 0 })
 
 typedef size_t rb_value_t;
 typedef struct rb_node rb_node_t;
@@ -31,6 +30,7 @@ struct rb_node {
 typedef struct {
     rb_value_t (*value)(rb_node_t *node);
     rb_node_t *root;
+    size_t count;
 } rb_tree_t;
 
 /// Insert a node into red black tree.

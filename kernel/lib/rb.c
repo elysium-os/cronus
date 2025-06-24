@@ -85,6 +85,8 @@ static void rebalance_insert(rb_tree_t *tree, rb_node_t *node) {
 }
 
 void rb_insert(rb_tree_t *tree, rb_node_t *node) {
+    tree->count++;
+
     node->left = nullptr;
     node->right = nullptr;
     node->parent = nullptr;
@@ -120,6 +122,8 @@ void rb_insert(rb_tree_t *tree, rb_node_t *node) {
 }
 
 void rb_remove(rb_tree_t *tree, rb_node_t *node) {
+    tree->count--;
+
     bool original_is_red = IS_RED(node);
 
     rb_node_t *x, *x_p;

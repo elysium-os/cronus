@@ -50,13 +50,13 @@ void event_queue(time_t delay, dw_function_t fn, void *data) {
     cpu_t *current_cpu = arch_cpu_current();
 
     event_t *event;
-    if(!RB_TREE_EMPTY(&current_cpu->free_events)) {
+    if(current_cpu->free_events.count != 0) {
         rb_node_t *node = rb_search(&current_cpu->free_events, 0, RB_SEARCH_TYPE_NEAREST);
         ASSERT(node != nullptr);
         rb_remove(&current_cpu->free_events, node);
         event = CONTAINER_OF(node, event_t, rb_node);
 
-        while(!RB_TREE_EMPTY(&current_cpu->free_events)) {
+        while(current_cpu->free_events.count != 0) {
             rb_node_t *node = rb_search(&current_cpu->free_events, 0, RB_SEARCH_TYPE_NEAREST);
             rb_remove(&current_cpu->free_events, node);
             heap_free(CONTAINER_OF(node, event_t, rb_node), sizeof(event_t));
