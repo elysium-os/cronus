@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #define RB_TREE_INIT(VALUE_FN) ((rb_tree_t) { .value = (VALUE_FN), .root = nullptr })
+#define RB_TREE_EMPTY(TREE) ((TREE)->root == nullptr)
 
 typedef size_t rb_value_t;
 typedef struct rb_node rb_node_t;
