@@ -72,7 +72,7 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
 
     pmm_order_t avl_order = order;
     pmm_zone_t *zone = (flags & PMM_FLAG_ZONE_LOW) != 0 ? &g_pmm_zone_low : &g_pmm_zone_normal;
-    interrupt_state_t previous_state = spinlock_acquire(&zone->lock);
+    spinlock_acquire_nodw(&zone->lock);
     while(zone->lists[avl_order].count == 0) {
         avl_order++;
         if(avl_order > PMM_MAX_ORDER) panic("PMM", "out of memory");
@@ -85,7 +85,7 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
         buddy->free = true;
         list_push(&zone->lists[avl_order - 1], &buddy->list_node);
     }
-    spinlock_release(&zone->lock, previous_state);
+    spinlock_release_nodw(&zone->lock);
 
     block->order = order;
     block->free = false;
@@ -110,7 +110,7 @@ void pmm_free(pmm_block_t *block) {
 
     block->free = true;
 
-    interrupt_state_t previous_state = spinlock_acquire(&zone->lock);
+    spinlock_acquire_nodw(&zone->lock);
     while(block->order < block->max_order) {
         pmm_block_t *buddy = &PAGE(BLOCK_PADDR(block) ^ (PMM_ORDER_TO_PAGECOUNT(block->order) * ARCH_PAGE_GRANULARITY))->block;
         if(!buddy->free || buddy->order != block->order) break;
@@ -122,5 +122,5 @@ void pmm_free(pmm_block_t *block) {
         if(BLOCK_PADDR(buddy) < BLOCK_PADDR(block)) block = buddy;
     }
     list_push(&zone->lists[block->order], &block->list_node);
-    spinlock_release(&zone->lock, previous_state);
+    spinlock_release_nodw(&zone->lock);
 }

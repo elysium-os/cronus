@@ -2,29 +2,60 @@
 
 #include "arch/cpu.h"
 #include "common/assert.h"
+#include "sys/dw.h"
 #include "sys/interrupt.h"
 
 #include <stdint.h>
 
 #define DEADLOCK_AT 100'000'000
 
-interrupt_state_t spinlock_acquire(volatile spinlock_t *lock) {
+void spinlock_acquire(spinlock_t *lock) {
+    sched_preempt_inc();
+    ASSERT(!arch_cpu_current()->flags.in_interrupt_soft && !arch_cpu_current()->flags.in_interrupt_hard);
+    spinlock_acquire_raw(lock);
+}
+
+void spinlock_release(spinlock_t *lock) {
+    spinlock_release_raw(lock);
+    ASSERT(!arch_cpu_current()->flags.in_interrupt_soft && !arch_cpu_current()->flags.in_interrupt_hard);
+    sched_preempt_dec();
+}
+
+void spinlock_acquire_nodw(spinlock_t *lock) {
+    sched_preempt_inc();
+    dw_status_disable();
+    ASSERT(!arch_cpu_current()->flags.in_interrupt_hard);
+    spinlock_acquire_raw(lock);
+}
+
+void spinlock_release_nodw(spinlock_t *lock) {
+    spinlock_release_raw(lock);
+    ASSERT(!arch_cpu_current()->flags.in_interrupt_hard);
+    dw_status_enable();
+    sched_preempt_dec();
+}
+
+interrupt_state_t spinlock_acquire_noint(spinlock_t *lock) {
     interrupt_state_t previous_state = interrupt_state_mask();
-    spinlock_primitive_acquire(lock);
+    sched_preempt_inc();
+    dw_status_disable();
+    spinlock_acquire_raw(lock);
     return previous_state;
 }
 
-void spinlock_release(volatile spinlock_t *lock, interrupt_state_t interrupt_state) {
-    spinlock_primitive_release(lock);
+void spinlock_release_noint(spinlock_t *lock, interrupt_state_t interrupt_state) {
+    spinlock_release_raw(lock);
+    dw_status_enable();
+    sched_preempt_dec();
     interrupt_state_restore(interrupt_state);
 }
 
-void spinlock_primitive_acquire(volatile spinlock_t *lock) {
+void spinlock_acquire_raw(spinlock_t *lock) {
 #ifdef __ENV_DEVELOPMENT
     uint64_t dead = 0;
 #endif
     while(true) {
-        if(spinlock_primitive_try_acquire(lock)) return;
+        if(spinlock_try_acquire(lock)) return;
 
         while(__atomic_load_n(lock, __ATOMIC_RELAXED)) {
             arch_cpu_relax();

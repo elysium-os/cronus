@@ -1,6 +1,7 @@
 #include "lapic.h"
 
 #include "common/assert.h"
+#include "common/log.h"
 #include "memory/mmio.h"
 
 #include "arch/x86_64/cpu/msr.h"
@@ -32,6 +33,8 @@ static void *g_common_vaddr = nullptr;
 
 void x86_64_lapic_init() {
     g_common_paddr = x86_64_msr_read(X86_64_MSR_APIC_BASE) & BASE_ADDR_MASK;
+    log(LOG_LEVEL_DEBUG, "LAPIC", "Lapic found at %#lx", g_common_paddr);
+
     g_common_vaddr = mmio_map(g_common_paddr, 4096);
     ASSERT(g_common_vaddr != nullptr);
     ASSERT(g_common_paddr != 0 && (g_common_paddr & BASE_ADDR_MASK) == g_common_paddr);

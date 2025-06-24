@@ -8,6 +8,7 @@
 #include "arch/sched.h"
 #include "arch/time.h"
 #include "common/assert.h"
+#include "common/lock/spinlock.h"
 #include "common/log.h"
 #include "common/panic.h"
 #include "dev/acpi.h"
@@ -153,8 +154,17 @@ static time_frequency_t calibrate_tsc() {
 }
 
 [[noreturn]] static void init_ap() {
+    x86_64_cpu_t *cpu = &g_x86_64_cpus[g_init_ap_cpu_id];
+    cpu->self = cpu;
+    cpu->sequential_id = g_init_ap_cpu_id;
+    x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
+
+    // Initialize event system
+    event_init_cpu();
+
     log(LOG_LEVEL_INFO, "INIT", "Initializing AP %lu", g_init_ap_cpu_id);
 
+    // GDT
     x86_64_gdt_init();
 
     // Virtual Memory
@@ -166,12 +176,6 @@ static time_frequency_t calibrate_tsc() {
 
     ADJUST_STACK(g_hhdm_offset);
     arch_ptm_load_address_space(g_vm_global_address_space);
-
-    // Init CPU local immediately after address space load
-    x86_64_cpu_t *cpu = &g_x86_64_cpus[g_init_ap_cpu_id];
-    cpu->self = cpu;
-    cpu->sequential_id = g_init_ap_cpu_id;
-    x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
 
     // Interrupts
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
@@ -189,8 +193,8 @@ static time_frequency_t calibrate_tsc() {
     cpu->tsc_timer_frequency = calibrate_tsc();
     cpu->tss = tss;
     cpu->current_thread = nullptr;
-    cpu->common.events = event_queue_make();
     cpu->common.dw_items = LIST_INIT;
+    cpu->common.flags.deferred_work_status = 0;
     cpu->common.flags.in_interrupt_hard = false;
     cpu->common.flags.in_interrupt_soft = false;
 
@@ -220,6 +224,19 @@ static time_frequency_t calibrate_tsc() {
 }
 
 [[noreturn]] void init(elyboot_t *boot_info) {
+    memclear(&g_early_bsp, sizeof(g_early_bsp));
+    g_early_bsp.self = &g_early_bsp;
+    g_early_bsp.sequential_id = boot_info->cpus[boot_info->bsp_index].sequential_id;
+    g_early_bsp.common.flags.in_interrupt_hard = false;
+    g_early_bsp.common.flags.in_interrupt_soft = false;
+    g_early_bsp.common.flags.deferred_work_status = 0;
+    g_early_bsp.common.sched.status.preempt_counter = 0;
+    g_early_bsp.common.sched.status.yield_immediately = false;
+    x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
+
+    // Initialize event system
+    event_init_cpu();
+
 #ifdef __ENV_DEVELOPMENT
     x86_64_qemu_debug_putc('\n');
     log_sink_add(&g_x86_64_qemu_debug_sink);
@@ -250,11 +267,6 @@ static time_frequency_t calibrate_tsc() {
         g_x86_64_cpu_count++;
     }
     if(g_x86_64_cpu_count - 1 != highest_seqid) panic("INIT", "Highest sequential id to cpu count mismatch");
-
-    memclear(&g_early_bsp, sizeof(g_early_bsp));
-    g_early_bsp.self = &g_early_bsp;
-    g_early_bsp.sequential_id = boot_info->cpus[boot_info->bsp_index].sequential_id;
-    x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
 
     log(LOG_LEVEL_DEBUG, "INIT", "Counted %lu working CPUs", g_x86_64_cpu_count);
     ASSERT(g_x86_64_cpu_count > 0);
@@ -500,11 +512,13 @@ static time_frequency_t calibrate_tsc() {
             cpu->tsc_timer_frequency = tsc_timer_freq;
             cpu->tss = tss;
             cpu->current_thread = nullptr;
-            cpu->common.events = event_queue_make();
             cpu->common.dw_items = LIST_INIT;
+            cpu->common.flags.deferred_work_status = 0;
             cpu->common.flags.in_interrupt_hard = false;
             cpu->common.flags.in_interrupt_soft = false;
             x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
+
+            event_init_cpu();
             continue;
         }
 
@@ -528,7 +542,7 @@ static time_frequency_t calibrate_tsc() {
 
     x86_64_init_flag_set(X86_64_INIT_FLAG_TIME);
 
-    // Initialize Deferred Work.
+    // Initialize Deferred Work
     dw_init();
 
     // Initialize syscalls
@@ -664,6 +678,7 @@ static time_frequency_t calibrate_tsc() {
         thread_t *thread = arch_sched_thread_create_user(proc, entry, thread_stack);
 
         log(LOG_LEVEL_DEBUG, "INIT", "init thread >> entry: %#lx, stack: %#lx", entry, thread_stack);
+
         sched_thread_schedule(thread);
     }
 

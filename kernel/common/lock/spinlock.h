@@ -6,28 +6,35 @@
 
 typedef bool spinlock_t;
 
-/// Acquire spinlock and mask interrupts.
-/// @warning Spins until acquired.
-interrupt_state_t spinlock_acquire(volatile spinlock_t *lock);
+/// Acquire spinlock (preemption).
+void spinlock_acquire(spinlock_t *lock);
 
-/// Release spinlock and restore interrupt state.
-void spinlock_release(volatile spinlock_t *lock, interrupt_state_t interrupt_state);
+/// Release spinlock (preemption).
+void spinlock_release(spinlock_t *lock);
 
-/// Acquire spinlock.
-/// @warning Spins until acquired.
-/// @warning Does not mask interrupts.
-void spinlock_primitive_acquire(volatile spinlock_t *lock);
+// Acquire spinlock (preemption, deferred work).
+void spinlock_acquire_nodw(spinlock_t *lock);
 
-/// Attempt to acquire spinlock.
+// Release spinlock (preemption, deferred work).
+void spinlock_release_nodw(spinlock_t *lock);
+
+/// Acquire spinlock (preemption, deferred work, interrupts).
+interrupt_state_t spinlock_acquire_noint(spinlock_t *lock);
+
+/// Release spinlock (preemption, deferred work, interrupts).
+void spinlock_release_noint(spinlock_t *lock, interrupt_state_t interrupt_state);
+
+/// Acquire spinlock with no side effects.
+void spinlock_acquire_raw(spinlock_t *lock);
+
+/// Attempt to acquire spinlock with no side effects.
 /// @warning Does not spin, only attempts to acquire the lock once.
-/// @warning Does not mask interrupts.
 /// @returns true = acquired the lock
-static inline bool spinlock_primitive_try_acquire(volatile spinlock_t *lock) {
+static inline bool spinlock_try_acquire(spinlock_t *lock) {
     return !__atomic_test_and_set(lock, __ATOMIC_ACQUIRE);
 }
 
-/// Release spinlock.
-/// @warning Does not restore interrupt state.
-static inline void spinlock_primitive_release(volatile spinlock_t *lock) {
+/// Release spinlock with no side effects.
+static inline void spinlock_release_raw(spinlock_t *lock) {
     __atomic_clear(lock, __ATOMIC_RELEASE);
 }

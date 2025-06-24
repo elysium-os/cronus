@@ -24,8 +24,8 @@ static void invalidate(uintptr_t addr, size_t length) {
 static void tlb_shootdown_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     ASSERT(x86_64_init_flag_check(X86_64_INIT_FLAG_SMP | X86_64_INIT_FLAG_SCHED));
 
-    if(spinlock_primitive_try_acquire(&g_tlb_shootdown_lock)) {
-        spinlock_primitive_release(&g_tlb_shootdown_lock);
+    if(spinlock_try_acquire(&g_tlb_shootdown_lock)) {
+        spinlock_release_raw(&g_tlb_shootdown_lock);
         log(LOG_LEVEL_WARN, "PTM", "Spurious TLB shootdown");
         return;
     }
@@ -41,7 +41,7 @@ void x86_64_tlb_shootdown(uintptr_t addr, size_t length) {
         return;
     }
 
-    interrupt_state_t previous_state = spinlock_acquire(&g_tlb_shootdown_lock);
+    spinlock_acquire_nodw(&g_tlb_shootdown_lock);
     g_tlb_shootdown_address = addr;
     g_tlb_shootdown_length = length;
     g_tlb_shootdown_complete = 0;
@@ -57,9 +57,11 @@ void x86_64_tlb_shootdown(uintptr_t addr, size_t length) {
         x86_64_lapic_ipi(cpu->lapic_id, g_tlb_shootdown_vector | X86_64_LAPIC_IPI_ASSERT);
     }
 
+    ASSERT(arch_interrupt_state());
+
     while(__atomic_load_n(&g_tlb_shootdown_complete, __ATOMIC_ACQUIRE) != g_x86_64_cpu_count) asm volatile("pause");
 
-    spinlock_release(&g_tlb_shootdown_lock, previous_state);
+    spinlock_release_nodw(&g_tlb_shootdown_lock);
 }
 
 void x86_64_tlb_init_ipis() {

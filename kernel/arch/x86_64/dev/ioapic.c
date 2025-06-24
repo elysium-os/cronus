@@ -2,6 +2,7 @@
 
 #include "arch/mmio.h"
 #include "arch/page.h"
+#include "common/log.h"
 #include "lib/math.h"
 #include "memory/mmio.h"
 
@@ -77,6 +78,8 @@ void x86_64_ioapic_init(struct acpi_madt *apic_table) {
         nbytes -= current_record->length;
         current_record = (struct acpi_entry_hdr *) ((uintptr_t) current_record + current_record->length);
     }
+
+    log(LOG_LEVEL_DEBUG, "IOAPIC", "Found ioapic at %#lx", ioapic_address);
 
     g_ioapic = mmio_map(ioapic_address, 4096);
 }

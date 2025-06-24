@@ -1,16 +1,22 @@
 #include "dw.h"
 
 #include "arch/cpu.h"
+#include "common/assert.h"
 #include "lib/container.h"
 #include "memory/slab.h"
 
+#include <stdint.h>
+
 static slab_cache_t *g_item_cache;
 
-void dw_queue(dw_function_t fn, void *data) {
+dw_item_t *dw_create(dw_function_t fn, void *data) {
     dw_item_t *item = slab_allocate(g_item_cache);
     item->fn = fn;
     item->data = data;
+    return item;
+}
 
+void dw_queue(dw_item_t *item) {
     interrupt_state_t previous_state = interrupt_state_mask();
     cpu_t *current_cpu = arch_cpu_current();
     list_push(&current_cpu->dw_items, &item->list_node);
@@ -32,6 +38,23 @@ repeat:
 
     slab_free(g_item_cache, dw_item);
     goto repeat;
+}
+
+void dw_status_disable() {
+    interrupt_state_t previous_state = interrupt_state_mask();
+    cpu_t *current_cpu = arch_cpu_current();
+    ASSERT(current_cpu->flags.deferred_work_status < UINT32_MAX);
+    current_cpu->flags.deferred_work_status++;
+    interrupt_state_restore(previous_state);
+}
+
+void dw_status_enable() {
+    interrupt_state_t previous_state = interrupt_state_mask();
+    cpu_t *current_cpu = arch_cpu_current();
+    current_cpu->flags.deferred_work_status--;
+    bool process_work = current_cpu->flags.deferred_work_status == 0;
+    interrupt_state_restore(previous_state);
+    if(process_work) dw_process();
 }
 
 void dw_init() {

@@ -4,17 +4,12 @@
 #include "lib/list.h"
 #include "sched/thread.h"
 
-typedef enum : bool {
-    SCHED_PREEMPT_STATE_DISABLED = false,
-    SCHED_PREEMPT_STATE_ENABLED = true
-} sched_preempt_state_t;
-
 typedef struct sched {
     spinlock_t lock;
     list_t thread_queue;
 
     struct {
-        uint64_t preempt           : 1;
+        uint32_t preempt_counter;
         uint64_t yield_immediately : 1;
     } status;
 
@@ -30,14 +25,13 @@ struct thread *sched_thread_next(sched_t *sched);
 /// Yield.
 void sched_yield(enum thread_state yield_state);
 
-/// Disable preemption and return the previous state.
-sched_preempt_state_t sched_preempt_disable();
+/// Increment the preempt counter, effectively disables preemtion.
+/// Meant to be paired up with a `dec` call.
+void sched_preempt_inc();
 
-/// Restore a preemption state. Meant to be paired up with disable.
-void sched_preempt_restore(sched_preempt_state_t state);
-
-/// Set preemption state and return the previous state.
-sched_preempt_state_t sched_preempt_set(sched_preempt_state_t state);
+/// Decrement the preempt counter.
+/// If it reaches zero preemptions are enabled and the yield_immediately flag processed.
+void sched_preempt_dec();
 
 /// Called when a thread is dropped by a CPU.
 void internal_sched_thread_drop(struct thread *thread);

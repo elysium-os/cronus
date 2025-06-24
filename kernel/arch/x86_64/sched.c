@@ -70,6 +70,8 @@ static long g_next_tid = BOOTSTRAP_TID + 1;
     internal_sched_thread_drop(&prev->common);
     arch_interrupt_enable();
     arch_sched_preempt();
+
+    ASSERT(X86_64_CPU_CURRENT.common.sched.status.preempt_counter == 0 && X86_64_CPU_CURRENT.common.flags.deferred_work_status == 0);
 }
 
 [[gnu::no_instrument_function]] static void kernel_thread_exit() {
@@ -129,6 +131,7 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
     thread->common.state = THREAD_STATE_READY;
     thread->common.proc = proc;
     thread->common.scheduler = scheduler;
+    thread->common.vm_fault.in_flight = false;
     thread->rsp = rsp;
     thread->kernel_stack = kernel_stack;
     thread->state.fs = 0;
@@ -155,9 +158,9 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
     }
 
     if(proc != nullptr) {
-        interrupt_state_t previous_state = spinlock_acquire(&proc->lock);
+        spinlock_acquire_nodw(&proc->lock);
         list_push(&proc->threads, &thread->common.list_proc);
-        spinlock_release(&proc->lock, previous_state);
+        spinlock_release_nodw(&proc->lock);
     }
 
     return thread;
@@ -213,7 +216,7 @@ void x86_64_sched_init_cpu(x86_64_cpu_t *cpu) {
     cpu->common.sched = (sched_t) {
         .lock = SPINLOCK_INIT,
         .thread_queue = LIST_INIT,
-        .status = { .preempt = true, .yield_immediately = false },
+        .status = { .preempt_counter = 0, .yield_immediately = false },
         .idle_thread = &idle_thread->common
     };
 }

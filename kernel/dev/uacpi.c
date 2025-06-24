@@ -69,9 +69,9 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address, uacpi_handl
 
     // TODO: this should not just create a device and push it,
     // it REALLY needs to first check if we are aware of such a device
-    interrupt_state_t previous_state = spinlock_acquire(&g_pci_devices_lock);
+    interrupt_state_t previous_state = spinlock_acquire_noint(&g_pci_devices_lock);
     list_push(&g_pci_devices, &device->list_node);
-    spinlock_release(&g_pci_devices_lock, previous_state);
+    spinlock_release_noint(&g_pci_devices_lock, previous_state);
 
     *out_handle = device;
 
@@ -179,10 +179,12 @@ uacpi_status uacpi_kernel_io_write32(uacpi_handle handle, uacpi_size offset, uac
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
     size_t offset = addr % ARCH_PAGE_GRANULARITY;
     uintptr_t ret = (uintptr_t) vm_map_direct(g_vm_global_address_space, nullptr, MATH_CEIL(len + offset, ARCH_PAGE_GRANULARITY), VM_PROT_RW, VM_CACHE_NONE, MATH_FLOOR(addr, ARCH_PAGE_GRANULARITY), VM_FLAG_NONE);
+    // log(LOG_LEVEL_INFO, "UACPI", "MAP (%#lx, %#lx) <%#lx, %#lx>", ret, MATH_CEIL(len + offset, ARCH_PAGE_GRANULARITY), addr, len);
     return (void *) (ret + offset);
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
+    // log(LOG_LEVEL_INFO, "UACPI", "UNMAP (%#lx, %#lx) <%#lx, %#lx>", MATH_FLOOR((uintptr_t) addr, ARCH_PAGE_GRANULARITY), MATH_CEIL(len + ((uintptr_t) addr % ARCH_PAGE_GRANULARITY), ARCH_PAGE_GRANULARITY), (uintptr_t) addr, len);
     vm_unmap(g_vm_global_address_space, (void *) MATH_FLOOR((uintptr_t) addr, ARCH_PAGE_GRANULARITY), MATH_CEIL(len + (uintptr_t) addr % ARCH_PAGE_GRANULARITY, ARCH_PAGE_GRANULARITY));
 }
 
@@ -311,11 +313,11 @@ void uacpi_kernel_free_spinlock(uacpi_handle lock) {
 }
 
 uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle lock) {
-    return (uacpi_cpu_flags) spinlock_acquire((volatile spinlock_t *) lock);
+    return (uacpi_cpu_flags) spinlock_acquire_noint((spinlock_t *) lock);
 }
 
 void uacpi_kernel_unlock_spinlock(uacpi_handle lock, uacpi_cpu_flags interrupt_state) {
-    spinlock_release((volatile spinlock_t *) lock, (interrupt_state_t) interrupt_state);
+    spinlock_release_noint((spinlock_t *) lock, (interrupt_state_t) interrupt_state);
 }
 
 /* Events */
@@ -353,6 +355,7 @@ void uacpi_kernel_reset_event(uacpi_handle handle) {
 }
 
 /* Interrupt Handling */
+// CRITICAL: this doesnt even get registered
 static interrupt_handler_t g_interrupt_handlers[256] = {};
 
 static void kernelapi_interrupt_handler(x86_64_interrupt_frame_t *frame) {

@@ -214,7 +214,7 @@ void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t 
     ASSERT(length % ARCH_PAGE_GRANULARITY == 0);
 
     if(!prot.read) log(LOG_LEVEL_ERROR, "PTM", "No-read mapping is not supported on x86_64");
-    interrupt_state_t previous_state = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_acquire_nodw(&X86_64_AS(address_space)->cr3_lock);
 
     for(size_t i = 0; i < length;) {
         page_size_t cursize = PAGE_SIZE_4K;
@@ -231,7 +231,7 @@ void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t 
 
     x86_64_tlb_shootdown(vaddr, length);
 
-    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
+    spinlock_release_nodw(&X86_64_AS(address_space)->cr3_lock);
 }
 
 void arch_ptm_rewrite(vm_address_space_t *address_space, uintptr_t vaddr, size_t length, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global) {
@@ -239,7 +239,7 @@ void arch_ptm_rewrite(vm_address_space_t *address_space, uintptr_t vaddr, size_t
     ASSERT(length % ARCH_PAGE_GRANULARITY == 0);
 
     if(!prot.read) log(LOG_LEVEL_ERROR, "PTM", "No-read mapping is not supported on x86_64");
-    interrupt_state_t previous_state = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_acquire_nodw(&X86_64_AS(address_space)->cr3_lock);
 
     for(size_t i = 0; i < length;) {
         uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
@@ -290,14 +290,14 @@ void arch_ptm_rewrite(vm_address_space_t *address_space, uintptr_t vaddr, size_t
 
     x86_64_tlb_shootdown(vaddr, length);
 
-    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
+    spinlock_release_nodw(&X86_64_AS(address_space)->cr3_lock);
 }
 
 void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr, size_t length) {
     ASSERT(vaddr % ARCH_PAGE_GRANULARITY == 0);
     ASSERT(length % ARCH_PAGE_GRANULARITY == 0);
 
-    interrupt_state_t previous_state = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_acquire_nodw(&X86_64_AS(address_space)->cr3_lock);
 
     for(size_t i = 0; i < length;) {
         uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
@@ -326,18 +326,18 @@ void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr, size_t l
 
     x86_64_tlb_shootdown(vaddr, length);
 
-    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
+    spinlock_release_nodw(&X86_64_AS(address_space)->cr3_lock);
 }
 
 bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, PARAM_OUT(uintptr_t *) paddr) {
-    interrupt_state_t previous_state = spinlock_acquire(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_acquire_nodw(&X86_64_AS(address_space)->cr3_lock);
 
     uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
     int j = LEVEL_COUNT;
     for(; j > 1; j--) {
         int index = VADDR_TO_INDEX(vaddr, j);
         if((current_table[index] & ENTRY_FLAG_PRESENT) == 0) {
-            spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
+            spinlock_release_nodw(&X86_64_AS(address_space)->cr3_lock);
             return false;
         }
         if((current_table[index] & ENTRYH_FLAG_PS) != 0) break;
@@ -345,7 +345,7 @@ bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, PARAM
     }
 
     uint64_t entry = current_table[VADDR_TO_INDEX(vaddr, j)];
-    spinlock_release(&X86_64_AS(address_space)->cr3_lock, previous_state);
+    spinlock_release_nodw(&X86_64_AS(address_space)->cr3_lock);
     if((entry & ENTRY_FLAG_PRESENT) == 0) return false;
 
     switch(j) {

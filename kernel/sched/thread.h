@@ -6,6 +6,7 @@ typedef struct thread thread_t;
 #include "lib/list.h"
 #include "sched/process.h"
 #include "sched/sched.h"
+#include "sys/dw.h"
 
 enum thread_state {
     THREAD_STATE_READY,
@@ -20,6 +21,12 @@ struct thread {
     process_t *proc;
 
     struct sched *scheduler;
+
+    struct {
+        bool in_flight;
+        uintptr_t address;
+        dw_item_t dw_item;
+    } vm_fault;
 
     list_node_t list_sched; /* list used by scheduler/reaper */
     list_node_t list_proc; /* list used by process */

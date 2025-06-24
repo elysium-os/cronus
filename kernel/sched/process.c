@@ -15,9 +15,9 @@ process_t *process_create(vm_address_space_t *address_space) {
     proc->threads = LIST_INIT;
     proc->address_space = address_space;
 
-    interrupt_state_t previous_state = spinlock_acquire(&g_sched_processes_lock);
+    spinlock_acquire(&g_sched_processes_lock);
     list_push_back(&g_sched_processes, &proc->list_sched);
-    spinlock_release(&g_sched_processes_lock, previous_state);
+    spinlock_release(&g_sched_processes_lock);
 
     log(LOG_LEVEL_DEBUG, "PROCESS", "created pid %lu", proc->id);
 

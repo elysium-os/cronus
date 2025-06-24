@@ -38,7 +38,7 @@ static slab_t *cache_make_slab(slab_cache_t *cache) {
 }
 
 static void *slab_direct_alloc(slab_cache_t *cache) {
-    interrupt_state_t previous_state = spinlock_acquire(&cache->slabs_lock);
+    spinlock_acquire_nodw(&cache->slabs_lock);
 
     if(cache->slabs_partial.count == 0) list_push(&cache->slabs_partial, &cache_make_slab(cache)->list_node);
     slab_t *slab = CONTAINER_OF(cache->slabs_partial.head, slab_t, list_node);
@@ -52,12 +52,12 @@ static void *slab_direct_alloc(slab_cache_t *cache) {
         list_push(&cache->slabs_full, &slab->list_node);
     }
 
-    spinlock_release(&cache->slabs_lock, previous_state);
+    spinlock_release_nodw(&cache->slabs_lock);
     return obj;
 }
 
 static void slab_direct_free(slab_cache_t *cache, void *obj) {
-    interrupt_state_t previous_state = spinlock_acquire(&cache->slabs_lock);
+    spinlock_acquire_nodw(&cache->slabs_lock);
 
     slab_t *slab = (slab_t *) (((uintptr_t) obj) & ~(PMM_ORDER_TO_PAGECOUNT(cache->block_order) * ARCH_PAGE_GRANULARITY - 1));
     *(void **) obj = slab->freelist;
@@ -68,7 +68,7 @@ static void slab_direct_free(slab_cache_t *cache, void *obj) {
     }
     slab->free_count++;
 
-    spinlock_release(&cache->slabs_lock, previous_state);
+    spinlock_release_nodw(&cache->slabs_lock);
 }
 
 void slab_init() {
@@ -136,9 +136,9 @@ slab_cache_t *slab_cache_create(const char *name, size_t object_size, pmm_order_
         }
     }
 
-    interrupt_state_t previous_state = spinlock_acquire(&g_slab_caches_lock);
+    spinlock_acquire_nodw(&g_slab_caches_lock);
     list_push(&g_slab_caches, &cache->list_node);
-    spinlock_release(&g_slab_caches_lock, previous_state);
+    spinlock_release_nodw(&g_slab_caches_lock);
 
     return cache;
 }
@@ -147,12 +147,12 @@ void *slab_allocate(slab_cache_t *cache) {
     if(!cache->cpu_cache_enabled) return slab_direct_alloc(cache);
 
     slab_cache_cpu_t *cc = &cache->cpu_cache[arch_cpu_id()];
-    interrupt_state_t previous_state = spinlock_acquire(&cc->lock);
+    spinlock_acquire_nodw(&cc->lock);
 
 alloc:
     if(cc->primary->round_count > 0) {
         void *obj = cc->primary->rounds[--cc->primary->round_count];
-        spinlock_release(&cc->lock, previous_state);
+        spinlock_release_nodw(&cc->lock);
         return obj;
     }
 
@@ -163,18 +163,18 @@ alloc:
         goto alloc;
     }
 
-    spinlock_primitive_acquire(&cache->magazines_lock);
+    spinlock_acquire_raw(&cache->magazines_lock);
     if(cache->magazines_full.count != 0) {
         list_push(&cache->magazines_empty, &cc->secondary->list_node);
         cc->secondary = cc->primary;
         cc->primary = CONTAINER_OF(list_pop(&cache->magazines_full), slab_magazine_t, list_node);
 
-        spinlock_primitive_release(&cache->magazines_lock);
+        spinlock_release_raw(&cache->magazines_lock);
         goto alloc;
     }
-    spinlock_primitive_release(&cache->magazines_lock);
+    spinlock_release_raw(&cache->magazines_lock);
 
-    spinlock_release(&cc->lock, previous_state);
+    spinlock_release_nodw(&cc->lock);
     return slab_direct_alloc(cache);
 }
 
@@ -182,12 +182,12 @@ void slab_free(slab_cache_t *cache, void *obj) {
     if(!cache->cpu_cache_enabled) return slab_direct_free(cache, obj);
 
     slab_cache_cpu_t *cc = &cache->cpu_cache[arch_cpu_id()];
-    interrupt_state_t previous_state = spinlock_acquire(&cc->lock);
+    spinlock_acquire_nodw(&cc->lock);
 
 free:
     if(cc->primary->round_count < MAGAZINE_SIZE) {
         cc->primary->rounds[cc->primary->round_count++] = obj;
-        spinlock_release(&cc->lock, previous_state);
+        spinlock_release_nodw(&cc->lock);
         return;
     }
 
@@ -198,17 +198,17 @@ free:
         goto free;
     }
 
-    spinlock_primitive_acquire(&cache->magazines_lock);
+    spinlock_acquire_raw(&cache->magazines_lock);
     if(cache->magazines_empty.count != 0) {
         list_push(&cache->magazines_full, &cc->secondary->list_node);
         cc->secondary = cc->primary;
         cc->primary = CONTAINER_OF(list_pop(&cache->magazines_empty), slab_magazine_t, list_node);
 
-        spinlock_primitive_release(&cache->magazines_lock);
+        spinlock_release_raw(&cache->magazines_lock);
         goto free;
     }
-    spinlock_primitive_release(&cache->magazines_lock);
+    spinlock_release_raw(&cache->magazines_lock);
 
-    spinlock_release(&cc->lock, previous_state);
+    spinlock_release_nodw(&cc->lock);
     slab_direct_free(cache, obj);
 }

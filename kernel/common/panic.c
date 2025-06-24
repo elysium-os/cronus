@@ -2,9 +2,11 @@
 
 #include "arch/cpu.h"
 #include "arch/debug.h"
+#include "arch/interrupt.h"
 #include "common/log.h"
 
 [[noreturn]] void panic(const char *tag, const char *fmt, ...) {
+    arch_interrupt_disable();
     log(LOG_LEVEL_FATAL, tag, "Kernel Panic");
     va_list list;
     va_start(list, format);
