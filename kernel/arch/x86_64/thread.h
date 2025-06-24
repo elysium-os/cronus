@@ -24,6 +24,8 @@ typedef struct {
         uint64_t fs, gs;
     } state;
 
+    bool in_interrupt_handler;
+
 #ifdef __ENV_DEVELOPMENT
     x86_64_debug_prof_call_frame_t prof_call_frames[X86_64_DEBUG_PROF_MAX_FRAMES];
     size_t prof_current_call_frame;

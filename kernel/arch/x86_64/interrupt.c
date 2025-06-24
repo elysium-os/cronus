@@ -67,7 +67,10 @@ void arch_interrupt_disable() {
     asm volatile("cli");
 }
 
-void x86_64_interrupt_handler(x86_64_interrupt_frame_t *frame) {
+[[gnu::no_instrument_function]] void x86_64_interrupt_handler(x86_64_interrupt_frame_t *frame) {
+    bool is_outmost_handler = !X86_64_CPU_CURRENT.current_thread->in_interrupt_handler;
+    if(is_outmost_handler) X86_64_CPU_CURRENT.current_thread->in_interrupt_handler = true;
+
     sched_preempt_inc();
     dw_status_disable();
 
@@ -91,6 +94,7 @@ void x86_64_interrupt_handler(x86_64_interrupt_frame_t *frame) {
 
     // Ensure preemption and dw is enabled if we return to userspace
     ASSERT(!X86_64_INTERRUPT_IS_FROM_USER(frame) || (X86_64_CPU_CURRENT.common.sched.status.preempt_counter == 0 && X86_64_CPU_CURRENT.common.flags.deferred_work_status == 0));
+    if(is_outmost_handler) X86_64_CPU_CURRENT.current_thread->in_interrupt_handler = false;
 }
 
 void x86_64_interrupt_init() {
