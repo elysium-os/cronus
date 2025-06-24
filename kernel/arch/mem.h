@@ -5,6 +5,8 @@
 #define ARCH_MEM_LOW_SIZE 0x100'0000
 #define ARCH_MEM_LOW_MASK 0xFF'FFFF
 
+#define ARCH_MEM_PHYS_MAX 0xF'FFFF'FFFF'FFFF
+
 #else
 #error Unimplemented
 #endif
