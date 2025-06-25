@@ -486,6 +486,8 @@ static time_frequency_t calibrate_tsc() {
     g_event_interrupt_vector = arch_interrupt_request(INTERRUPT_PRIORITY_EVENT, events_process);
     if(g_event_interrupt_vector < 0) panic("INIT", "Failed to acquire interrupt vector for event handler");
 
+    event_init();
+
     // SMP init
     g_x86_64_cpus = heap_alloc(sizeof(x86_64_cpu_t) * boot_info->cpu_count);
     memclear(g_x86_64_cpus, sizeof(x86_64_cpu_t) * boot_info->cpu_count);

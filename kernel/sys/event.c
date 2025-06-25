@@ -5,11 +5,13 @@
 #include "arch/time.h"
 #include "common/assert.h"
 #include "lib/container.h"
-#include "memory/heap.h"
+#include "memory/slab.h"
 #include "sys/dw.h"
 #include "sys/interrupt.h"
 
 static_assert(sizeof(rb_value_t) >= sizeof(time_t));
+
+static slab_cache_t *g_event_cache;
 
 static rb_value_t rbnode_value(rb_node_t *node) {
     return (rb_value_t) CONTAINER_OF(node, event_t, rb_node)->deadline;
@@ -36,7 +38,7 @@ void events_process() {
         if(arch_cpu_current()->flags.in_interrupt_hard) {
             rb_insert(&current_cpu->free_events, &event->rb_node);
         } else {
-            heap_free(event, sizeof(event_t));
+            slab_free(g_event_cache, event);
         }
     }
 
@@ -59,10 +61,10 @@ void event_queue(time_t delay, dw_function_t fn, void *data) {
         while(current_cpu->free_events.count != 0) {
             rb_node_t *node = rb_search(&current_cpu->free_events, 0, RB_SEARCH_TYPE_NEAREST);
             rb_remove(&current_cpu->free_events, node);
-            heap_free(CONTAINER_OF(node, event_t, rb_node), sizeof(event_t));
+            slab_free(g_event_cache, CONTAINER_OF(node, event_t, rb_node));
         }
     } else {
-        event = heap_alloc(sizeof(event_t));
+        event = slab_allocate(g_event_cache);
     }
     event->dw_item = dw_create(fn, data);
 
@@ -82,12 +84,16 @@ void event_cancel(event_t *event) {
     rb_tree_t *events = &arch_cpu_current()->events;
 
     rb_remove(events, &event->rb_node);
-    heap_free(event, sizeof(event_t));
+    slab_free(g_event_cache, event);
 
     rb_node_t *first_node = rb_search(events, 0, RB_SEARCH_TYPE_NEAREST);
     if(first_node != nullptr) arch_event_timer_arm(CONTAINER_OF(first_node, event_t, rb_node)->deadline - arch_time_monotonic());
 
     interrupt_state_restore(interrupt_state);
+}
+
+void event_init() {
+    g_event_cache = slab_cache_create("event", sizeof(event_t), 2);
 }
 
 void event_init_cpu() {
