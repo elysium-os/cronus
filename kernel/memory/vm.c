@@ -272,7 +272,7 @@ static bool memory_exists(vm_address_space_t *address_space, uintptr_t address, 
 }
 
 static void *map_common(vm_address_space_t *address_space, void *hint, size_t length, vm_protection_t prot, vm_cache_t cache, vm_flags_t flags, vm_region_type_t type, uintptr_t direct_physical_address) {
-    log(LOG_LEVEL_DEBUG, "VM", "map(hint: %#lx, length: %#lx, prot: %c%c%c, flags: %lu, cache: %u, type: %u)", (uintptr_t) hint, length, prot.read ? 'R' : '-', prot.write ? 'W' : '-', prot.exec ? 'E' : '-', flags, cache, type);
+    LOG_TRACE("VM", "map(hint: %#lx, length: %#lx, prot: %c%c%c, flags: %lu, cache: %u, type: %u)", (uintptr_t) hint, length, prot.read ? 'R' : '-', prot.write ? 'W' : '-', prot.exec ? 'E' : '-', flags, cache, type);
 
     uintptr_t address = (uintptr_t) hint;
     if(length == 0 || length % ARCH_PAGE_GRANULARITY != 0) return nullptr;
@@ -306,6 +306,7 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
         case VM_REGION_TYPE_DIRECT:
             ASSERT(direct_physical_address % ARCH_PAGE_GRANULARITY == 0);
             region->type_data.direct.physical_address = direct_physical_address;
+            LOG_TRACE("VM", "physical address of region: %#lx", direct_physical_address);
             break;
     }
 
@@ -315,12 +316,12 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
 
     spinlock_release_nodw(&address_space->lock);
 
-    log(LOG_LEVEL_DEBUG, "VM", "map success (base: %#lx, length: %#lx)", address, length);
+    LOG_TRACE("VM", "map success (base: %#lx, length: %#lx)", address, length);
     return (void *) address;
 }
 
 static void rewrite_common(vm_address_space_t *address_space, void *address, size_t length, rewrite_type_t type, vm_protection_t prot, vm_cache_t cache) {
-    log(LOG_LEVEL_DEBUG, "VM", "rewrite(as_start: %#lx, address: %#lx, length: %#lx)", address_space->start, (uintptr_t) address, length);
+    LOG_TRACE("VM", "rewrite(as_start: %#lx, address: %#lx, length: %#lx)", address_space->start, (uintptr_t) address, length);
     if(length == 0) return;
 
     ASSERT((uintptr_t) address % ARCH_PAGE_GRANULARITY == 0 && length % ARCH_PAGE_GRANULARITY == 0);
