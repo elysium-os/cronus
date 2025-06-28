@@ -179,12 +179,12 @@ uacpi_status uacpi_kernel_io_write32(uacpi_handle handle, uacpi_size offset, uac
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
     size_t offset = addr % ARCH_PAGE_GRANULARITY;
     uintptr_t ret = (uintptr_t) vm_map_direct(g_vm_global_address_space, nullptr, MATH_CEIL(len + offset, ARCH_PAGE_GRANULARITY), VM_PROT_RW, VM_CACHE_NONE, MATH_FLOOR(addr, ARCH_PAGE_GRANULARITY), VM_FLAG_NONE);
-    // log(LOG_LEVEL_INFO, "UACPI", "MAP (%#lx, %#lx) <%#lx, %#lx>", ret, MATH_CEIL(len + offset, ARCH_PAGE_GRANULARITY), addr, len);
+    LOG_TRACE("UACPI", "MAP (%#lx, %#lx) <%#lx, %#lx>", ret, MATH_CEIL(len + offset, ARCH_PAGE_GRANULARITY), addr, len);
     return (void *) (ret + offset);
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
-    // log(LOG_LEVEL_INFO, "UACPI", "UNMAP (%#lx, %#lx) <%#lx, %#lx>", MATH_FLOOR((uintptr_t) addr, ARCH_PAGE_GRANULARITY), MATH_CEIL(len + ((uintptr_t) addr % ARCH_PAGE_GRANULARITY), ARCH_PAGE_GRANULARITY), (uintptr_t) addr, len);
+    LOG_TRACE("UACPI", "UNMAP (%#lx, %#lx) <%#lx, %#lx>", MATH_FLOOR((uintptr_t) addr, ARCH_PAGE_GRANULARITY), MATH_CEIL(len + ((uintptr_t) addr % ARCH_PAGE_GRANULARITY), ARCH_PAGE_GRANULARITY), (uintptr_t) addr, len);
     vm_unmap(g_vm_global_address_space, (void *) MATH_FLOOR((uintptr_t) addr, ARCH_PAGE_GRANULARITY), MATH_CEIL(len + (uintptr_t) addr % ARCH_PAGE_GRANULARITY, ARCH_PAGE_GRANULARITY));
 }
 
