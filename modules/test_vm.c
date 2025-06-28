@@ -123,7 +123,7 @@ void __module_initialize() {
     TEST_ASSERT(as, check_as(as, 2, (as_check_t) { .offset = 5, .count = 3 }, (as_check_t) { .offset = 12, .count = 3 }));
 
     // Fill the gap
-    TEST_ASSERT(as, MAP(as, 8, 4, VM_PROT_NONE, VM_CACHE_STANDARD) != nullptr);
+    TEST_ASSERT(as, MAP(as, 8, 4, VM_PROT_RX, VM_CACHE_STANDARD) != nullptr);
 
     TEST_ASSERT(as, check_as(as, 3, (as_check_t) { .offset = 5, .count = 3 }, (as_check_t) { .offset = 8, .count = 4 }, (as_check_t) { .offset = 12, .count = 3 }));
 

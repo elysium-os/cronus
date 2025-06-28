@@ -14,6 +14,7 @@
 
 #define VM_PROT_NONE ((vm_protection_t) {})
 #define VM_PROT_RW ((vm_protection_t) { .read = true, .write = true })
+#define VM_PROT_RX ((vm_protection_t) { .read = true, .exec = true })
 #define VM_PROT_RWX ((vm_protection_t) { .read = true, .write = true, .exec = true })
 
 typedef struct {
