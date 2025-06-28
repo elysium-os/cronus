@@ -3,6 +3,7 @@
 #include "arch/mem.h"
 #include "arch/page.h"
 #include "common/assert.h"
+#include "common/log.h"
 #include "lib/mem.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"
@@ -25,7 +26,7 @@ static inline uint8_t pagecount_to_order(size_t pages) {
     return (uint8_t) ((sizeof(unsigned long long) * 8) - __builtin_clzll(pages - 1));
 }
 
-void pmm_region_add(uintptr_t base, size_t size, bool used) {
+void pmm_region_add(uintptr_t base, size_t size, bool is_free) {
     pmm_zone_t *zones[] = { &g_pmm_zone_low, &g_pmm_zone_normal };
     for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
         pmm_zone_t *zone = zones[i];
@@ -43,24 +44,33 @@ void pmm_region_add(uintptr_t base, size_t size, bool used) {
         size_t page_count = local_size / ARCH_PAGE_GRANULARITY;
 
         zone->total_page_count += page_count;
-        if(!used) zone->free_page_count += page_count;
-
-        for(size_t j = 0; j < page_count; j++) {
-            g_page_cache[index_offset + j].block = (pmm_block_t) { .free = !used, .order = 0 };
-        }
 
         for(size_t j = 0; j < page_count;) {
+            // Approximate the order
             pmm_order_t order = pagecount_to_order(page_count - j);
             if(order > PMM_MAX_ORDER) order = PMM_MAX_ORDER;
-            while(PMM_ORDER_TO_PAGECOUNT(order) > (page_count - j) || ((local_base + j * ARCH_PAGE_GRANULARITY) & (PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY - 1)) != 0) {
+
+            // Reduce it until it fits
+            while(PMM_ORDER_TO_PAGECOUNT(order) > (page_count - j)) {
                 ASSERT(order != 0);
                 order--;
             }
 
-            page_t *page = &g_page_cache[index_offset + j];
-            page->block.order = order;
-            page->block.max_order = order;
-            list_push(&zone->lists[order], &page->block.list_node);
+            // Reduce it until it is aligned
+            while(((local_base + j * ARCH_PAGE_GRANULARITY) & (PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY - 1)) != 0) {
+                ASSERT(order != 0);
+                order--;
+            }
+
+            // Initialize the block
+            for(size_t y = 0; y < PMM_ORDER_TO_PAGECOUNT(order); y++) {
+                page_t *page = &g_page_cache[index_offset + j + y];
+                page->block.order = order;
+                page->block.max_order = order;
+                page->block.free = is_free;
+            }
+
+            if(is_free) list_push(&zone->lists[order], &g_page_cache[index_offset + j].block.list_node);
 
             j += PMM_ORDER_TO_PAGECOUNT(order);
         }
@@ -68,6 +78,7 @@ void pmm_region_add(uintptr_t base, size_t size, bool used) {
 }
 
 pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
+    LOG_TRACE("PMM", "alloc(oder: %u, flags: %u)", order, flags);
     ASSERT(order <= PMM_MAX_ORDER);
 
     pmm_order_t avl_order = order;
@@ -93,6 +104,8 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
 
     if((flags & PMM_FLAG_ZERO) != 0) memclear((void *) HHDM(BLOCK_PADDR(block)), PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY);
 
+    LOG_TRACE("PMM", "alloc success(%#lx -> %#llx)", BLOCK_PADDR(block), BLOCK_PADDR(block) + PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY);
+
     return block;
 }
 
@@ -105,6 +118,7 @@ pmm_block_t *pmm_alloc_page(pmm_flags_t flags) {
 }
 
 void pmm_free(pmm_block_t *block) {
+    LOG_TRACE("PMM", "free(%#lx, order: %u, max_order: %u)", BLOCK_PADDR(block), block->order, block->max_order);
     pmm_zone_t *zone = (BLOCK_PADDR(block) & ~ARCH_MEM_LOW_MASK) > 0 ? &g_pmm_zone_normal : &g_pmm_zone_low;
     zone->free_page_count += PMM_ORDER_TO_PAGECOUNT(block->order);
 
@@ -113,7 +127,9 @@ void pmm_free(pmm_block_t *block) {
     spinlock_acquire_nodw(&zone->lock);
     while(block->order < block->max_order) {
         pmm_block_t *buddy = &PAGE(BLOCK_PADDR(block) ^ (PMM_ORDER_TO_PAGECOUNT(block->order) * ARCH_PAGE_GRANULARITY))->block;
-        if(!buddy->free || buddy->order != block->order) break;
+        if(!buddy->free || buddy->order == buddy->max_order || buddy->order != block->order) break;
+
+        LOG_TRACE("PMM", "merging %#lx and buddy %#lx to order (%u)", BLOCK_PADDR(block), BLOCK_PADDR(buddy), block->order);
 
         list_node_delete(&zone->lists[block->order], &buddy->list_node);
         buddy->order++;

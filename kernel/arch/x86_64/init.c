@@ -320,9 +320,9 @@ static time_frequency_t calibrate_tsc() {
 
     for(size_t i = 0; i < boot_info->mm_entry_count; i++) {
         elyboot_mm_entry_t *entry = &boot_info->mm_entries[i];
-        bool used = true;
+        bool is_free = false;
         switch(entry->type) {
-            case ELYBOOT_MM_TYPE_FREE:                   used = false; break;
+            case ELYBOOT_MM_TYPE_FREE:                   is_free = true; break;
             case ELYBOOT_MM_TYPE_BOOTLOADER_RECLAIMABLE: break;
             case ELYBOOT_MM_TYPE_EFI_RECLAIMABLE:        break;
             case ELYBOOT_MM_TYPE_ACPI_RECLAIMABLE:       break;
@@ -330,9 +330,9 @@ static time_frequency_t calibrate_tsc() {
         }
         ASSERT(entry->address % ARCH_PAGE_GRANULARITY == 0 && entry->length % ARCH_PAGE_GRANULARITY == 0);
 
-        log(LOG_LEVEL_DEBUG, "INIT", ">> %#lx -> %#lx", entry->address, entry->address + entry->length);
+        log(LOG_LEVEL_DEBUG, "INIT", ">> %#lx -> %#lx (free: %u)", entry->address, entry->address + entry->length, is_free);
 
-        pmm_region_add(entry->address, entry->length, used);
+        pmm_region_add(entry->address, entry->length, is_free);
     }
 
     x86_64_init_flag_set(X86_64_INIT_FLAG_MEMORY_PHYS);
