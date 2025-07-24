@@ -1,9 +1,7 @@
 #include "ioapic.h"
 
 #include "arch/mmio.h"
-#include "arch/page.h"
 #include "common/log.h"
-#include "lib/math.h"
 #include "memory/mmio.h"
 
 #include <uacpi/acpi.h>

@@ -8,10 +8,6 @@ cpu_t *arch_cpu_current() {
     return &X86_64_CPU_CURRENT.self->common;
 }
 
-size_t arch_cpu_count() {
-    return g_x86_64_cpu_count;
-}
-
 size_t arch_cpu_id() {
     return X86_64_CPU_CURRENT.sequential_id;
 }

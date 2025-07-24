@@ -7,7 +7,6 @@
 #include "sys/kernel_symbol.h"
 
 #include "arch/x86_64/cpu/cpu.h"
-#include "arch/x86_64/init.h"
 
 #ifdef __ENV_DEVELOPMENT
 

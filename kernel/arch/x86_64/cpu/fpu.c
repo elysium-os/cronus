@@ -1,13 +1,14 @@
 #include "fpu.h"
 
 #include "common/assert.h"
+#include "sys/init.h"
 
 #include "arch/x86_64/cpu/cpuid.h"
 #include "arch/x86_64/cpu/cr.h"
 
 uint32_t g_x86_64_fpu_area_size = 0;
-void (*g_x86_64_fpu_save)(void *area) = 0;
-void (*g_x86_64_fpu_restore)(void *area) = 0;
+void (*g_x86_64_fpu_save)(void *area) = nullptr;
+void (*g_x86_64_fpu_restore)(void *area) = nullptr;
 
 static inline void xsave(void *area) {
     asm volatile("xsave (%0)" : : "r"(area), "a"(0xFFFF'FFFF), "d"(0xFFFF'FFFF) : "memory");
@@ -25,7 +26,7 @@ static inline void fxrstor(void *area) {
     asm volatile("fxrstor (%0)" : : "r"(area) : "memory");
 }
 
-void x86_64_fpu_init() {
+static void init_fpu() {
     if(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_XSAVE)) {
         uint32_t area_size = 0;
         bool success = !x86_64_cpuid_register(0xD, X86_64_CPUID_REGISTER_ECX, &area_size);
@@ -41,7 +42,9 @@ void x86_64_fpu_init() {
     }
 }
 
-void x86_64_fpu_init_cpu() {
+INIT_TARGET(fpu, INIT_STAGE_MAIN, init_fpu);
+
+static void init_cpu_fpu() {
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_FXSR));
 
     /* Enable FPU */
@@ -73,3 +76,5 @@ void x86_64_fpu_init_cpu() {
         asm volatile("xsetbv" : : "a"(xcr0), "d"(xcr0 >> 32), "c"(0) : "memory");
     }
 }
+
+INIT_TARGET_PERCORE(fpu_cpu, INIT_STAGE_MAIN, init_cpu_fpu);

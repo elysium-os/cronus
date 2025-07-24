@@ -3,6 +3,7 @@
 #include "arch/cpu.h"
 #include "common/assert.h"
 #include "common/log.h"
+#include "sys/init.h"
 
 #include "arch/x86_64/cpu/cr.h"
 #include "arch/x86_64/debug.h"
@@ -49,3 +50,13 @@ static const char *get_message(uint8_t int_no) {
     arch_cpu_halt();
     ASSERT_UNREACHABLE();
 }
+
+static void init_exceptions() {
+    for(int i = 0; i < 32; i++) {
+        switch(i) {
+            default: x86_64_interrupt_set(i, x86_64_exception_unhandled); break;
+        }
+    }
+}
+
+INIT_TARGET(exceptions, INIT_STAGE_EARLY, init_exceptions);

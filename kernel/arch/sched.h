@@ -2,6 +2,9 @@
 
 #include "sched/thread.h"
 
+/// Handoff current CPU to scheduler.
+[[noreturn]] void arch_sched_handoff_cpu();
+
 /// Create a new userspace thread.
 /// @param ip Userspace entry point
 /// @param sp Userspace stack pointer

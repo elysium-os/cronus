@@ -5,9 +5,10 @@
 #include "common/assert.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"
+#include "sys/init.h"
 
 #define MAGAZINE_SIZE 32
-#define MAGAZINE_COUNT_EXTRA arch_cpu_count() * 2
+#define MAGAZINE_COUNT_EXTRA (g_cpu_count * 2)
 
 static spinlock_t g_slab_caches_lock = SPINLOCK_INIT;
 static list_t g_slab_caches = LIST_INIT;
@@ -71,31 +72,6 @@ static void slab_direct_free(slab_cache_t *cache, void *obj) {
     spinlock_release_nodw(&cache->slabs_lock);
 }
 
-void slab_init() {
-    g_alloc_cache = (slab_cache_t) { .name = "slab-cache",
-                                     .object_size = sizeof(slab_cache_t) + arch_cpu_count() * sizeof(slab_cache_cpu_t),
-                                     .block_order = 3,
-                                     .slabs_lock = SPINLOCK_INIT,
-                                     .slabs_full = LIST_INIT,
-                                     .slabs_partial = LIST_INIT,
-                                     .magazines_lock = SPINLOCK_INIT,
-                                     .magazines_full = LIST_INIT,
-                                     .magazines_empty = LIST_INIT,
-                                     .cpu_cache_enabled = false };
-    g_alloc_magazine = (slab_cache_t) { .name = "slab-magazine",
-                                        .object_size = sizeof(slab_magazine_t) + MAGAZINE_SIZE * sizeof(void *),
-                                        .block_order = 2,
-                                        .slabs_lock = SPINLOCK_INIT,
-                                        .slabs_full = LIST_INIT,
-                                        .slabs_partial = LIST_INIT,
-                                        .magazines_lock = SPINLOCK_INIT,
-                                        .magazines_full = LIST_INIT,
-                                        .magazines_empty = LIST_INIT,
-                                        .cpu_cache_enabled = false };
-    list_push(&g_slab_caches, &g_alloc_cache.list_node);
-    list_push(&g_slab_caches, &g_alloc_magazine.list_node);
-}
-
 slab_cache_t *slab_cache_create(const char *name, size_t object_size, pmm_order_t order) {
     ASSERT(object_size >= 8);
 
@@ -121,7 +97,7 @@ slab_cache_t *slab_cache_create(const char *name, size_t object_size, pmm_order_
     }
 
     if(cache->cpu_cache_enabled) {
-        for(size_t i = 0; i < arch_cpu_count(); i++) {
+        for(size_t i = 0; i < g_cpu_count; i++) {
             slab_magazine_t *magazine_primary = slab_allocate(&g_alloc_magazine);
             magazine_primary->round_count = MAGAZINE_SIZE;
             for(size_t j = 0; j < MAGAZINE_SIZE; j++) magazine_primary->rounds[j] = slab_direct_alloc(cache);
@@ -212,3 +188,34 @@ free:
     spinlock_release_nodw(&cc->lock);
     slab_direct_free(cache, obj);
 }
+
+static void slab_init() {
+    g_alloc_cache = (slab_cache_t) {
+        .name = "slab-cache",
+        .object_size = sizeof(slab_cache_t) + g_cpu_count * sizeof(slab_cache_cpu_t),
+        .block_order = 3,
+        .slabs_lock = SPINLOCK_INIT,
+        .slabs_full = LIST_INIT,
+        .slabs_partial = LIST_INIT,
+        .magazines_lock = SPINLOCK_INIT,
+        .magazines_full = LIST_INIT,
+        .magazines_empty = LIST_INIT,
+        .cpu_cache_enabled = false,
+    };
+    g_alloc_magazine = (slab_cache_t) {
+        .name = "slab-magazine",
+        .object_size = sizeof(slab_magazine_t) + MAGAZINE_SIZE * sizeof(void *),
+        .block_order = 2,
+        .slabs_lock = SPINLOCK_INIT,
+        .slabs_full = LIST_INIT,
+        .slabs_partial = LIST_INIT,
+        .magazines_lock = SPINLOCK_INIT,
+        .magazines_full = LIST_INIT,
+        .magazines_empty = LIST_INIT,
+        .cpu_cache_enabled = false,
+    };
+    list_push(&g_slab_caches, &g_alloc_cache.list_node);
+    list_push(&g_slab_caches, &g_alloc_magazine.list_node);
+}
+
+INIT_TARGET(slab, INIT_STAGE_BEFORE_MAIN, slab_init);

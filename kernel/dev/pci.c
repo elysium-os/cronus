@@ -3,9 +3,14 @@
 #include "arch/mmio.h"
 #include "common/assert.h"
 #include "common/log.h"
+#include "lib/container.h"
 #include "lib/list.h"
 #include "memory/heap.h"
-#include "memory/hhdm.h"
+#include "memory/mmio.h"
+#include "sys/init.h"
+
+#include <uacpi/acpi.h>
+#include <uacpi/tables.h>
 
 #ifdef __ARCH_X86_64
 #include "arch/x86_64/cpu/port.h"
@@ -17,6 +22,8 @@
 #define VENDOR_INVALID 0xFFFF
 #define CMD_REG_BUSMASTER (1 << 2)
 #define HEADER_TYPE_MULTIFUNC (1 << 7)
+
+#define PCIE_DEVICE(PCI_DEVICE) CONTAINER_OF((PCI_DEVICE), pcie_device_t, common)
 
 typedef struct [[gnu::packed]] {
     uint16_t vendor_id;
@@ -94,11 +101,19 @@ typedef struct {
     uint8_t end_bus_number;
 } pcie_segment_t;
 
+typedef struct {
+    pci_device_t common;
+    void *config_space;
+} pcie_device_t;
+
 static size_t g_segment_count;
 static pcie_segment_t *g_segments;
 
 spinlock_t g_pci_devices_lock = SPINLOCK_INIT;
 list_t g_pci_devices = LIST_INIT;
+
+static pci_device_t *(*g_create_device)(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t func);
+static void (*g_free_device)(pci_device_t *device);
 
 static uint32_t (*g_read)(pci_device_t *device, uint8_t offset, uint8_t size);
 static void (*g_write)(pci_device_t *device, uint8_t offset, uint8_t size, uint32_t value);
@@ -127,13 +142,28 @@ static void writeb(pci_device_t *device, uint8_t offset, uint8_t value) {
     return g_write(device, offset, 1, value);
 }
 
-static uint32_t pcie_read(pci_device_t *device, uint8_t offset, uint8_t size) {
-    uint32_t register_offset = offset;
-    register_offset |= (uint32_t) (device->bus - g_segments[device->segment].start_bus_number) << 20;
-    register_offset |= (uint32_t) (device->slot & 0x1F) << 15;
-    register_offset |= (uint32_t) (device->func & 0x7) << 12;
-    volatile void *address = (void *) HHDM(g_segments[device->segment].base_address) + register_offset;
+static pci_device_t *pcie_create_device(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t func) {
+    pcie_device_t *device = heap_alloc(sizeof(pcie_device_t));
+    device->common.segment = segment;
+    device->common.bus = bus;
+    device->common.slot = slot;
+    device->common.func = func;
 
+    size_t offset = ((uint32_t) (bus - g_segments[segment].start_bus_number) << 20) | ((uint32_t) (slot & 0x1F) << 15) | ((uint32_t) (func & 0x7) << 12);
+
+    device->config_space = mmio_map(g_segments[segment].base_address + offset, 4096);
+
+    return &device->common;
+}
+
+static void pcie_free_device(pci_device_t *device) {
+    pcie_device_t *pcie_device = PCIE_DEVICE(device);
+    mmio_unmap(pcie_device->config_space, 4096);
+    heap_free(pcie_device, sizeof(pcie_device_t));
+}
+
+static uint32_t pcie_read(pci_device_t *device, uint8_t offset, uint8_t size) {
+    void *address = PCIE_DEVICE(device)->config_space + offset;
     switch(size) {
         case 4: return arch_mmio_read32(address);
         case 2: return arch_mmio_read16(address);
@@ -143,12 +173,7 @@ static uint32_t pcie_read(pci_device_t *device, uint8_t offset, uint8_t size) {
 }
 
 static void pcie_write(pci_device_t *device, uint8_t offset, uint8_t size, uint32_t value) {
-    uint32_t register_offset = offset;
-    register_offset |= (uint32_t) (device->bus - g_segments[device->segment].start_bus_number) << 20;
-    register_offset |= (uint32_t) (device->slot & 0x1F) << 15;
-    register_offset |= (uint32_t) (device->func & 0x7) << 12;
-    volatile void *address = (void *) (HHDM(g_segments[device->segment].base_address) + register_offset);
-
+    void *address = PCIE_DEVICE(device)->config_space + offset;
     switch(size) {
         case 4: arch_mmio_write32(address, value); return;
         case 2: arch_mmio_write16(address, value); return;
@@ -158,6 +183,19 @@ static void pcie_write(pci_device_t *device, uint8_t offset, uint8_t size, uint3
 }
 
 #ifdef __ARCH_X86_64
+static pci_device_t *pci_create_device(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t func) {
+    pci_device_t *device = heap_alloc(sizeof(pci_device_t));
+    device->segment = segment;
+    device->bus = bus;
+    device->slot = slot;
+    device->func = func;
+    return device;
+}
+
+static void pci_free_device(pci_device_t *device) {
+    heap_free(device, sizeof(pci_device_t));
+}
+
 static uint32_t pci_read(pci_device_t *device, uint8_t offset, uint8_t size) {
     uint32_t register_offset = (offset & 0xFC) | (1 << 31);
     register_offset |= (uint32_t) device->bus << 16;
@@ -194,20 +232,17 @@ static void pci_write(pci_device_t *device, uint8_t offset, uint8_t size, uint32
 }
 #endif
 
-static void check_bus(uint16_t segment, uint8_t bus);
+static void enumerate_bus(uint16_t segment, uint8_t bus);
 
-static void check_function(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t func) {
-    pci_device_t *device = heap_alloc(sizeof(pci_device_t));
-    device->segment = segment;
-    device->bus = bus;
-    device->slot = slot;
-    device->func = func;
+static void enumerate_function(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t func) {
+    pci_device_t *device = g_create_device(segment, bus, slot, func);
 
     uint16_t vendor_id = readw(device, offsetof(pci_device_header_t, vendor_id));
     if(vendor_id == VENDOR_INVALID) {
-        heap_free(device, sizeof(pci_device_t));
+        g_free_device(device);
         return;
     }
+
     spinlock_acquire_nodw(&g_pci_devices_lock);
     list_push(&g_pci_devices, &device->list_node);
     spinlock_release_nodw(&g_pci_devices_lock);
@@ -219,7 +254,7 @@ static void check_function(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t 
     log(LOG_LEVEL_INFO, "PCI", "Enumerated PCI Device { VendorID: %#x, Class: %#x, SubClass: %#x, ProgIf: %#x }", vendor_id, class, sub_class, prog_if);
 
     if(class == 0x6 && sub_class == 0x4) {
-        check_bus(segment, (uint8_t) (readb(device, offsetof(pci_header1_t, secondary_bus)) >> 8));
+        enumerate_bus(segment, (uint8_t) (readb(device, offsetof(pci_header1_t, secondary_bus)) >> 8));
         return;
     }
 
@@ -234,25 +269,29 @@ static void check_function(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t 
     // }
 }
 
-static void check_bus(uint16_t segment, uint8_t bus) {
+static void enumerate_bus(uint16_t segment, uint8_t bus) {
     for(uint8_t slot = 0; slot < 32; slot++) {
-        pci_device_t device = { .segment = segment, .bus = bus, .slot = slot };
-        if(readw(&device, offsetof(pci_device_header_t, vendor_id)) == VENDOR_INVALID) continue;
-        for(uint8_t func = 0; func < ((readb(&device, offsetof(pci_device_header_t, header_type)) & HEADER_TYPE_MULTIFUNC) ? 8 : 1); func++) check_function(segment, bus, slot, func);
+        pci_device_t *device = g_create_device(segment, bus, slot, 0);
+        if(readw(device, offsetof(pci_device_header_t, vendor_id)) == VENDOR_INVALID) continue;
+        for(uint8_t func = 0; func < ((readb(device, offsetof(pci_device_header_t, header_type)) & HEADER_TYPE_MULTIFUNC) ? 8 : 1); func++) {
+            enumerate_function(segment, bus, slot, func);
+        }
+        g_free_device(device);
     }
 }
 
-static void check_segment(uint16_t segment) {
-    pci_device_t root_controller = { .segment = segment };
-    if(readb(&root_controller, offsetof(pci_device_header_t, header_type)) & HEADER_TYPE_MULTIFUNC) {
+static void enumerate_segment(uint16_t segment) {
+    pci_device_t *root_controller = g_create_device(segment, 0, 0, 0);
+    if(readb(root_controller, offsetof(pci_device_header_t, header_type)) & HEADER_TYPE_MULTIFUNC) {
         for(uint8_t func = 0; func < 8; func++) {
             pci_device_t controller = { .segment = segment, .func = func };
             if(readw(&controller, offsetof(pci_device_header_t, vendor_id)) == VENDOR_INVALID) break;
-            check_bus(segment, func);
+            enumerate_bus(segment, func);
         }
     } else {
-        check_bus(segment, 0);
+        enumerate_bus(segment, 0);
     }
+    g_free_device(root_controller);
 }
 
 uint8_t pci_config_read_byte(pci_device_t *device, uint8_t offset) {
@@ -309,11 +348,20 @@ pci_bar_t *pci_config_read_bar(pci_device_t *device, uint8_t index) {
     return new_bar;
 }
 
-void pci_enumerate(struct acpi_mcfg *mcfg) {
-    if(mcfg != NULL) {
+static void pci_enumerate() {
+    struct acpi_mcfg *mcfg = nullptr;
+
+    uacpi_table table;
+    uacpi_status ret = uacpi_table_find_by_signature(ACPI_MCFG_SIGNATURE, &table);
+    if(uacpi_likely_success(ret)) mcfg = (struct acpi_mcfg *) table.hdr;
+
+    if(mcfg != nullptr) {
         log(LOG_LEVEL_INFO, "PCI", "Enumerating PCI-e Devices");
-        g_read = &pcie_read;
-        g_write = &pcie_write;
+
+        g_create_device = pcie_create_device;
+        g_free_device = pcie_free_device;
+        g_read = pcie_read;
+        g_write = pcie_write;
 
         g_segment_count = (mcfg->hdr.length - offsetof(struct acpi_mcfg, entries)) / sizeof(struct acpi_mcfg_allocation);
         g_segments = heap_alloc(sizeof(pcie_segment_t) * g_segment_count);
@@ -323,16 +371,22 @@ void pci_enumerate(struct acpi_mcfg *mcfg) {
             g_segments[i].segment_group_number = allocation->segment;
             g_segments[i].start_bus_number = allocation->start_bus;
             g_segments[i].end_bus_number = allocation->end_bus;
-            check_segment(i); // FIX: fix on real hw
+            enumerate_segment(i); // FIX: fix on real hw
         }
     } else {
-        log(LOG_LEVEL_INFO, "PCI", "Enumerating PCI Devices");
 #ifdef __ARCH_X86_64
-        g_read = &pci_read;
-        g_write = &pci_write;
-        check_segment(0); // FIX: fix on real hw
+        log(LOG_LEVEL_INFO, "PCI", "Enumerating PCI Devices");
+        g_create_device = pci_create_device;
+        g_free_device = pci_free_device;
+        g_read = pci_read;
+        g_write = pci_write;
+        enumerate_segment(0); // FIX: fix on real hw
 #else
-        panic("PCI", "Both legacy PCI and PCIe unavailable");
+        log(LOG_LEVEL_ERROR, "PCI", "Both legacy PCI and PCIe unavailable");
 #endif
     }
+
+    if(uacpi_likely_success(ret)) uacpi_table_unref(&table);
 }
+
+INIT_TARGET(pci_enumerate, INIT_STAGE_DEV, pci_enumerate);

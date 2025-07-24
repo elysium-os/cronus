@@ -7,6 +7,7 @@
 #include "lib/container.h"
 #include "memory/slab.h"
 #include "sys/dw.h"
+#include "sys/init.h"
 #include "sys/interrupt.h"
 
 static_assert(sizeof(rb_value_t) >= sizeof(time_t));
@@ -92,14 +93,16 @@ void event_cancel(event_t *event) {
     interrupt_state_restore(interrupt_state);
 }
 
-void event_init() {
-    g_event_cache = slab_cache_create("event", sizeof(event_t), 2);
-}
-
-void event_init_cpu() {
+void event_init_cpu_local() {
     interrupt_state_t prev_state = interrupt_state_mask();
     cpu_t *current_cpu = arch_cpu_current();
     current_cpu->events = RB_TREE_INIT(rbnode_value);
     current_cpu->free_events = RB_TREE_INIT(rbnode_value);
     interrupt_state_restore(prev_state);
 }
+
+static void event_cache_init() {
+    g_event_cache = slab_cache_create("event", sizeof(event_t), 2);
+}
+
+INIT_TARGET(event_cache, INIT_STAGE_MAIN, event_cache_init);

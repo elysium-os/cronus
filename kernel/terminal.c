@@ -1,10 +1,9 @@
-#include "terminal.h"
-
 #include "common/log.h"
 #include "graphics/draw.h"
 #include "graphics/font.h"
 #include "graphics/framebuffer.h"
 #include "lib/format.h"
+#include "sys/init.h"
 
 #include <stdarg.h>
 
@@ -64,8 +63,15 @@ static void log_fb(log_level_t level, const char *tag, const char *fmt, va_list 
     write_char('\n');
 }
 
-log_sink_t g_terminal_sink = {
+static log_sink_t g_terminal_sink = {
     .name = "FB_TERM",
     .filter = { .level = LOG_LEVEL_INFO, .tags_as_include = false, .tags = nullptr, .tag_count = 0 },
     .log = log_fb
 };
+
+static void init_terminal() {
+    draw_rect(&g_framebuffer, 0, 0, g_framebuffer.width, g_framebuffer.height, draw_color(14, 14, 15));
+    log_sink_add(&g_terminal_sink);
+}
+
+INIT_TARGET(terminal, INIT_STAGE_EARLY, init_terminal);

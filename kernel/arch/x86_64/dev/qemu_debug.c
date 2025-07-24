@@ -1,11 +1,16 @@
-#include "qemu_debug.h"
-
 #include "common/log.h"
 #include "lib/format.h"
+#include "sys/init.h"
 
 #include "arch/x86_64/cpu/port.h"
 
 #include <stdarg.h>
+
+#ifdef __ENV_DEVELOPMENT
+
+static void x86_64_qemu_debug_putc(char ch) {
+    x86_64_port_outb(0xE9, ch);
+}
 
 static void debug_format(char *fmt, ...) {
     va_list list;
@@ -30,12 +35,17 @@ static void log_debug(log_level_t level, const char *tag, const char *fmt, va_li
     x86_64_qemu_debug_putc('\n');
 }
 
-log_sink_t g_x86_64_qemu_debug_sink = {
+static log_sink_t g_qemu_debug_sink = {
     .name = "QEMU",
     .filter = { .level = LOG_LEVEL_TRACE, .tags_as_include = false, .tags = nullptr, .tag_count = 0 },
     .log = log_debug
 };
 
-void x86_64_qemu_debug_putc(char ch) {
-    x86_64_port_outb(0xE9, ch);
+static void qemu_debug_init() {
+    x86_64_qemu_debug_putc('\n');
+    log_sink_add(&g_qemu_debug_sink);
 }
+
+INIT_TARGET(qemu_debug, INIT_STAGE_BEFORE_EARLY, qemu_debug_init);
+
+#endif

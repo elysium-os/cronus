@@ -12,14 +12,25 @@
 
 #define BLOCK_PADDR(BLOCK) PAGE_PADDR(PAGE_FROM_BLOCK(BLOCK))
 
-pmm_zone_t g_pmm_zone_low = { .name = "LOW", .start = ARCH_PAGE_GRANULARITY, .end = ARCH_MEM_LOW_SIZE, .total_page_count = 0, .free_page_count = 0, .lock = SPINLOCK_INIT, .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
-pmm_zone_t g_pmm_zone_normal = { .name = "NORMAL",
-                                 .start = ARCH_MEM_LOW_SIZE,
-                                 .end = ((UINTPTR_MAX) / ARCH_PAGE_GRANULARITY) * ARCH_PAGE_GRANULARITY,
-                                 .total_page_count = 0,
-                                 .free_page_count = 0,
-                                 .lock = SPINLOCK_INIT,
-                                 .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT } };
+pmm_zone_t g_pmm_zone_low = {
+    .name = "LOW",
+    .start = ARCH_PAGE_GRANULARITY,
+    .end = ARCH_MEM_LOW_SIZE,
+    .total_page_count = 0,
+    .free_page_count = 0,
+    .lock = SPINLOCK_INIT,
+    .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT },
+};
+
+pmm_zone_t g_pmm_zone_normal = {
+    .name = "NORMAL",
+    .start = ARCH_MEM_LOW_SIZE,
+    .end = ((UINTPTR_MAX) / ARCH_PAGE_GRANULARITY) * ARCH_PAGE_GRANULARITY,
+    .total_page_count = 0,
+    .free_page_count = 0,
+    .lock = SPINLOCK_INIT,
+    .lists = { [0 ... PMM_MAX_ORDER] = LIST_INIT },
+};
 
 static inline uint8_t pagecount_to_order(size_t pages) {
     if(pages == 1) return 0;
@@ -65,12 +76,11 @@ void pmm_region_add(uintptr_t base, size_t size, bool is_free) {
             // Initialize the block
             for(size_t y = 0; y < PMM_ORDER_TO_PAGECOUNT(order); y++) {
                 page_t *page = &g_page_cache[index_offset + j + y];
-                page->block.order = order;
+                page->block.order = 0;
                 page->block.max_order = order;
                 page->block.free = is_free;
+                if(is_free) list_push(&zone->lists[order], &page->block.list_node);
             }
-
-            if(is_free) list_push(&zone->lists[order], &g_page_cache[index_offset + j].block.list_node);
 
             j += PMM_ORDER_TO_PAGECOUNT(order);
         }

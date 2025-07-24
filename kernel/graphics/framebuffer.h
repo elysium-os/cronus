@@ -4,12 +4,9 @@
 #include <stdint.h>
 
 typedef struct {
-    uintptr_t physical_address;
+    void *address;
     size_t size;
-
-    uint64_t height;
-    uint64_t width;
-    uint64_t pitch;
+    uint64_t height, width, pitch;
 } framebuffer_t;
 
 extern framebuffer_t g_framebuffer;

@@ -25,6 +25,3 @@ void dw_status_disable();
 /// Enable deferred work. Note that deferred work is only actually
 /// enabled when the status reaches zero.
 void dw_status_enable();
-
-/// Initialize deferred work system.
-void dw_init();

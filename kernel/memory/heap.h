@@ -2,9 +2,6 @@
 
 #include <stddef.h>
 
-/// Initialize the heap.
-void heap_initialize();
-
 /// Allocate a block of memory.
 void *heap_alloc(size_t size);
 

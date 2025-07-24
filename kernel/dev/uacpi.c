@@ -313,11 +313,12 @@ void uacpi_kernel_free_spinlock(uacpi_handle lock) {
 }
 
 uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle lock) {
-    return (uacpi_cpu_flags) spinlock_acquire_noint((spinlock_t *) lock);
+    spinlock_acquire_nodw((spinlock_t *) lock);
+    return 0;
 }
 
-void uacpi_kernel_unlock_spinlock(uacpi_handle lock, uacpi_cpu_flags interrupt_state) {
-    spinlock_release_noint((spinlock_t *) lock, (interrupt_state_t) interrupt_state);
+void uacpi_kernel_unlock_spinlock(uacpi_handle lock, uacpi_cpu_flags) {
+    spinlock_release_nodw((spinlock_t *) lock);
 }
 
 /* Events */

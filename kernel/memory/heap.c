@@ -9,6 +9,7 @@
 #include "memory/page.h"
 #include "memory/pmm.h"
 #include "memory/slab.h"
+#include "sys/init.h"
 
 #define SLAB_8X_COUNT (sizeof(g_slab_8x_sizes) / sizeof(*g_slab_8x_sizes))
 #define SLAB_128X_COUNT (sizeof(g_slab_128x_sizes) / sizeof(*g_slab_128x_sizes))
@@ -43,14 +44,8 @@ static slab_cache_t *find_cache(size_t size) {
     return cache;
 }
 
-void heap_initialize() {
-    for(size_t i = 0; i < SLAB_8X_COUNT; i++) g_8x_slabs[i] = slab_cache_create(g_slab_8x_names[i], g_slab_8x_sizes[i], 2);
-    for(size_t i = 0; i < SLAB_128X_COUNT; i++) g_128x_slabs[i] = slab_cache_create(g_slab_128x_names[i], g_slab_128x_sizes[i], 3);
-    for(size_t i = 0; i < SLAB_OTHER_COUNT; i++) g_other_slabs[i] = slab_cache_create(g_slab_other_names[i], g_slab_other_sizes[i], 5);
-}
-
 void *heap_alloc(size_t size) {
-    if(size == 0) return nullptr;
+    if(EXPECT_UNLIKELY(size == 0)) return nullptr;
     if(EXPECT_UNLIKELY(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1])) return (void *) HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(MATH_DIV_CEIL(size, ARCH_PAGE_GRANULARITY), PMM_FLAG_NONE))));
     return slab_allocate(find_cache(size));
 }
@@ -72,7 +67,15 @@ void *heap_reallocarray(void *array, size_t element_size, size_t current_count, 
 }
 
 void heap_free(void *address, size_t size) {
-    if(address == nullptr) return;
-    if(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1]) return pmm_free(&PAGE(HHDM_TO_PHYS(address))->block);
+    if(EXPECT_UNLIKELY(address == nullptr)) return;
+    if(EXPECT_UNLIKELY(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1])) return pmm_free(&PAGE(HHDM_TO_PHYS(address))->block);
     slab_free(find_cache(size), address);
 }
+
+static void heap_initialize() {
+    for(size_t i = 0; i < SLAB_8X_COUNT; i++) g_8x_slabs[i] = slab_cache_create(g_slab_8x_names[i], g_slab_8x_sizes[i], 2);
+    for(size_t i = 0; i < SLAB_128X_COUNT; i++) g_128x_slabs[i] = slab_cache_create(g_slab_128x_names[i], g_slab_128x_sizes[i], 3);
+    for(size_t i = 0; i < SLAB_OTHER_COUNT; i++) g_other_slabs[i] = slab_cache_create(g_slab_other_names[i], g_slab_other_sizes[i], 5);
+}
+
+INIT_TARGET(heap, INIT_STAGE_BEFORE_MAIN, heap_initialize, "slab");

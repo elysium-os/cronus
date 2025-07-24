@@ -33,5 +33,4 @@ typedef struct x86_64_cpu {
 
 static_assert(offsetof(x86_64_cpu_t, current_thread) == 48, "current_thread in x86_64_cpu_t changed. Update arch/x86_64/syscall.asm::CURRENT_THREAD_OFFSET");
 
-extern size_t g_x86_64_cpu_count;
 extern x86_64_cpu_t *g_x86_64_cpus;

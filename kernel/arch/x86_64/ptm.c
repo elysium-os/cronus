@@ -5,22 +5,22 @@
 #include "common/assert.h"
 #include "common/lock/spinlock.h"
 #include "common/log.h"
-#include "lib/container.h"
+#include "lib/expect.h"
 #include "lib/mem.h"
+#include "memory/earlymem.h"
 #include "memory/heap.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"
 #include "memory/pmm.h"
+#include "sys/init.h"
 
+#include "arch/x86_64/cpu/cpu.h"
 #include "arch/x86_64/cpu/cr.h"
 #include "arch/x86_64/exception.h"
-#include "arch/x86_64/init.h"
 #include "arch/x86_64/tlb.h"
 
 #include <stddef.h>
 #include <stdint.h>
-
-#define X86_64_AS(ADDRESS_SPACE) (CONTAINER_OF((ADDRESS_SPACE), x86_64_address_space_t, common))
 
 #define VADDR_TO_INDEX(VADDR, LEVEL) (((VADDR) >> ((LEVEL) * 9 + 3)) & 0x1FF)
 #define INDEX_TO_VADDR(INDEX, LEVEL) ((uint64_t) (INDEX) << ((LEVEL) * 9 + 3))
@@ -75,13 +75,16 @@ typedef enum {
     PAGE_SIZE_1GB = ARCH_PAGE_SIZE_1GB,
 } page_size_t;
 
-typedef struct {
-    spinlock_t cr3_lock;
-    uintptr_t cr3;
-    vm_address_space_t common;
-} x86_64_address_space_t;
+static x86_64_ptm_address_space_t g_global_address_space;
 
-static x86_64_address_space_t g_initial_address_space;
+static uintptr_t alloc_page() {
+    if(EXPECT_UNLIKELY(g_earlymem_active)) {
+        uintptr_t address = earlymem_alloc_page();
+        memclear((void *) HHDM(address), ARCH_PAGE_GRANULARITY);
+        return address;
+    }
+    return PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_ZERO)));
+}
 
 static uint64_t privilege_to_x86_flags(vm_privilege_t privilege) {
     switch(privilege) {
@@ -98,10 +101,6 @@ static uint64_t cache_to_x86_flags(vm_cache_t cache, page_size_t page_size) {
         case VM_CACHE_NONE:          return PAT3;
     }
     ASSERT_UNREACHABLE();
-}
-
-static rb_value_t region_node_value(rb_node_t *node) {
-    return CONTAINER_OF(node, vm_region_t, rb_node)->base;
 }
 
 static uint64_t break_big(uint64_t *table, int index, int current_level) {
@@ -121,7 +120,7 @@ static uint64_t break_big(uint64_t *table, int index, int current_level) {
         new_entry |= ENTRYH_FLAG_PAT;
     }
 
-    entry |= PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_ZERO)));
+    entry |= alloc_page();
     if(pat) entry |= ENTRYL_FLAG_PAT;
 
     uint64_t *new_table = (void *) (entry & ENTRYL_ADDRESS_MASK);
@@ -146,7 +145,7 @@ static void map_page(uint64_t *pml4, uintptr_t vaddr, uintptr_t paddr, page_size
 
         uint64_t entry = current_table[index];
         if((entry & ENTRY_FLAG_PRESENT) == 0) {
-            entry = ENTRY_FLAG_PRESENT | (PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_ZERO))) & ENTRYL_ADDRESS_MASK);
+            entry = ENTRY_FLAG_PRESENT | (alloc_page() & ENTRYL_ADDRESS_MASK);
             if(!prot.exec) entry |= ENTRY_FLAG_NX;
         } else {
             if((entry & ENTRYH_FLAG_PS) != 0) entry = break_big(current_table, index, j);
@@ -167,45 +166,22 @@ static void map_page(uint64_t *pml4, uintptr_t vaddr, uintptr_t paddr, page_size
     __atomic_store(&current_table[VADDR_TO_INDEX(vaddr, lowest_index)], &entry, __ATOMIC_SEQ_CST);
 }
 
-vm_address_space_t *x86_64_ptm_init() {
-    g_initial_address_space.common.lock = SPINLOCK_INIT;
-    g_initial_address_space.common.regions = RB_TREE_INIT(region_node_value);
-    g_initial_address_space.common.start = KERNELSPACE_START;
-    g_initial_address_space.common.end = KERNELSPACE_END;
-    g_initial_address_space.cr3 = PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_ZERO)));
-    g_initial_address_space.cr3_lock = SPINLOCK_INIT;
-
-    uint64_t *old_pml4 = (uint64_t *) HHDM(x86_64_cr3_read());
-    uint64_t *pml4 = (uint64_t *) HHDM(g_initial_address_space.cr3);
-    for(int i = 256; i < 512; i++) {
-        if((old_pml4[i] & ENTRY_FLAG_PRESENT) != 0) {
-            pml4[i] = old_pml4[i];
-            continue;
-        }
-
-        // Needs to be completely unrestricted as these are not synchronized across address spaces
-        pml4[i] = ENTRY_FLAG_PRESENT | ENTRY_FLAG_RW | (PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_ZERO))) & ENTRYL_ADDRESS_MASK);
-    }
-
-    return &g_initial_address_space.common;
-}
-
 vm_address_space_t *arch_ptm_address_space_create() {
-    x86_64_address_space_t *address_space = heap_alloc(sizeof(x86_64_address_space_t));
-    address_space->cr3 = PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_ZERO)));
-    address_space->cr3_lock = SPINLOCK_INIT;
+    x86_64_ptm_address_space_t *address_space = heap_alloc(sizeof(x86_64_ptm_address_space_t));
+    address_space->pt_top = alloc_page();
+    address_space->pt_lock = SPINLOCK_INIT;
     address_space->common.lock = SPINLOCK_INIT;
-    address_space->common.regions = RB_TREE_INIT(region_node_value);
+    address_space->common.regions = vm_create_regions();
     address_space->common.start = USERSPACE_START;
     address_space->common.end = USERSPACE_END;
 
-    memcpy((void *) HHDM(address_space->cr3 + 256 * sizeof(uint64_t)), (void *) HHDM(X86_64_AS(g_vm_global_address_space)->cr3 + 256 * sizeof(uint64_t)), 256 * sizeof(uint64_t));
+    memcpy((void *) HHDM(address_space->pt_top + 256 * sizeof(uint64_t)), (void *) HHDM(X86_64_PTM_AS(g_vm_global_address_space)->pt_top + 256 * sizeof(uint64_t)), 256 * sizeof(uint64_t));
 
     return &address_space->common;
 }
 
 void arch_ptm_load_address_space(vm_address_space_t *address_space) {
-    x86_64_cr3_write(X86_64_AS(address_space)->cr3);
+    x86_64_cr3_write(X86_64_PTM_AS(address_space)->pt_top);
 }
 
 void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t paddr, size_t length, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global) {
@@ -214,7 +190,7 @@ void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t 
     ASSERT(length % ARCH_PAGE_GRANULARITY == 0);
 
     if(!prot.read) log(LOG_LEVEL_ERROR, "PTM", "No-read mapping is not supported on x86_64");
-    spinlock_acquire_nodw(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_acquire_nodw(&X86_64_PTM_AS(address_space)->pt_lock);
 
     for(size_t i = 0; i < length;) {
         page_size_t cursize = PAGE_SIZE_4K;
@@ -224,14 +200,14 @@ void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t 
         bool g_x86_64_cpu_pdpe1gb_support = true;
         if(g_x86_64_cpu_pdpe1gb_support && paddr % PAGE_SIZE_1GB == 0 && vaddr % PAGE_SIZE_1GB == 0 && length - i >= PAGE_SIZE_1GB) cursize = PAGE_SIZE_1GB;
 
-        map_page((uint64_t *) HHDM(X86_64_AS(address_space)->cr3), vaddr + i, paddr + i, cursize, prot, cache, privilege, global);
+        map_page((uint64_t *) HHDM(X86_64_PTM_AS(address_space)->pt_top), vaddr + i, paddr + i, cursize, prot, cache, privilege, global);
 
         i += cursize;
     }
 
     x86_64_tlb_shootdown(vaddr, length);
 
-    spinlock_release_nodw(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_release_nodw(&X86_64_PTM_AS(address_space)->pt_lock);
 }
 
 void arch_ptm_rewrite(vm_address_space_t *address_space, uintptr_t vaddr, size_t length, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global) {
@@ -239,10 +215,10 @@ void arch_ptm_rewrite(vm_address_space_t *address_space, uintptr_t vaddr, size_t
     ASSERT(length % ARCH_PAGE_GRANULARITY == 0);
 
     if(!prot.read) log(LOG_LEVEL_ERROR, "PTM", "No-read mapping is not supported on x86_64");
-    spinlock_acquire_nodw(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_acquire_nodw(&X86_64_PTM_AS(address_space)->pt_lock);
 
     for(size_t i = 0; i < length;) {
-        uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
+        uint64_t *current_table = (uint64_t *) HHDM(X86_64_PTM_AS(address_space)->pt_top);
 
         int j = LEVEL_COUNT;
         for(; j > 1; j--) {
@@ -290,17 +266,17 @@ void arch_ptm_rewrite(vm_address_space_t *address_space, uintptr_t vaddr, size_t
 
     x86_64_tlb_shootdown(vaddr, length);
 
-    spinlock_release_nodw(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_release_nodw(&X86_64_PTM_AS(address_space)->pt_lock);
 }
 
 void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr, size_t length) {
     ASSERT(vaddr % ARCH_PAGE_GRANULARITY == 0);
     ASSERT(length % ARCH_PAGE_GRANULARITY == 0);
 
-    spinlock_acquire_nodw(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_acquire_nodw(&X86_64_PTM_AS(address_space)->pt_lock);
 
     for(size_t i = 0; i < length;) {
-        uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
+        uint64_t *current_table = (uint64_t *) HHDM(X86_64_PTM_AS(address_space)->pt_top);
 
         int j = LEVEL_COUNT;
         for(; j > 1; j--) {
@@ -326,18 +302,18 @@ void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr, size_t l
 
     x86_64_tlb_shootdown(vaddr, length);
 
-    spinlock_release_nodw(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_release_nodw(&X86_64_PTM_AS(address_space)->pt_lock);
 }
 
 bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, PARAM_OUT(uintptr_t *) paddr) {
-    spinlock_acquire_nodw(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_acquire_nodw(&X86_64_PTM_AS(address_space)->pt_lock);
 
-    uint64_t *current_table = (uint64_t *) HHDM(X86_64_AS(address_space)->cr3);
+    uint64_t *current_table = (uint64_t *) HHDM(X86_64_PTM_AS(address_space)->pt_top);
     int j = LEVEL_COUNT;
     for(; j > 1; j--) {
         int index = VADDR_TO_INDEX(vaddr, j);
         if((current_table[index] & ENTRY_FLAG_PRESENT) == 0) {
-            spinlock_release_nodw(&X86_64_AS(address_space)->cr3_lock);
+            spinlock_release_nodw(&X86_64_PTM_AS(address_space)->pt_lock);
             return false;
         }
         if((current_table[index] & ENTRYH_FLAG_PS) != 0) break;
@@ -345,7 +321,7 @@ bool arch_ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, PARAM
     }
 
     uint64_t entry = current_table[VADDR_TO_INDEX(vaddr, j)];
-    spinlock_release_nodw(&X86_64_AS(address_space)->cr3_lock);
+    spinlock_release_nodw(&X86_64_PTM_AS(address_space)->pt_lock);
     if((entry & ENTRY_FLAG_PRESENT) == 0) return false;
 
     switch(j) {
@@ -361,6 +337,27 @@ void x86_64_ptm_page_fault_handler(x86_64_interrupt_frame_t *frame) {
     vm_fault_t fault = VM_FAULT_UNKNOWN;
     if((frame->err_code & PAGEFAULT_FLAG_PRESENT) == 0) fault = VM_FAULT_NOT_PRESENT;
 
-    if(x86_64_init_flag_check(X86_64_INIT_FLAG_SCHED) && vm_fault(x86_64_cr2_read(), fault)) return;
+    if(X86_64_CPU_CURRENT.common.flags.threaded && vm_fault(x86_64_cr2_read(), fault)) return;
     x86_64_exception_unhandled(frame);
 }
+
+static void ptm_init() {
+    g_global_address_space.common.lock = SPINLOCK_INIT;
+    g_global_address_space.common.regions = vm_create_regions();
+    g_global_address_space.common.start = KERNELSPACE_START;
+    g_global_address_space.common.end = KERNELSPACE_END;
+    g_global_address_space.pt_top = alloc_page();
+    g_global_address_space.pt_lock = SPINLOCK_INIT;
+
+    uint64_t *pml4 = (uint64_t *) HHDM(g_global_address_space.pt_top);
+    for(int i = 256; i < 512; i++) {
+        // Needs to be completely unrestricted as these are not synchronized across address spaces
+        pml4[i] = ENTRY_FLAG_PRESENT | ENTRY_FLAG_RW | (alloc_page() & ENTRYL_ADDRESS_MASK);
+    }
+
+    g_vm_global_address_space = &g_global_address_space.common;
+
+    x86_64_interrupt_set(0xE, x86_64_ptm_page_fault_handler);
+}
+
+INIT_TARGET(ptm, INIT_STAGE_EARLY, ptm_init);

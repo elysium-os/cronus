@@ -6,7 +6,7 @@
 #include <stddef.h>
 
 #ifdef TRACE
-#define LOG_TRACE(TAG, FMT, ...) log(LOG_LEVEL_TRACE, TAG, FMT, __VA_ARGS__)
+#define LOG_TRACE(TAG, FMT, ...) log(LOG_LEVEL_TRACE, TAG, FMT __VA_OPT__(, ) __VA_ARGS__)
 #else
 #define LOG_TRACE(TAG, FMT, ...)
 #endif

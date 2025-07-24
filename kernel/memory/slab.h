@@ -45,9 +45,6 @@ typedef struct {
     void *freelist;
 } slab_t;
 
-/// Initialize slab allocator.
-void slab_init();
-
 /// Create slab cache.
 /// @param order The block order of each slab in the cache
 slab_cache_t *slab_cache_create(const char *name, size_t object_size, pmm_order_t order);

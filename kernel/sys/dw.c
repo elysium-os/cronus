@@ -4,6 +4,7 @@
 #include "common/assert.h"
 #include "lib/container.h"
 #include "memory/slab.h"
+#include "sys/init.h"
 
 #include <stdint.h>
 
@@ -24,8 +25,8 @@ void dw_queue(dw_item_t *item) {
 }
 
 void dw_process() {
-repeat:
     interrupt_state_t previous_state = interrupt_state_mask();
+repeat:
     cpu_t *current_cpu = arch_cpu_current();
     if(current_cpu->dw_items.count == 0) {
         interrupt_state_restore(previous_state);
@@ -57,6 +58,8 @@ void dw_status_enable() {
     if(process_work) dw_process();
 }
 
-void dw_init() {
+static void dw_init() {
     g_item_cache = slab_cache_create("deferred_work", sizeof(dw_item_t), 2);
 }
+
+INIT_TARGET(deferred_work, INIT_STAGE_MAIN, dw_init);

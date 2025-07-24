@@ -36,6 +36,14 @@ SECTIONS
         *(.bss .bss.*)
     } :data
 
+    ld_init_targets_start = .;
+
+    .init_targets : {
+        *(.init_targets .init_targets.*)
+    } :data
+
+    ld_init_targets_end = .;
+
     ld_kernel_end = .;
 
     /DISCARD/ : {

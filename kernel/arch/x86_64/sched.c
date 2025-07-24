@@ -1,10 +1,9 @@
-#include "sched.h"
+#include "arch/sched.h"
 
 #include "arch/cpu.h"
 #include "arch/interrupt.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
-#include "arch/sched.h"
 #include "common/assert.h"
 #include "common/lock/spinlock.h"
 #include "common/log.h"
@@ -20,12 +19,12 @@
 #include "sched/sched.h"
 #include "sched/thread.h"
 #include "sys/event.h"
+#include "sys/init.h"
 #include "sys/interrupt.h"
 
 #include "arch/x86_64/cpu/cpu.h"
 #include "arch/x86_64/cpu/fpu.h"
 #include "arch/x86_64/cpu/msr.h"
-#include "arch/x86_64/init.h"
 #include "arch/x86_64/profiler.h"
 #include "arch/x86_64/thread.h"
 
@@ -123,7 +122,7 @@ static sched_t *pick_next_scheduler() {
     // TODO: this is NOT a good way of doing this
     static size_t current_cpu_id = 0;
     size_t cpu_id = __atomic_fetch_add(&current_cpu_id, 1, __ATOMIC_RELAXED);
-    return &g_x86_64_cpus[cpu_id % g_x86_64_cpu_count].common.sched;
+    return &g_x86_64_cpus[cpu_id % g_cpu_count].common.sched;
 }
 
 static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *scheduler, x86_64_thread_stack_t kernel_stack, uintptr_t rsp) {
@@ -206,7 +205,20 @@ void arch_sched_context_switch(thread_t *current, thread_t *next) {
     sched_switch(X86_64_THREAD(current), X86_64_THREAD(next));
 }
 
-void x86_64_sched_init_cpu(x86_64_cpu_t *cpu) {
+[[noreturn]] void arch_sched_handoff_cpu() {
+    x86_64_thread_t *bootstrap_thread = heap_alloc(sizeof(x86_64_thread_t));
+    memclear(bootstrap_thread, sizeof(x86_64_thread_t));
+    bootstrap_thread->common.state = THREAD_STATE_DESTROY;
+    bootstrap_thread->common.scheduler = &X86_64_CPU_CURRENT.self->common.sched;
+    bootstrap_thread->common.id = BOOTSTRAP_TID;
+
+    X86_64_CPU_CURRENT.common.flags.threaded = true;
+
+    sched_switch(bootstrap_thread, X86_64_THREAD(X86_64_CPU_CURRENT.common.sched.idle_thread));
+    ASSERT_UNREACHABLE();
+}
+
+static void setup_sched() {
     x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));
@@ -214,29 +226,9 @@ void x86_64_sched_init_cpu(x86_64_cpu_t *cpu) {
     init_stack->thread_init = common_thread_init;
     init_stack->thread_exit_kernel = kernel_thread_exit;
 
-    x86_64_thread_t *idle_thread = create_thread(nullptr, IDLE_TID, &cpu->common.sched, kernel_stack, (uintptr_t) init_stack);
+    x86_64_thread_t *idle_thread = create_thread(nullptr, IDLE_TID, &X86_64_CPU_CURRENT.self->common.sched, kernel_stack, (uintptr_t) init_stack);
 
-    cpu->common.sched = (sched_t) {
-        .lock = SPINLOCK_INIT,
-        .thread_queue = LIST_INIT,
-        .status = { .preempt_counter = 0, .yield_immediately = false },
-        .idle_thread = &idle_thread->common
-    };
+    X86_64_CPU_CURRENT.common.sched.idle_thread = &idle_thread->common;
 }
 
-[[gnu::no_instrument_function]] [[noreturn]] void x86_64_sched_handoff_cpu(x86_64_cpu_t *cpu, bool release) {
-    x86_64_thread_t *bootstrap_thread = heap_alloc(sizeof(x86_64_thread_t));
-    memclear(bootstrap_thread, sizeof(x86_64_thread_t));
-    bootstrap_thread->common.state = THREAD_STATE_DESTROY;
-    bootstrap_thread->common.scheduler = &cpu->common.sched;
-    bootstrap_thread->common.id = BOOTSTRAP_TID;
-
-    if(release) {
-        x86_64_init_flag_set(X86_64_INIT_FLAG_SCHED);
-    } else {
-        while(!x86_64_init_flag_check(X86_64_INIT_FLAG_SCHED)) arch_cpu_relax();
-    }
-
-    sched_switch(bootstrap_thread, X86_64_THREAD(cpu->common.sched.idle_thread));
-    ASSERT_UNREACHABLE();
-}
+INIT_TARGET_PERCORE(sched_setup, INIT_STAGE_LATE, setup_sched);

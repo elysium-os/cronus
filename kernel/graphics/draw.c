@@ -5,7 +5,7 @@
 
 static inline void putpixel(framebuffer_t *fb, uint64_t offset, draw_color_t color) {
     if(offset + sizeof(draw_color_t) > fb->size) return;
-    *(draw_color_t *) (HHDM(fb->physical_address) + offset) = color;
+    *(draw_color_t *) ((uintptr_t) fb->address + offset) = color;
 }
 
 draw_color_t draw_color(uint8_t r, uint8_t g, uint8_t b) {

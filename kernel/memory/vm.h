@@ -110,3 +110,6 @@ size_t vm_copy_to(vm_address_space_t *dest_as, uintptr_t dest_addr, void *src, s
 
 /// Copy data from another address space.
 size_t vm_copy_from(void *dest, vm_address_space_t *src_as, uintptr_t src_addr, size_t count);
+
+/// Create a regions rbtree.
+rb_tree_t vm_create_regions();

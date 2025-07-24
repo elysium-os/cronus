@@ -16,8 +16,5 @@ void events_process();
 /// Queue an event.
 void event_queue(time_t delay, dw_function_t fn, void *data);
 
-/// Initialize the event system.
-void event_init();
-
 /// Initialize the event system for current CPU.
-void event_init_cpu();
+void event_init_cpu_local();

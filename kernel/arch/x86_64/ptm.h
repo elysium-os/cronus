@@ -1,11 +1,12 @@
 #pragma once
 
+#include "lib/container.h"
 #include "memory/vm.h"
 
-#include "arch/x86_64/interrupt.h"
+#define X86_64_PTM_AS(ADDRESS_SPACE) (CONTAINER_OF((ADDRESS_SPACE), x86_64_ptm_address_space_t, common))
 
-/// Initialize page table manager.
-vm_address_space_t *x86_64_ptm_init();
-
-/// Handles page faults and passes to the architecture agnostic handler.
-void x86_64_ptm_page_fault_handler(x86_64_interrupt_frame_t *frame);
+typedef struct {
+    spinlock_t pt_lock;
+    uintptr_t pt_top;
+    vm_address_space_t common;
+} x86_64_ptm_address_space_t;

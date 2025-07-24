@@ -1,6 +1,5 @@
 #include "vm.h"
 
-#include "arch/cpu.h"
 #include "arch/mem.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
@@ -36,6 +35,10 @@ static list_t g_region_cache = LIST_INIT;
 static_assert(ARCH_PAGE_GRANULARITY > (sizeof(vm_region_t) * 2));
 
 static vm_region_t *region_insert(vm_address_space_t *address_space, vm_region_t *region);
+
+static rb_value_t region_node_value(rb_node_t *node) {
+    return CONTAINER_OF(node, vm_region_t, rb_node)->base;
+}
 
 /// Find last region within a segment.
 static vm_region_t *find_region(vm_address_space_t *address_space, uintptr_t address, size_t length) {
@@ -510,4 +513,8 @@ size_t vm_copy_from(void *dest, vm_address_space_t *src_as, uintptr_t src_addr, 
         dest += len;
     }
     return i;
+}
+
+rb_tree_t vm_create_regions() {
+    return RB_TREE_INIT(region_node_value);
 }
