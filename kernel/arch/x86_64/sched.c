@@ -160,7 +160,7 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
 
     if(proc != nullptr) {
         spinlock_acquire_nodw(&proc->lock);
-        list_push(&proc->threads, &thread->common.list_proc);
+        list_push(&proc->threads, &thread->common.list_node_proc);
         spinlock_release_nodw(&proc->lock);
     }
 

@@ -41,7 +41,7 @@ repeat:
             spinlock_release_nodw(&g_reaper_lock);
             break;
         }
-        thread_t *thread = CONTAINER_OF(list_pop(&g_thread_queue), thread_t, list_sched);
+        thread_t *thread = CONTAINER_OF(list_pop(&g_thread_queue), thread_t, list_node_sched);
         spinlock_release_nodw(&g_reaper_lock);
 
         log(LOG_LEVEL_DEBUG, "REAPER", "tid: %lu", thread->id);
@@ -60,7 +60,7 @@ thread_t *reaper_create() {
 
 void reaper_queue_thread(thread_t *thread) {
     spinlock_acquire_nodw(&g_reaper_lock);
-    list_push_back(&g_thread_queue, &thread->list_sched);
+    list_push_back(&g_thread_queue, &thread->list_node_sched);
     spinlock_release_nodw(&g_reaper_lock);
 }
 

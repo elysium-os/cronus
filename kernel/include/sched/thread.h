@@ -28,7 +28,7 @@ struct thread {
         dw_item_t dw_item;
     } vm_fault;
 
-    list_node_t list_sched; /* list used by scheduler/reaper */
-    list_node_t list_proc; /* list used by process */
-    list_node_t list_wait; /* list used by waitable */
+    list_node_t list_node_sched; /* list node used by scheduler/reaper */
+    list_node_t list_node_proc; /* list node used by process */
+    list_node_t list_node_wait; /* list node used by waitable */
 };

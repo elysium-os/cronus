@@ -17,7 +17,7 @@ void sched_thread_schedule(thread_t *thread) {
     thread->state = THREAD_STATE_READY;
 
     spinlock_acquire_nodw(&thread->scheduler->lock);
-    list_push_back(&thread->scheduler->thread_queue, &thread->list_sched);
+    list_push_back(&thread->scheduler->thread_queue, &thread->list_node_sched);
     spinlock_release_nodw(&thread->scheduler->lock);
 }
 
@@ -28,7 +28,7 @@ thread_t *sched_thread_next(sched_t *sched) {
         return nullptr;
     }
 
-    thread_t *thread = CONTAINER_OF(list_pop(&sched->thread_queue), thread_t, list_sched);
+    thread_t *thread = CONTAINER_OF(list_pop(&sched->thread_queue), thread_t, list_node_sched);
 
     spinlock_release_nodw(&sched->lock);
     thread->state = THREAD_STATE_ACTIVE; // TODO: move this?
@@ -93,7 +93,7 @@ void internal_sched_thread_drop(thread_t *thread) {
         case THREAD_STATE_DESTROY:
             if(thread->proc != nullptr) {
                 spinlock_acquire_nodw(&thread->proc->lock);
-                list_node_delete(&thread->proc->threads, &thread->list_proc);
+                list_node_delete(&thread->proc->threads, &thread->list_node_proc);
                 if(thread->proc->threads.count == 0) {
                     reaper_queue_process(thread->proc);
                     dw_status_enable();
@@ -103,10 +103,9 @@ void internal_sched_thread_drop(thread_t *thread) {
                 }
             }
             reaper_queue_thread(thread);
-            return;
-        case THREAD_STATE_BLOCK:  return;
-        case THREAD_STATE_ACTIVE: sched_thread_schedule(thread); return;
-        case THREAD_STATE_READY:  sched_thread_schedule(thread); return;
+            break;
+        case THREAD_STATE_BLOCK: break;
+        case THREAD_STATE_READY: sched_thread_schedule(thread); break;
+        default:                 ASSERT_UNREACHABLE_COMMENT("invalid state on drop"); break;
     }
-    ASSERT_UNREACHABLE();
 }
