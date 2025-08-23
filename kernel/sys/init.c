@@ -1,4 +1,4 @@
-#include "init.h"
+#include "sys/init.h"
 
 #include "arch/cpu.h"
 #include "common/assert.h"
@@ -47,7 +47,7 @@ static void run_init_target(init_target_t *target, bool is_ap) {
     if((is_ap && !target->per_core) || target->completed) return;
 
     if(target->per_core) {
-        log(LOG_LEVEL_DEBUG, "INIT", "Running per-core init target `%s/%s` for core %lu", stage_stringify(target->stage), target->name, arch_cpu_id());
+        log(LOG_LEVEL_DEBUG, "INIT", "Running per-core init target `%s/%s` for core %lu", stage_stringify(target->stage), target->name, cpu_id());
     } else {
         log(LOG_LEVEL_DEBUG, "INIT", "Running init target `%s/%s`", stage_stringify(target->stage), target->name);
     }

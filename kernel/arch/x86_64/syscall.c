@@ -2,9 +2,8 @@
 
 #include "common/log.h"
 #include "sys/init.h"
-
-#include "arch/x86_64/cpu/gdt.h"
-#include "arch/x86_64/cpu/msr.h"
+#include "x86_64/cpu/gdt.h"
+#include "x86_64/cpu/msr.h"
 
 #define MSR_EFER_SCE (1 << 0)
 

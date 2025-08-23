@@ -1,4 +1,4 @@
-#include "sched.h"
+#include "sched/sched.h"
 
 #include "arch/cpu.h"
 #include "arch/interrupt.h"
@@ -7,7 +7,7 @@
 #include "common/lock/spinlock.h"
 #include "lib/container.h"
 #include "lib/list.h"
-#include "reaper.h"
+#include "sched/reaper.h"
 #include "sched/thread.h"
 #include "sys/cpu.h"
 #include "sys/dw.h"
@@ -39,28 +39,28 @@ void sched_yield(enum thread_state yield_state) {
     interrupt_state_t previous_state = interrupt_state_mask();
 
     ASSERT(yield_state != THREAD_STATE_ACTIVE);
-    ASSERT(!arch_cpu_current()->flags.in_interrupt_hard && !arch_cpu_current()->flags.in_interrupt_soft);
+    ASSERT(!cpu_current()->flags.in_interrupt_hard && !cpu_current()->flags.in_interrupt_soft);
 
-    thread_t *current = arch_sched_thread_current();
+    thread_t *current = sched_thread_current();
 
-    thread_t *next = sched_thread_next(&arch_cpu_current()->sched);
+    thread_t *next = sched_thread_next(&cpu_current()->sched);
     if(next == nullptr && current != current->scheduler->idle_thread) next = current->scheduler->idle_thread;
     if(next != nullptr) {
         ASSERT(current != next);
         current->state = yield_state;
-        arch_sched_context_switch(current, next);
+        sched_context_switch(current, next);
     } else {
         ASSERT(current->state == yield_state);
     }
 
-    arch_sched_preempt();
+    sched_preempt();
 
     interrupt_state_restore(previous_state);
 }
 
 void sched_preempt_inc() {
     interrupt_state_t previous_state = interrupt_state_mask();
-    cpu_t *current_cpu = arch_cpu_current();
+    cpu_t *current_cpu = cpu_current();
     ASSERT(current_cpu->sched.status.preempt_counter < UINT32_MAX);
     current_cpu->sched.status.preempt_counter++;
     interrupt_state_restore(previous_state);
@@ -69,7 +69,7 @@ void sched_preempt_inc() {
 void sched_preempt_dec() {
     interrupt_state_t previous_state = interrupt_state_mask();
 
-    cpu_t *current_cpu = arch_cpu_current();
+    cpu_t *current_cpu = cpu_current();
     ASSERT(current_cpu->sched.status.preempt_counter != 0);
     current_cpu->sched.status.preempt_counter--;
 
@@ -84,8 +84,8 @@ void sched_preempt_dec() {
 }
 
 void internal_sched_thread_drop(thread_t *thread) {
-    ASSERT(!arch_interrupt_state());
-    ASSERT(thread->scheduler == &arch_cpu_current()->sched);
+    ASSERT(!interrupt_state());
+    ASSERT(thread->scheduler == &cpu_current()->sched);
 
     if(thread == thread->scheduler->idle_thread) return;
 

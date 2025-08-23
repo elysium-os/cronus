@@ -1,4 +1,4 @@
-#include "spinlock.h"
+#include "common/lock/spinlock.h"
 
 #include "arch/cpu.h"
 #include "common/assert.h"
@@ -11,26 +11,26 @@
 
 void spinlock_acquire(spinlock_t *lock) {
     sched_preempt_inc();
-    ASSERT(!arch_cpu_current()->flags.in_interrupt_soft && !arch_cpu_current()->flags.in_interrupt_hard);
+    ASSERT(!cpu_current()->flags.in_interrupt_soft && !cpu_current()->flags.in_interrupt_hard);
     spinlock_acquire_raw(lock);
 }
 
 void spinlock_release(spinlock_t *lock) {
     spinlock_release_raw(lock);
-    ASSERT(!arch_cpu_current()->flags.in_interrupt_soft && !arch_cpu_current()->flags.in_interrupt_hard);
+    ASSERT(!cpu_current()->flags.in_interrupt_soft && !cpu_current()->flags.in_interrupt_hard);
     sched_preempt_dec();
 }
 
 void spinlock_acquire_nodw(spinlock_t *lock) {
     sched_preempt_inc();
     dw_status_disable();
-    ASSERT(!arch_cpu_current()->flags.in_interrupt_hard);
+    ASSERT(!cpu_current()->flags.in_interrupt_hard);
     spinlock_acquire_raw(lock);
 }
 
 void spinlock_release_nodw(spinlock_t *lock) {
     spinlock_release_raw(lock);
-    ASSERT(!arch_cpu_current()->flags.in_interrupt_hard);
+    ASSERT(!cpu_current()->flags.in_interrupt_hard);
     dw_status_enable();
     sched_preempt_dec();
 }
@@ -58,7 +58,7 @@ void spinlock_acquire_raw(spinlock_t *lock) {
         if(spinlock_try_acquire(lock)) return;
 
         while(__atomic_load_n(lock, __ATOMIC_RELAXED)) {
-            arch_cpu_relax();
+            cpu_relax();
 #ifdef __ENV_DEVELOPMENT
             ASSERT(dead++ != DEADLOCK_AT);
 #endif

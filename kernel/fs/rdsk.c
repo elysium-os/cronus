@@ -1,9 +1,9 @@
-#include "rdsk.h"
+#include "fs/rdsk.h"
 
+#include "fs/vfs.h"
 #include "lib/mem.h"
 #include "lib/string.h"
 #include "memory/heap.h"
-#include "vfs.h"
 
 #include <stdint.h>
 

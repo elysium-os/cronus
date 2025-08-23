@@ -1,12 +1,11 @@
-#include "profiler.h"
+#include "x86_64/profiler.h"
 
 #include "common/assert.h"
 #include "common/log.h"
 #include "common/panic.h"
 #include "memory/heap.h"
 #include "sys/kernel_symbol.h"
-
-#include "arch/x86_64/cpu/cpu.h"
+#include "x86_64/cpu/cpu.h"
 
 #ifdef __ENV_DEVELOPMENT
 

@@ -1,10 +1,9 @@
-#include "fpu.h"
+#include "x86_64/cpu/fpu.h"
 
 #include "common/assert.h"
 #include "sys/init.h"
-
-#include "arch/x86_64/cpu/cpuid.h"
-#include "arch/x86_64/cpu/cr.h"
+#include "x86_64/cpu/cpuid.h"
+#include "x86_64/cpu/cr.h"
 
 uint32_t g_x86_64_fpu_area_size = 0;
 void (*g_x86_64_fpu_save)(void *area) = nullptr;

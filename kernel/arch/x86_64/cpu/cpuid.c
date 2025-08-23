@@ -1,4 +1,4 @@
-#include "cpuid.h"
+#include "x86_64/cpu/cpuid.h"
 
 bool x86_64_cpuid_feature(x86_64_cpuid_feature_t feature) {
     uint32_t value = 0;

@@ -1,4 +1,4 @@
-#include "pci.h"
+#include "dev/pci.h"
 
 #include "arch/mmio.h"
 #include "common/assert.h"
@@ -13,7 +13,7 @@
 #include <uacpi/tables.h>
 
 #ifdef __ARCH_X86_64
-#include "arch/x86_64/cpu/port.h"
+#include "x86_64/cpu/port.h"
 
 #define PORT_CONFIG_ADDRESS 0xCF8
 #define PORT_CONFIG_DATA 0xCFC
@@ -165,9 +165,9 @@ static void pcie_free_device(pci_device_t *device) {
 static uint32_t pcie_read(pci_device_t *device, uint8_t offset, uint8_t size) {
     void *address = PCIE_DEVICE(device)->config_space + offset;
     switch(size) {
-        case 4: return arch_mmio_read32(address);
-        case 2: return arch_mmio_read16(address);
-        case 1: return arch_mmio_read8(address);
+        case 4: return mmio_read32(address);
+        case 2: return mmio_read16(address);
+        case 1: return mmio_read8(address);
     }
     ASSERT_UNREACHABLE_COMMENT("invalid pcie read size");
 }
@@ -175,9 +175,9 @@ static uint32_t pcie_read(pci_device_t *device, uint8_t offset, uint8_t size) {
 static void pcie_write(pci_device_t *device, uint8_t offset, uint8_t size, uint32_t value) {
     void *address = PCIE_DEVICE(device)->config_space + offset;
     switch(size) {
-        case 4: arch_mmio_write32(address, value); return;
-        case 2: arch_mmio_write16(address, value); return;
-        case 1: arch_mmio_write8(address, value); return;
+        case 4: mmio_write32(address, value); return;
+        case 2: mmio_write16(address, value); return;
+        case 1: mmio_write8(address, value); return;
     }
     ASSERT_UNREACHABLE_COMMENT("invalid pcie write size");
 }

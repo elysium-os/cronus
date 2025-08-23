@@ -1,4 +1,4 @@
-#include "ioapic.h"
+#include "x86_64/dev/ioapic.h"
 
 #include "arch/mmio.h"
 #include "common/log.h"
@@ -50,13 +50,13 @@ static legacy_irq_translation_t g_legacy_irq_map[16] = {
 static volatile uint32_t *g_ioapic;
 
 static void ioapic_write(uint32_t index, uint32_t data) {
-    arch_mmio_write32(g_ioapic, index & 0xFF);
-    arch_mmio_write32(&g_ioapic[4], data);
+    mmio_write32(g_ioapic, index & 0xFF);
+    mmio_write32(&g_ioapic[4], data);
 }
 
 static uint32_t ioapic_read(uint32_t index) {
-    arch_mmio_write32(g_ioapic, index & 0xFF);
-    return arch_mmio_read32(&g_ioapic[4]);
+    mmio_write32(g_ioapic, index & 0xFF);
+    return mmio_read32(&g_ioapic[4]);
 }
 
 void x86_64_ioapic_init(struct acpi_madt *apic_table) {

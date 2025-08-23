@@ -1,4 +1,4 @@
-#include "acpi.h"
+#include "dev/acpi.h"
 
 #include "common/panic.h"
 #include "sys/init.h"

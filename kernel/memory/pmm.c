@@ -1,4 +1,4 @@
-#include "pmm.h"
+#include "memory/pmm.h"
 
 #include "arch/mem.h"
 #include "arch/page.h"
@@ -14,8 +14,8 @@
 
 pmm_zone_t g_pmm_zone_low = {
     .name = "LOW",
-    .start = ARCH_PAGE_GRANULARITY,
-    .end = ARCH_MEM_LOW_SIZE,
+    .start = PAGE_GRANULARITY,
+    .end = MEM_LOW_SIZE,
     .total_page_count = 0,
     .free_page_count = 0,
     .lock = SPINLOCK_INIT,
@@ -24,8 +24,8 @@ pmm_zone_t g_pmm_zone_low = {
 
 pmm_zone_t g_pmm_zone_normal = {
     .name = "NORMAL",
-    .start = ARCH_MEM_LOW_SIZE,
-    .end = ((UINTPTR_MAX) / ARCH_PAGE_GRANULARITY) * ARCH_PAGE_GRANULARITY,
+    .start = MEM_LOW_SIZE,
+    .end = ((UINTPTR_MAX) / PAGE_GRANULARITY) * PAGE_GRANULARITY,
     .total_page_count = 0,
     .free_page_count = 0,
     .lock = SPINLOCK_INIT,
@@ -51,8 +51,8 @@ void pmm_region_add(uintptr_t base, size_t size, bool is_free) {
         }
         if(local_base + local_size > zone->end) local_size = zone->end - local_base;
 
-        size_t index_offset = local_base / ARCH_PAGE_GRANULARITY;
-        size_t page_count = local_size / ARCH_PAGE_GRANULARITY;
+        size_t index_offset = local_base / PAGE_GRANULARITY;
+        size_t page_count = local_size / PAGE_GRANULARITY;
 
         zone->total_page_count += page_count;
 
@@ -68,7 +68,7 @@ void pmm_region_add(uintptr_t base, size_t size, bool is_free) {
             }
 
             // Reduce it until it is aligned
-            while(((local_base + j * ARCH_PAGE_GRANULARITY) & (PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY - 1)) != 0) {
+            while(((local_base + j * PAGE_GRANULARITY) & (PMM_ORDER_TO_PAGECOUNT(order) * PAGE_GRANULARITY - 1)) != 0) {
                 ASSERT(order != 0);
                 order--;
             }
@@ -101,7 +101,7 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
 
     pmm_block_t *block = CONTAINER_OF(list_pop(&zone->lists[avl_order]), pmm_block_t, list_node);
     for(; avl_order > order; avl_order--) {
-        pmm_block_t *buddy = &PAGE(BLOCK_PADDR(block) + (PMM_ORDER_TO_PAGECOUNT(avl_order - 1) * ARCH_PAGE_GRANULARITY))->block;
+        pmm_block_t *buddy = &PAGE(BLOCK_PADDR(block) + (PMM_ORDER_TO_PAGECOUNT(avl_order - 1) * PAGE_GRANULARITY))->block;
         buddy->order = avl_order - 1;
         buddy->free = true;
         list_push(&zone->lists[avl_order - 1], &buddy->list_node);
@@ -112,9 +112,9 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
     block->free = false;
     zone->free_page_count -= PMM_ORDER_TO_PAGECOUNT(order);
 
-    if((flags & PMM_FLAG_ZERO) != 0) memclear((void *) HHDM(BLOCK_PADDR(block)), PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY);
+    if((flags & PMM_FLAG_ZERO) != 0) memclear((void *) HHDM(BLOCK_PADDR(block)), PMM_ORDER_TO_PAGECOUNT(order) * PAGE_GRANULARITY);
 
-    LOG_TRACE("PMM", "alloc success(%#lx -> %#llx)", BLOCK_PADDR(block), BLOCK_PADDR(block) + PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY);
+    LOG_TRACE("PMM", "alloc success(%#lx -> %#llx)", BLOCK_PADDR(block), BLOCK_PADDR(block) + PMM_ORDER_TO_PAGECOUNT(order) * PAGE_GRANULARITY);
 
     return block;
 }
@@ -129,14 +129,14 @@ pmm_block_t *pmm_alloc_page(pmm_flags_t flags) {
 
 void pmm_free(pmm_block_t *block) {
     LOG_TRACE("PMM", "free(%#lx, order: %u, max_order: %u)", BLOCK_PADDR(block), block->order, block->max_order);
-    pmm_zone_t *zone = (BLOCK_PADDR(block) & ~ARCH_MEM_LOW_MASK) > 0 ? &g_pmm_zone_normal : &g_pmm_zone_low;
+    pmm_zone_t *zone = (BLOCK_PADDR(block) & ~MEM_LOW_MASK) > 0 ? &g_pmm_zone_normal : &g_pmm_zone_low;
     zone->free_page_count += PMM_ORDER_TO_PAGECOUNT(block->order);
 
     block->free = true;
 
     spinlock_acquire_nodw(&zone->lock);
     while(block->order < block->max_order) {
-        pmm_block_t *buddy = &PAGE(BLOCK_PADDR(block) ^ (PMM_ORDER_TO_PAGECOUNT(block->order) * ARCH_PAGE_GRANULARITY))->block;
+        pmm_block_t *buddy = &PAGE(BLOCK_PADDR(block) ^ (PMM_ORDER_TO_PAGECOUNT(block->order) * PAGE_GRANULARITY))->block;
         if(!buddy->free || buddy->order == buddy->max_order || buddy->order != block->order) break;
 
         LOG_TRACE("PMM", "merging %#lx and buddy %#lx to order (%u)", BLOCK_PADDR(block), BLOCK_PADDR(buddy), block->order);

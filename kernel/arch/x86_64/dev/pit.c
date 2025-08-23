@@ -1,6 +1,6 @@
-#include "pit.h"
+#include "x86_64/dev/pit.h"
 
-#include "arch/x86_64/cpu/port.h"
+#include "x86_64/cpu/port.h"
 
 #define CHANNEL0_DATA 0x40
 #define CHANNEL1_DATA 0x41

@@ -1,4 +1,4 @@
-#include "format.h"
+#include "lib/format.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -258,7 +258,7 @@ int format(format_writer_t writer, const char *format, va_list list) {
             case 'x':
                 if(precision < 0) precision = 1;
                 if(flags & FLAG_ALTERNATIVE) {
-                    if(flags & FLAG_UPPERCASE) prefix_offset = 4; 
+                    if(flags & FLAG_UPPERCASE) prefix_offset = 4;
                     else prefix_offset = 1;
                 } else prefix_offset = 0;
                 radix = 16;

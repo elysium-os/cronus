@@ -15,7 +15,7 @@
 #define R_X86_64_32S 11
 #define R_X86_64_PC64 24
 
-bool arch_elf_do_relocation_addend(elf64_rela_t *rela, elf64_symbol_t *symbol, uintptr_t section_address) {
+bool elf_do_relocation_addend(elf64_rela_t *rela, elf64_symbol_t *symbol, uintptr_t section_address) {
     void *address = (void *) (section_address + rela->offset);
 
     LOG_TRACE("ELF", "relocation: [type: %#lx] [addr: %#lx] [sym_val: %#lx] [addend: %li]", ELF64_R_TYPE(rela->info), (uintptr_t) address, symbol->value, rela->addend);

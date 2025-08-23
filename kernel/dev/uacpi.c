@@ -19,21 +19,21 @@
 #include <uacpi/types.h>
 
 // FIX using x86_64 in generic code
-#include "arch/x86_64/cpu/lapic.h"
-#include "arch/x86_64/cpu/port.h"
-#include "arch/x86_64/dev/ioapic.h"
-#include "arch/x86_64/interrupt.h"
+#include "x86_64/cpu/lapic.h"
+#include "x86_64/cpu/port.h"
+#include "x86_64/dev/ioapic.h"
+#include "x86_64/interrupt.h"
 
 typedef struct {
     uacpi_io_addr base;
     uacpi_size length;
-} io_range_t;
+} uacpi_io_range_t;
 
 typedef struct {
     int vector;
     uacpi_interrupt_handler fn;
     uacpi_handle ctx;
-} interrupt_handler_t;
+} uacpi_interrupt_handler_t;
 
 
 /*Convenience initialization / deinitialization hooks that will be called by *uACPI automatically when appropriate if compiled -
@@ -122,7 +122,7 @@ uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len, uacpi_handl
 #ifdef __ARCH_X86_64
     if(base + len > 0xFFFF) return UACPI_STATUS_INVALID_ARGUMENT;
 #endif
-    io_range_t *range = heap_alloc(sizeof(io_range_t));
+    uacpi_io_range_t *range = heap_alloc(sizeof(uacpi_io_range_t));
     range->base = base;
     range->length = len;
     *out_handle = range;
@@ -130,46 +130,46 @@ uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len, uacpi_handl
 }
 
 void uacpi_kernel_io_unmap(uacpi_handle handle) {
-    heap_free(handle, sizeof(io_range_t));
+    heap_free(handle, sizeof(uacpi_io_range_t));
 }
 
 uacpi_status uacpi_kernel_io_read8(uacpi_handle handle, uacpi_size offset, uacpi_u8 *out_value) {
-    io_range_t *range = (io_range_t *) handle;
+    uacpi_io_range_t *range = (uacpi_io_range_t *) handle;
     if(offset >= range->length) return UACPI_STATUS_INVALID_ARGUMENT;
     *out_value = x86_64_port_inb(range->base + offset);
     return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_io_read16(uacpi_handle handle, uacpi_size offset, uacpi_u16 *out_value) {
-    io_range_t *range = (io_range_t *) handle;
+    uacpi_io_range_t *range = (uacpi_io_range_t *) handle;
     if(offset >= range->length) return UACPI_STATUS_INVALID_ARGUMENT;
     *out_value = x86_64_port_inw(range->base + offset);
     return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_io_read32(uacpi_handle handle, uacpi_size offset, uacpi_u32 *out_value) {
-    io_range_t *range = (io_range_t *) handle;
+    uacpi_io_range_t *range = (uacpi_io_range_t *) handle;
     if(offset >= range->length) return UACPI_STATUS_INVALID_ARGUMENT;
     *out_value = x86_64_port_ind(range->base + offset);
     return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_io_write8(uacpi_handle handle, uacpi_size offset, uacpi_u8 in_value) {
-    io_range_t *range = (io_range_t *) handle;
+    uacpi_io_range_t *range = (uacpi_io_range_t *) handle;
     if(offset >= range->length) return UACPI_STATUS_INVALID_ARGUMENT;
     x86_64_port_outb(range->base + offset, in_value);
     return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_io_write16(uacpi_handle handle, uacpi_size offset, uacpi_u16 in_value) {
-    io_range_t *range = (io_range_t *) handle;
+    uacpi_io_range_t *range = (uacpi_io_range_t *) handle;
     if(offset >= range->length) return UACPI_STATUS_INVALID_ARGUMENT;
     x86_64_port_outw(range->base + offset, in_value);
     return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_io_write32(uacpi_handle handle, uacpi_size offset, uacpi_u32 in_value) {
-    io_range_t *range = (io_range_t *) handle;
+    uacpi_io_range_t *range = (uacpi_io_range_t *) handle;
     if(offset >= range->length) return UACPI_STATUS_INVALID_ARGUMENT;
     x86_64_port_outd(range->base + offset, in_value);
     return UACPI_STATUS_OK;
@@ -177,15 +177,15 @@ uacpi_status uacpi_kernel_io_write32(uacpi_handle handle, uacpi_size offset, uac
 
 /* Virtual Memory */
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
-    size_t offset = addr % ARCH_PAGE_GRANULARITY;
-    uintptr_t ret = (uintptr_t) vm_map_direct(g_vm_global_address_space, nullptr, MATH_CEIL(len + offset, ARCH_PAGE_GRANULARITY), VM_PROT_RW, VM_CACHE_NONE, MATH_FLOOR(addr, ARCH_PAGE_GRANULARITY), VM_FLAG_NONE);
-    LOG_TRACE("UACPI", "MAP (%#lx, %#lx) <%#lx, %#lx>", ret, MATH_CEIL(len + offset, ARCH_PAGE_GRANULARITY), addr, len);
+    size_t offset = addr % PAGE_GRANULARITY;
+    uintptr_t ret = (uintptr_t) vm_map_direct(g_vm_global_address_space, nullptr, MATH_CEIL(len + offset, PAGE_GRANULARITY), VM_PROT_RW, VM_CACHE_NONE, MATH_FLOOR(addr, PAGE_GRANULARITY), VM_FLAG_NONE);
+    LOG_TRACE("UACPI", "MAP (%#lx, %#lx) <%#lx, %#lx>", ret, MATH_CEIL(len + offset, PAGE_GRANULARITY), addr, len);
     return (void *) (ret + offset);
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
-    LOG_TRACE("UACPI", "UNMAP (%#lx, %#lx) <%#lx, %#lx>", MATH_FLOOR((uintptr_t) addr, ARCH_PAGE_GRANULARITY), MATH_CEIL(len + ((uintptr_t) addr % ARCH_PAGE_GRANULARITY), ARCH_PAGE_GRANULARITY), (uintptr_t) addr, len);
-    vm_unmap(g_vm_global_address_space, (void *) MATH_FLOOR((uintptr_t) addr, ARCH_PAGE_GRANULARITY), MATH_CEIL(len + (uintptr_t) addr % ARCH_PAGE_GRANULARITY, ARCH_PAGE_GRANULARITY));
+    LOG_TRACE("UACPI", "UNMAP (%#lx, %#lx) <%#lx, %#lx>", MATH_FLOOR((uintptr_t) addr, PAGE_GRANULARITY), MATH_CEIL(len + ((uintptr_t) addr % PAGE_GRANULARITY), ARCH_PAGE_GRANULARITY), (uintptr_t) addr, len);
+    vm_unmap(g_vm_global_address_space, (void *) MATH_FLOOR((uintptr_t) addr, PAGE_GRANULARITY), MATH_CEIL(len + (uintptr_t) addr % PAGE_GRANULARITY, PAGE_GRANULARITY));
 }
 
 /* Heap */
@@ -242,7 +242,7 @@ void uacpi_kernel_vlog(uacpi_log_level level, const uacpi_char *fmt, uacpi_va_li
 
 /* Time */
 uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot() {
-    return (uacpi_u64) arch_time_monotonic();
+    return (uacpi_u64) time_monotonic();
 }
 
 /* Mutexes*/
@@ -336,12 +336,12 @@ void uacpi_kernel_free_event(uacpi_handle handle) {
 uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16 timeout) {
     size_t *counter = (size_t *) handle;
     if(timeout == 0xFFFF) {
-        while(*counter != 0) arch_cpu_relax();
+        while(*counter != 0) cpu_relax();
         return UACPI_TRUE;
     }
 
-    time_t deadline = arch_time_monotonic() + (timeout * (TIME_NANOSECONDS_IN_SECOND / TIME_MILLISECONDS_IN_SECOND));
-    while(*counter != 0 && arch_time_monotonic() < deadline) arch_cpu_relax();
+    time_t deadline = time_monotonic() + (timeout * (TIME_NANOSECONDS_IN_SECOND / TIME_MILLISECONDS_IN_SECOND));
+    while(*counter != 0 && time_monotonic() < deadline) cpu_relax();
     if(*counter == 0) return UACPI_TRUE;
     __atomic_fetch_sub((size_t *) handle, 1, __ATOMIC_SEQ_CST);
     return UACPI_FALSE;
@@ -357,16 +357,16 @@ void uacpi_kernel_reset_event(uacpi_handle handle) {
 
 /* Interrupt Handling */
 // CRITICAL: this doesnt even get registered
-static interrupt_handler_t g_interrupt_handlers[256] = {};
+static uacpi_interrupt_handler_t g_interrupt_handlers[256] = {};
 
 static void kernelapi_interrupt_handler(x86_64_interrupt_frame_t *frame) {
-    interrupt_handler_t *handler = &g_interrupt_handlers[frame->int_no];
+    uacpi_interrupt_handler_t *handler = &g_interrupt_handlers[frame->int_no];
     ASSERT(handler != nullptr);
     handler->fn(handler->ctx);
 }
 
 uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interrupt_handler fn, uacpi_handle ctx, uacpi_handle *out_irq_handle) {
-    interrupt_handler_t *handler = heap_alloc(sizeof(interrupt_handler_t));
+    uacpi_interrupt_handler_t *handler = heap_alloc(sizeof(uacpi_interrupt_handler_t));
     handler->ctx = ctx;
     handler->fn = fn;
 
@@ -383,9 +383,9 @@ uacpi_status uacpi_kernel_install_interrupt_handler(uacpi_u32 irq, uacpi_interru
 }
 
 uacpi_status uacpi_kernel_uninstall_interrupt_handler([[maybe_unused]] uacpi_interrupt_handler fn, uacpi_handle irq_handle) {
-    interrupt_handler_t *handler = (interrupt_handler_t *) irq_handle;
+    uacpi_interrupt_handler_t *handler = (uacpi_interrupt_handler_t *) irq_handle;
     x86_64_interrupt_set(handler->vector, nullptr);
-    heap_free(handler, sizeof(interrupt_handler_t));
+    heap_free(handler, sizeof(uacpi_interrupt_handler_t));
     return UACPI_STATUS_OK;
 }
 

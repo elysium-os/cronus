@@ -1,4 +1,4 @@
-#include "tmpfs.h"
+#include "fs/tmpfs.h"
 
 #include "common/assert.h"
 #include "common/log.h"

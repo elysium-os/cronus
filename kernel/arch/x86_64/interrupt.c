@@ -1,13 +1,11 @@
-#include "interrupt.h"
+#include "x86_64/interrupt.h"
 
 #include "arch/interrupt.h"
 #include "common/assert.h"
-#include "common/log.h"
 #include "sys/dw.h"
 #include "sys/init.h"
-
-#include "arch/x86_64/cpu/cpu.h"
-#include "arch/x86_64/cpu/gdt.h"
+#include "x86_64/cpu/cpu.h"
+#include "x86_64/cpu/gdt.h"
 
 #define FLAGS_NORMAL 0x8E
 #define FLAGS_TRAP 0x8F
@@ -33,7 +31,7 @@ typedef struct {
     handler_type_t type;
     union {
         x86_64_interrupt_handler_t x86_64_handler;
-        arch_interrupt_handler_t arch_handler;
+        interrupt_handler_t arch_handler;
     };
 } interrupt_entry_t;
 
@@ -55,17 +53,17 @@ static int find_vector(interrupt_priority_t priority) {
     return -1;
 }
 
-bool arch_interrupt_state() {
+bool interrupt_state() {
     uint64_t rflags;
     asm volatile("pushfq\npopq %0" : "=rm"(rflags));
     return (rflags & (1 << 9)) != 0;
 }
 
-void arch_interrupt_enable() {
+void interrupt_enable() {
     asm volatile("sti");
 }
 
-void arch_interrupt_disable() {
+void interrupt_disable() {
     asm volatile("cli");
 }
 
@@ -93,9 +91,9 @@ void arch_interrupt_disable() {
     if(is_threaded) {
         // At this point the HardINT is handled, so we can enable interrupts
         X86_64_CPU_CURRENT.common.flags.in_interrupt_soft = true;
-        arch_interrupt_enable();
+        interrupt_enable();
         dw_status_enable();
-        arch_interrupt_disable();
+        interrupt_disable();
         X86_64_CPU_CURRENT.common.flags.in_interrupt_soft = false;
 
         sched_preempt_dec();
@@ -129,7 +127,7 @@ int x86_64_interrupt_request(interrupt_priority_t priority, x86_64_interrupt_han
     return vector;
 }
 
-int arch_interrupt_request(enum interrupt_priority priority, arch_interrupt_handler_t handler) {
+int interrupt_request(enum interrupt_priority priority, interrupt_handler_t handler) {
     int vector = find_vector(priority);
     if(vector >= 0) {
         g_entries[vector].type = HANDLER_TYPE_ARCH;

@@ -1,4 +1,4 @@
-#include "event.h"
+#include "sys/event.h"
 
 #include "arch/cpu.h"
 #include "arch/event.h"
@@ -20,23 +20,23 @@ static rb_value_t rbnode_value(rb_node_t *node) {
 
 void events_process() {
     interrupt_state_t interrupt_state = interrupt_state_mask();
-    cpu_t *current_cpu = arch_cpu_current();
+    cpu_t *current_cpu = cpu_current();
 
     while(true) {
         rb_node_t *node = rb_search(&current_cpu->events, 0, RB_SEARCH_TYPE_NEAREST);
         if(node == nullptr) break;
 
         event_t *event = CONTAINER_OF(node, event_t, rb_node);
-        time_t time_current = arch_time_monotonic();
+        time_t time_current = time_monotonic();
         if(event->deadline > time_current) {
-            arch_event_timer_arm(event->deadline - time_current);
+            event_timer_arm(event->deadline - time_current);
             break;
         }
 
         rb_remove(&current_cpu->events, node);
         dw_queue(event->dw_item);
 
-        if(arch_cpu_current()->flags.in_interrupt_hard) {
+        if(cpu_current()->flags.in_interrupt_hard) {
             rb_insert(&current_cpu->free_events, &event->rb_node);
         } else {
             slab_free(g_event_cache, event);
@@ -50,7 +50,7 @@ void event_queue(time_t delay, dw_function_t fn, void *data) {
     ASSERT(delay > 0);
 
     interrupt_state_t interrupt_state = interrupt_state_mask();
-    cpu_t *current_cpu = arch_cpu_current();
+    cpu_t *current_cpu = cpu_current();
 
     event_t *event;
     if(current_cpu->free_events.count != 0) {
@@ -69,11 +69,11 @@ void event_queue(time_t delay, dw_function_t fn, void *data) {
     }
     event->dw_item = dw_create(fn, data);
 
-    time_t current_time = arch_time_monotonic();
+    time_t current_time = time_monotonic();
     event->deadline = current_time + delay;
 
     rb_node_t *node = rb_search(&current_cpu->events, 0, RB_SEARCH_TYPE_NEAREST);
-    if(node == nullptr || rbnode_value(node) > event->deadline) arch_event_timer_arm(event->deadline - current_time);
+    if(node == nullptr || rbnode_value(node) > event->deadline) event_timer_arm(event->deadline - current_time);
 
     rb_insert(&current_cpu->events, &event->rb_node);
 
@@ -82,20 +82,20 @@ void event_queue(time_t delay, dw_function_t fn, void *data) {
 
 void event_cancel(event_t *event) {
     interrupt_state_t interrupt_state = interrupt_state_mask();
-    rb_tree_t *events = &arch_cpu_current()->events;
+    rb_tree_t *events = &cpu_current()->events;
 
     rb_remove(events, &event->rb_node);
     slab_free(g_event_cache, event);
 
     rb_node_t *first_node = rb_search(events, 0, RB_SEARCH_TYPE_NEAREST);
-    if(first_node != nullptr) arch_event_timer_arm(CONTAINER_OF(first_node, event_t, rb_node)->deadline - arch_time_monotonic());
+    if(first_node != nullptr) event_timer_arm(CONTAINER_OF(first_node, event_t, rb_node)->deadline - time_monotonic());
 
     interrupt_state_restore(interrupt_state);
 }
 
 void event_init_cpu_local() {
     interrupt_state_t prev_state = interrupt_state_mask();
-    cpu_t *current_cpu = arch_cpu_current();
+    cpu_t *current_cpu = cpu_current();
     current_cpu->events = RB_TREE_INIT(rbnode_value);
     current_cpu->free_events = RB_TREE_INIT(rbnode_value);
     interrupt_state_restore(prev_state);

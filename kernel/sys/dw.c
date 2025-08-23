@@ -1,4 +1,4 @@
-#include "dw.h"
+#include "sys/dw.h"
 
 #include "arch/cpu.h"
 #include "common/assert.h"
@@ -19,7 +19,7 @@ dw_item_t *dw_create(dw_function_t fn, void *data) {
 
 void dw_queue(dw_item_t *item) {
     interrupt_state_t previous_state = interrupt_state_mask();
-    cpu_t *current_cpu = arch_cpu_current();
+    cpu_t *current_cpu = cpu_current();
     list_push(&current_cpu->dw_items, &item->list_node);
     interrupt_state_restore(previous_state);
 }
@@ -27,7 +27,7 @@ void dw_queue(dw_item_t *item) {
 void dw_process() {
     interrupt_state_t previous_state = interrupt_state_mask();
 repeat:
-    cpu_t *current_cpu = arch_cpu_current();
+    cpu_t *current_cpu = cpu_current();
     if(current_cpu->dw_items.count == 0) {
         interrupt_state_restore(previous_state);
         return;
@@ -43,7 +43,7 @@ repeat:
 
 void dw_status_disable() {
     interrupt_state_t previous_state = interrupt_state_mask();
-    cpu_t *current_cpu = arch_cpu_current();
+    cpu_t *current_cpu = cpu_current();
     ASSERT(current_cpu->flags.deferred_work_status < UINT32_MAX);
     current_cpu->flags.deferred_work_status++;
     interrupt_state_restore(previous_state);
@@ -51,7 +51,7 @@ void dw_status_disable() {
 
 void dw_status_enable() {
     interrupt_state_t previous_state = interrupt_state_mask();
-    cpu_t *current_cpu = arch_cpu_current();
+    cpu_t *current_cpu = cpu_current();
     current_cpu->flags.deferred_work_status--;
     bool process_work = current_cpu->flags.deferred_work_status == 0;
     interrupt_state_restore(previous_state);

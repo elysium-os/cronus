@@ -1,4 +1,4 @@
-#include "string.h"
+#include "lib/string.h"
 
 size_t string_length(const char *str) {
     size_t i = 0;

@@ -1,4 +1,4 @@
-#include "hpet.h"
+#include "x86_64/dev/hpet.h"
 
 #include "common/log.h"
 #include "memory/mmio.h"
@@ -13,11 +13,11 @@ static void *g_hpet;
 static uint32_t g_period;
 
 static uint64_t hpet_read(uint64_t reg) {
-    return arch_mmio_read64(g_hpet + (reg * sizeof(uint64_t)));
+    return mmio_read64(g_hpet + (reg * sizeof(uint64_t)));
 }
 
 static void hpet_write(uint64_t reg, uint64_t value) {
-    return arch_mmio_write64(g_hpet + (reg * sizeof(uint64_t)), value);
+    return mmio_write64(g_hpet + (reg * sizeof(uint64_t)), value);
 }
 
 time_t hpet_current_time() {

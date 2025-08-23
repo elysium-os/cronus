@@ -1,6 +1,6 @@
-#include "pic8259.h"
+#include "x86_64/dev/pic8259.h"
 
-#include "arch/x86_64/cpu/port.h"
+#include "x86_64/cpu/port.h"
 
 #define MASTER_CMD 0x20
 #define MASTER_DATA 0x21

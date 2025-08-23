@@ -8,8 +8,8 @@
 #include "lib/rb.h"
 #include "memory/vm.h"
 
-#define MAP(AS, OFFSET, CNT, PROT, CACHE) vm_map_anon((AS), (void *) (ARCH_PAGE_GRANULARITY * (OFFSET)), (ARCH_PAGE_GRANULARITY * (CNT)), (PROT), (CACHE), VM_FLAG_FIXED)
-#define UNMAP(AS, OFFSET, CNT) vm_unmap((AS), (void *) (ARCH_PAGE_GRANULARITY * (OFFSET)), (ARCH_PAGE_GRANULARITY * (CNT)))
+#define MAP(AS, OFFSET, CNT, PROT, CACHE) vm_map_anon((AS), (void *) (PAGE_GRANULARITY * (OFFSET)), (PAGE_GRANULARITY * (CNT)), (PROT), (CACHE), VM_FLAG_FIXED)
+#define UNMAP(AS, OFFSET, CNT) vm_unmap((AS), (void *) (PAGE_GRANULARITY * (OFFSET)), (PAGE_GRANULARITY * (CNT)))
 #define TEST_ASSERT(AS, ASSERT)                                                                    \
     if(!(ASSERT)) {                                                                                \
         print_as((AS), LOG_LEVEL_FATAL);                                                           \
@@ -37,7 +37,7 @@ static bool check_as(vm_address_space_t *as, int n, ...) {
 
 
         vm_region_t *region = CONTAINER_OF(node, vm_region_t, rb_node);
-        if(region->base != chk.offset * ARCH_PAGE_GRANULARITY || region->length != chk.count * ARCH_PAGE_GRANULARITY) {
+        if(region->base != chk.offset * PAGE_GRANULARITY || region->length != chk.count * PAGE_GRANULARITY) {
             va_end(list);
             return false;
         }
@@ -67,7 +67,7 @@ rep:
 void __module_initialize() {
     log(LOG_LEVEL_INFO, "TEST_VM", "Running VM tests");
 
-    vm_address_space_t *as = arch_ptm_address_space_create();
+    vm_address_space_t *as = ptm_address_space_create();
 
     TEST_ASSERT(as, as->regions.root == nullptr);
 
@@ -128,16 +128,16 @@ void __module_initialize() {
     TEST_ASSERT(as, check_as(as, 3, (as_check_t) { .offset = 5, .count = 3 }, (as_check_t) { .offset = 8, .count = 4 }, (as_check_t) { .offset = 12, .count = 3 }));
 
     // Test rewrite
-    vm_rewrite_prot(as, (void *) (ARCH_PAGE_GRANULARITY * 7), ARCH_PAGE_GRANULARITY * 4, VM_PROT_RWX);
+    vm_rewrite_prot(as, (void *) (PAGE_GRANULARITY * 7), PAGE_GRANULARITY * 4, VM_PROT_RWX);
 
     TEST_ASSERT(as, check_as(as, 4, (as_check_t) { .offset = 5, .count = 2 }, (as_check_t) { .offset = 7, .count = 4 }, (as_check_t) { .offset = 11, .count = 1 }, (as_check_t) { .offset = 12, .count = 3 }));
 
-    vm_rewrite_prot(as, (void *) (ARCH_PAGE_GRANULARITY * 3), ARCH_PAGE_GRANULARITY * 9, VM_PROT_RW);
+    vm_rewrite_prot(as, (void *) (PAGE_GRANULARITY * 3), PAGE_GRANULARITY * 9, VM_PROT_RW);
 
     TEST_ASSERT(as, check_as(as, 1, (as_check_t) { .offset = 5, .count = 10 }));
 
     // Unmap everything
-    vm_unmap(as, (void *) as->start, MATH_FLOOR(as->end - as->start, ARCH_PAGE_GRANULARITY));
+    vm_unmap(as, (void *) as->start, MATH_FLOOR(as->end - as->start, PAGE_GRANULARITY));
     TEST_ASSERT(as, as->regions.root == nullptr);
 
     // TODO: free address space

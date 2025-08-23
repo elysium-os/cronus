@@ -1,4 +1,4 @@
-#include "buffer.h"
+#include "common/buffer.h"
 
 #include "common/assert.h"
 #include "lib/mem.h"

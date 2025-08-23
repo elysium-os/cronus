@@ -1,4 +1,4 @@
-#include "gdt.h"
+#include "x86_64/cpu/gdt.h"
 
 #include "common/log.h"
 

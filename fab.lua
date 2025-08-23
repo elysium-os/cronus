@@ -17,7 +17,11 @@ if opt_arch == "x86_64" then
 end
 
 -- Includes
-local include_dirs = { builtins.c.include_dir("kernel") }
+local include_dirs = {
+    builtins.c.include_dir("kernel/include"),
+    builtins.c.include_dir(path("kernel/arch", opt_arch, "include")),
+    builtins.c.include_dir("kernel/arch/include")
+}
 
 -- Flags
 local c_flags = {
@@ -125,7 +129,7 @@ end
 
 if opt_arch == "x86_64" then
     -- Tools
-    local nasm = builtins.nasm.get_assembler()
+    local nasm = builtins.nasm.get_assembler(nil, false)
     if nasm == nil then
         error("No NASM assembler found")
     end

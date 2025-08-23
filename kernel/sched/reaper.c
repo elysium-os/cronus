@@ -1,4 +1,4 @@
-#include "reaper.h"
+#include "sched/reaper.h"
 
 #include "arch/sched.h"
 #include "common/assert.h"
@@ -55,7 +55,7 @@ repeat:
 }
 
 thread_t *reaper_create() {
-    return arch_sched_thread_create_kernel(reaper_thread);
+    return sched_thread_create_kernel(reaper_thread);
 }
 
 void reaper_queue_thread(thread_t *thread) {

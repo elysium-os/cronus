@@ -1,12 +1,11 @@
 #include "arch/debug.h"
 
 #include "sys/kernel_symbol.h"
-
-#include "arch/x86_64/debug.h"
+#include "x86_64/debug.h"
 
 #include <stddef.h>
 
-void arch_debug_stack_trace(log_level_t level, const char *tag) {
+void debug_stack_trace(log_level_t level, const char *tag) {
     x86_64_debug_stack_frame_t *stack_frame;
     asm volatile("movq %%rbp, %0" : "=r"(stack_frame));
     x86_64_debug_stack_trace_from(level, tag, stack_frame);

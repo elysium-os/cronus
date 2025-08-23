@@ -1,49 +1,49 @@
 ; MMIO Reads
-global arch_mmio_read8
-arch_mmio_read8:
+global mmio_read8
+mmio_read8:
     xor rax, rax
     mov al, byte [rdi]
     ret
 
-global arch_mmio_read16
-arch_mmio_read16:
+global mmio_read16
+mmio_read16:
     xor rax, rax
     mov ax, word [rdi]
     ret
 
-global arch_mmio_read32
-arch_mmio_read32:
+global mmio_read32
+mmio_read32:
     xor rax, rax
     mov eax, dword [rdi]
     ret
 
-global arch_mmio_read64
-arch_mmio_read64:
+global mmio_read64
+mmio_read64:
     xor rax, rax
     mov rax, qword [rdi]
     ret
 
 ; MMIO Writes
-global arch_mmio_write8
-arch_mmio_write8:
+global mmio_write8
+mmio_write8:
     mov rax, rsi
     mov byte [rdi], al
     ret
 
-global arch_mmio_write16
-arch_mmio_write16:
+global mmio_write16
+mmio_write16:
     mov rax, rsi
     mov word [rdi], ax
     ret
 
-global arch_mmio_write32
-arch_mmio_write32:
+global mmio_write32
+mmio_write32:
     mov rax, rsi
     mov dword [rdi], eax
     ret
 
-global arch_mmio_write64
-arch_mmio_write64:
+global mmio_write64
+mmio_write64:
     mov rax, rsi
     mov qword [rdi], rax
     ret

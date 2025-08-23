@@ -19,21 +19,20 @@
 #include "sys/event.h"
 #include "sys/init.h"
 #include "sys/time.h"
-
-#include "arch/x86_64/abi/sysv/auxv.h"
-#include "arch/x86_64/abi/sysv/sysv.h"
-#include "arch/x86_64/cpu/cpu.h"
-#include "arch/x86_64/cpu/cpuid.h"
-#include "arch/x86_64/cpu/cr.h"
-#include "arch/x86_64/cpu/gdt.h"
-#include "arch/x86_64/cpu/lapic.h"
-#include "arch/x86_64/cpu/msr.h"
-#include "arch/x86_64/cpu/pat.h"
-#include "arch/x86_64/dev/hpet.h"
-#include "arch/x86_64/dev/ioapic.h"
-#include "arch/x86_64/dev/pic8259.h"
-#include "arch/x86_64/dev/pit.h"
-#include "arch/x86_64/interrupt.h"
+#include "x86_64/abi/sysv/auxv.h"
+#include "x86_64/abi/sysv/sysv.h"
+#include "x86_64/cpu/cpu.h"
+#include "x86_64/cpu/cpuid.h"
+#include "x86_64/cpu/cr.h"
+#include "x86_64/cpu/gdt.h"
+#include "x86_64/cpu/lapic.h"
+#include "x86_64/cpu/msr.h"
+#include "x86_64/cpu/pat.h"
+#include "x86_64/dev/hpet.h"
+#include "x86_64/dev/ioapic.h"
+#include "x86_64/dev/pic8259.h"
+#include "x86_64/dev/pit.h"
+#include "x86_64/interrupt.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -68,7 +67,7 @@ static time_frequency_t calibrate_lapic_timer() {
             x86_64_pit_set_reload(0xFFF0);
             uint16_t start_count = x86_64_pit_count();
             x86_64_lapic_timer_start(sample_count);
-            while(x86_64_lapic_timer_read() != 0) arch_cpu_relax();
+            while(x86_64_lapic_timer_read() != 0) cpu_relax();
             uint64_t delta = start_count - x86_64_pit_count();
 
             if(delta < 0x4000) continue;
@@ -80,7 +79,7 @@ static time_frequency_t calibrate_lapic_timer() {
         time_t timeout = (TIME_NANOSECONDS_IN_SECOND / TIME_MILLISECONDS_IN_SECOND) * 100;
         x86_64_lapic_timer_start(UINT32_MAX);
         time_t target = hpet_current_time() + timeout;
-        while(hpet_current_time() < target) arch_cpu_relax();
+        while(hpet_current_time() < target) cpu_relax();
         return ((uint64_t) UINT32_MAX - x86_64_lapic_timer_read()) * (TIME_NANOSECONDS_IN_SECOND / timeout);
     }
     ASSERT_UNREACHABLE();
@@ -93,7 +92,7 @@ static time_frequency_t calibrate_tsc() {
             x86_64_pit_set_reload(0xFFF0);
             uint16_t start_count = x86_64_pit_count();
             uint64_t tsc_target = __rdtsc() + sample_count;
-            while(__rdtsc() < tsc_target) arch_cpu_relax();
+            while(__rdtsc() < tsc_target) cpu_relax();
             uint64_t delta = start_count - x86_64_pit_count();
 
             if(delta < 0x4000) continue;
@@ -104,7 +103,7 @@ static time_frequency_t calibrate_tsc() {
         time_t timeout = (TIME_NANOSECONDS_IN_SECOND / TIME_MILLISECONDS_IN_SECOND) * 100;
         uint64_t tsc_start = __rdtsc();
         time_t target = hpet_current_time() + timeout;
-        while(hpet_current_time() < target) arch_cpu_relax();
+        while(hpet_current_time() < target) cpu_relax();
         return (__rdtsc() - tsc_start) * (TIME_NANOSECONDS_IN_SECOND / timeout);
     }
     ASSERT_UNREACHABLE();
@@ -156,7 +155,7 @@ static void initialize_cpu() {
     initialize_cpu();
     init_stage(INIT_STAGE_EARLY, true);
 
-    arch_ptm_load_address_space(g_vm_global_address_space);
+    ptm_load_address_space(g_vm_global_address_space);
 
     init_stage(INIT_STAGE_BEFORE_MAIN, true);
     cpu->lapic_id = x86_64_lapic_id();
@@ -170,20 +169,20 @@ static void initialize_cpu() {
     log(LOG_LEVEL_DEBUG, "INIT", "AP %lu (Lapic ID: %i) init exit", g_init_ap_cpu_id, x86_64_lapic_id());
     __atomic_add_fetch(&g_init_ap_finished, true, __ATOMIC_SEQ_CST);
 
-    arch_sched_handoff_cpu();
+    sched_handoff_cpu();
     ASSERT_UNREACHABLE();
 }
 
-void arch_init_bsp_local(size_t seqid) {
+void init_bsp_local(size_t seqid) {
     initialize_cpu_local(&g_early_bsp, seqid);
     x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
 }
 
-void arch_init_bsp() {
+void init_bsp() {
     initialize_cpu();
 }
 
-void arch_init_cpu_locals(tartarus_boot_info_t *boot_info) {
+void init_cpu_locals(tartarus_boot_info_t *boot_info) {
     log(LOG_LEVEL_DEBUG, "INIT", "Setting up proper CPU locals (%lu locals)", g_cpu_count);
     g_x86_64_cpus = heap_alloc(sizeof(x86_64_cpu_t) * g_cpu_count);
     memclear(g_x86_64_cpus, sizeof(x86_64_cpu_t) * g_cpu_count);
@@ -204,7 +203,7 @@ void arch_init_cpu_locals(tartarus_boot_info_t *boot_info) {
     }
 }
 
-void arch_init_smp(tartarus_boot_info_t *boot_info) {
+void init_smp(tartarus_boot_info_t *boot_info) {
     for(size_t i = 0; i < boot_info->cpu_count; i++) {
         if(boot_info->cpus[i].init_state == TARTARUS_CPU_STATE_FAIL) continue;
 
@@ -252,8 +251,8 @@ static void setup_tss() {
     memclear(tss, sizeof(x86_64_tss_t));
     tss->iomap_base = sizeof(x86_64_tss_t);
 
-    x86_64_tss_set_ist(tss, 0, HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_NONE))) + ARCH_PAGE_GRANULARITY));
-    x86_64_tss_set_ist(tss, 1, HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_NONE))) + ARCH_PAGE_GRANULARITY));
+    x86_64_tss_set_ist(tss, 0, HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_NONE))) + PAGE_GRANULARITY));
+    x86_64_tss_set_ist(tss, 1, HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_NONE))) + PAGE_GRANULARITY));
     x86_64_interrupt_set_ist(2, 1); // Non-maskable
     x86_64_interrupt_set_ist(18, 2); // Machine check
 
@@ -312,7 +311,7 @@ INIT_TARGET_PERCORE(timers, INIT_STAGE_BEFORE_DEV, initialize_timers, "acpi_tabl
 
 static void setup_init_program() {
     log(LOG_LEVEL_DEBUG, "INIT", "loading /usr/bin/init");
-    vm_address_space_t *as = arch_ptm_address_space_create();
+    vm_address_space_t *as = ptm_address_space_create();
 
     vfs_node_t *init_exec;
     vfs_result_t res = vfs_lookup(&VFS_ABSOLUTE_PATH("/usr/bin/init"), &init_exec);
@@ -370,8 +369,8 @@ static void setup_init_program() {
     char *envp[] = { nullptr };
 
     process_t *proc = process_create(as);
-    uintptr_t thread_stack = x86_64_sysv_stack_setup(proc->address_space, ARCH_PAGE_GRANULARITY * 8, argv, envp, &auxv);
-    thread_t *thread = arch_sched_thread_create_user(proc, entry, thread_stack);
+    uintptr_t thread_stack = x86_64_sysv_stack_setup(proc->address_space, PAGE_GRANULARITY * 8, argv, envp, &auxv);
+    thread_t *thread = sched_thread_create_user(proc, entry, thread_stack);
 
     log(LOG_LEVEL_DEBUG, "INIT", "init thread (tid: %lu) >> entry: %#lx, stack: %#lx", thread->id, entry, thread_stack);
 

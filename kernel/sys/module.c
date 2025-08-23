@@ -1,4 +1,4 @@
-#include "module.h"
+#include "sys/module.h"
 
 #include "abi/sysv/elf64.h"
 #include "arch/elf.h"
@@ -101,7 +101,7 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
                 if((shdrs[i].flags & ELF64_SHF_WRITE) != 0) prot.write = true;
                 if((shdrs[i].flags & ELF64_SHF_EXECINSTR) != 0) prot.exec = true;
 
-                size_t aligned_size = MATH_CEIL(shdrs[i].size, ARCH_PAGE_GRANULARITY);
+                size_t aligned_size = MATH_CEIL(shdrs[i].size, PAGE_GRANULARITY);
                 void *addr = vm_map_anon(g_vm_global_address_space, nullptr, aligned_size, prot, VM_CACHE_STANDARD, VM_FLAG_NONE);
                 if(addr == nullptr) return MODULE_RESULT_ERR_VM;
 
@@ -177,7 +177,7 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
             uintptr_t section_address = ((uintptr_t *) &section_addresses->data)[shdrs[i].info];
             ASSERT(section_address != 0);
 
-            if(!arch_elf_do_relocation_addend(rela, symbol, section_address)) return MODULE_RESULT_ERR_INVALID_RELOCATION;
+            if(!elf_do_relocation_addend(rela, symbol, section_address)) return MODULE_RESULT_ERR_INVALID_RELOCATION;
         }
     }
 

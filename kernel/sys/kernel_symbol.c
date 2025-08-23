@@ -1,4 +1,4 @@
-#include "kernel_symbol.h"
+#include "sys/kernel_symbol.h"
 
 #include "common/log.h"
 #include "common/panic.h"
