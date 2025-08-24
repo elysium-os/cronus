@@ -83,8 +83,8 @@ local freestanding_c_headers = fab.dependency(
 
 local cc_runtime = fab.dependency(
     "cc-runtime",
-    "https://github.com/osdev0/freestnd-c-hdrs.git",
-    "d5425655388977fa12ff9b903e554a20b20c426e"
+    "https://github.com/osdev0/cc-runtime.git",
+    "dae79833b57a01b9fd3e359ee31def69f5ae899b"
 )
 
 local tartarus_bootloader = fab.dependency(
