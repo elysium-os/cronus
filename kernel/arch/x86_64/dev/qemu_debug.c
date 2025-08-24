@@ -29,7 +29,8 @@ static void log_debug(log_level_t level, const char *tag, const char *fmt, va_li
         case LOG_LEVEL_FATAL: color = "\e[31m"; break; /* Red */
         default:              color = "\e[0m"; break;
     }
-    debug_format("%s%s/%s |%s ", color, log_level_stringify(level), tag, "\e[0m");
+
+    debug_format("%s%10s%s ", color, tag, "\e[0m");
     format(x86_64_qemu_debug_putc, fmt, args);
     x86_64_qemu_debug_putc('\n');
 }

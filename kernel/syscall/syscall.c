@@ -55,7 +55,7 @@ syscall_return_t syscall_debug(size_t length, char *str) {
     syscall_return_t ret = {};
 
     if(length > MAX_DEBUG_LENGTH) {
-        log(LOG_LEVEL_WARN, "SYSCALL_DEBUG", "exceeded maximum length (%lu)", length);
+        log(LOG_LEVEL_WARN, "SYSCALL", "debug string exceeded maximum length (%lu)", length);
         length = MAX_DEBUG_LENGTH;
     }
 
@@ -65,7 +65,7 @@ syscall_return_t syscall_debug(size_t length, char *str) {
         return ret;
     }
 
-    log(LOG_LEVEL_INFO, "SYSCALL_DEBUG", "%s", str);
+    log(LOG_LEVEL_DEBUG, "SYSCALL", "debug(\"%s\")", str);
 
     heap_free(str, length + 1);
     return ret;
