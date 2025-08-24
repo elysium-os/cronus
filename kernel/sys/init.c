@@ -38,7 +38,7 @@ static void run_init_target(init_target_t *target, bool is_ap) {
     for(size_t i = 0; i < target->dependency_count; i++) {
         init_target_t *dep = find_init_target(target->stage, target->dependencies[i]);
         if(dep == nullptr) {
-            log(LOG_LEVEL_WARN, "INIT", "Init target `%s/%s` has an unknown dependency `%s`", stage_stringify(target->stage), target->name, target->dependencies[i]);
+            log(LOG_LEVEL_WARN, "INIT", "Target `%s/%s` has an unknown dependency `%s`", stage_stringify(target->stage), target->name, target->dependencies[i]);
             continue;
         }
         run_init_target(dep, is_ap);
@@ -47,9 +47,9 @@ static void run_init_target(init_target_t *target, bool is_ap) {
     if((is_ap && !target->per_core) || target->completed) return;
 
     if(target->per_core) {
-        log(LOG_LEVEL_DEBUG, "INIT", "Running per-core init target `%s/%s` for core %lu", stage_stringify(target->stage), target->name, cpu_id());
+        log(LOG_LEVEL_DEBUG, "INIT", "Target `%s/%s` (per-core %lu)", stage_stringify(target->stage), target->name, cpu_id());
     } else {
-        log(LOG_LEVEL_DEBUG, "INIT", "Running init target `%s/%s`", stage_stringify(target->stage), target->name);
+        log(LOG_LEVEL_DEBUG, "INIT", "Target `%s/%s`", stage_stringify(target->stage), target->name);
     }
 
     target->completed = true;
