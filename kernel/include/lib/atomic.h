@@ -1,0 +1,15 @@
+#pragma once
+
+#define ATOMIC [[clang::annotate("atomic_only")]]
+#define ATOMIC_PARAM [[clang::annotate("atomic_only_param")]]
+
+#define ATOMIC_RELAXED __ATOMIC_RELAXED
+#define ATOMIC_ACQUIRE __ATOMIC_ACQUIRE
+#define ATOMIC_RELEASE __ATOMIC_RELEASE
+#define ATOMIC_ACQ_REL __ATOMIC_ACQ_REL
+#define ATOMIC_SEQ_CST __ATOMIC_SEQ_CST
+
+#define ATOMIC_LOAD(POINTER, MEMORYORDER) __atomic_load_n(POINTER, MEMORYORDER)
+
+#define ATOMIC_FETCH_ADD(POINTER, VALUE, MEMORYORDER) __atomic_fetch_add(POINTER, VALUE, MEMORYORDER)
+#define ATOMIC_FETCH_SUB(POINTER, VALUE, MEMORYORDER) __atomic_fetch_sub(POINTER, VALUE, MEMORYORDER)

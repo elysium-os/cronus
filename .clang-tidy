@@ -1,3 +1,5 @@
 Checks:
+    - "-*"
     - "modernize-use-nullptr"
+    - "elysium-atomic-checks"
 WarningsAsErrors: "*"
