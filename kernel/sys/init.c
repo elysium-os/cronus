@@ -13,15 +13,17 @@
 extern nullptr_t ld_init_targets_start[];
 extern nullptr_t ld_init_targets_end[];
 
+init_stage_t g_init_stage_current = INIT_STAGE_BOOT;
+
 static const char *stage_stringify(init_stage_t stage) {
     switch(stage) {
-        case INIT_STAGE_BEFORE_EARLY: return "before_early";
-        case INIT_STAGE_EARLY:        return "early";
-        case INIT_STAGE_BEFORE_MAIN:  return "before_main";
-        case INIT_STAGE_MAIN:         return "main";
-        case INIT_STAGE_BEFORE_DEV:   return "before_dev";
-        case INIT_STAGE_DEV:          return "dev";
-        case INIT_STAGE_LATE:         return "late";
+        case INIT_STAGE_BOOT:        return "boot";
+        case INIT_STAGE_EARLY:       return "early";
+        case INIT_STAGE_BEFORE_MAIN: return "before_main";
+        case INIT_STAGE_MAIN:        return "main";
+        case INIT_STAGE_BEFORE_DEV:  return "before_dev";
+        case INIT_STAGE_DEV:         return "dev";
+        case INIT_STAGE_LATE:        return "late";
     }
     ASSERT_UNREACHABLE();
 }
@@ -57,6 +59,7 @@ static void run_init_target(init_target_t *target, bool is_ap) {
 }
 
 void init_reset_ap() {
+    g_init_stage_current = INIT_STAGE_BOOT;
     for(size_t i = 0; i < TARGET_COUNT; i++) {
         if(!TARGETS[i].per_core) continue;
         TARGETS[i].completed = false;
@@ -64,6 +67,8 @@ void init_reset_ap() {
 }
 
 void init_stage(init_stage_t stage, bool is_ap) {
+    ASSERT(stage >= g_init_stage_current);
+    g_init_stage_current = stage;
     for(size_t i = 0; i < TARGET_COUNT; i++) {
         if(TARGETS[i].stage != stage) continue;
         run_init_target(&TARGETS[i], is_ap);

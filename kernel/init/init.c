@@ -12,6 +12,7 @@
 #include "fs/vfs.h"
 #include "graphics/framebuffer.h"
 #include "lib/math.h"
+#include "lib/mem.h"
 #include "lib/string.h"
 #include "memory/earlymem.h"
 #include "memory/hhdm.h"
@@ -27,7 +28,7 @@
 #include <uacpi/uacpi.h>
 
 framebuffer_t g_framebuffer;
-size_t g_cpu_count;
+size_t g_cpu_count = 0;
 
 static vm_region_t g_hhdm_region, g_page_cache_region;
 
@@ -40,32 +41,19 @@ static void thread_init() {
 [[gnu::no_instrument_function]] [[noreturn]] void init(tartarus_boot_info_t *boot_info) {
     init_bsp_local(boot_info->cpus[boot_info->bsp_index].sequential_id);
     event_init_cpu_local();
-    init_stage(INIT_STAGE_BEFORE_EARLY, false);
     init_bsp();
+
+    init_stage(INIT_STAGE_BOOT, false);
+
+    log(LOG_LEVEL_INFO, "INIT", "Elysium " MACROS_STRINGIFY(__ARCH) " " MACROS_STRINGIFY(__VERSION) " (" __DATE__ " " __TIME__ ")");
 
     // Initialize HHDM
     ASSERT(boot_info->hhdm_offset % PAGE_GRANULARITY == 0 && boot_info->hhdm_offset % PAGE_GRANULARITY == 0);
     g_hhdm_offset = boot_info->hhdm_offset;
     g_hhdm_size = boot_info->hhdm_size;
 
-    // Set RSDP
-    g_acpi_rsdp = boot_info->acpi_rsdp_address;
-    log(LOG_LEVEL_DEBUG, "INIT", "RSDP at %#lx", g_acpi_rsdp);
-
-    // Initialize framebuffer
-    if(boot_info->framebuffer_count == 0) panic("INIT", "no framebuffer provided");
-    // TODO: handle pixel format... and the entire way we deal with framebuffers in general
-    tartarus_framebuffer_t *framebuffer = &boot_info->framebuffers[0];
-    g_framebuffer.address = framebuffer->vaddr;
-    g_framebuffer.size = framebuffer->size;
-    g_framebuffer.width = framebuffer->width;
-    g_framebuffer.height = framebuffer->height;
-    g_framebuffer.pitch = framebuffer->pitch;
-
-    log(LOG_LEVEL_INFO, "INIT", "Elysium " MACROS_STRINGIFY(__ARCH) " " MACROS_STRINGIFY(__VERSION) " (" __DATE__ " " __TIME__ ")");
-
+    // Count CPUs and ensure seqids make sense
     uint32_t highest_seqid = 0;
-    g_cpu_count = 0;
     for(tartarus_size_t i = 0; i < boot_info->cpu_count; i++) {
         if(boot_info->cpus[i].init_state == TARTARUS_CPU_STATE_FAIL) continue;
         if(boot_info->cpus[i].sequential_id > highest_seqid) highest_seqid = boot_info->cpus[i].sequential_id;
@@ -75,17 +63,6 @@ static void thread_init() {
 
     log(LOG_LEVEL_DEBUG, "INIT", "Counted %lu working CPUs", g_cpu_count);
     ASSERT(g_cpu_count > 0);
-
-    // Load modules
-    log(LOG_LEVEL_DEBUG, "INIT", "Enumerating %lu modules", boot_info->module_count);
-    for(uint16_t i = 0; i < boot_info->module_count; i++) {
-        tartarus_module_t *module = &boot_info->modules[i];
-        log(LOG_LEVEL_DEBUG, "INIT", "| found `%s`", module->name);
-
-        if(!string_eq("kernel.ksym", module->name)) continue;
-        kernel_symbols_load((void *) HHDM(module->paddr));
-        log(LOG_LEVEL_DEBUG, "INIT", "| » Kernel symbols loaded");
-    }
 
     // Initialize Early Memory
     for(size_t i = 0; i < boot_info->mm_entry_count; i++) {
@@ -111,7 +88,33 @@ static void thread_init() {
         earlymem_region_add(entry->base, entry->length); // TODO: coalesce these regions so that we dont end up with weird max_orders in the buddy
     }
 
+    // Load modules
+    log(LOG_LEVEL_DEBUG, "INIT", "Enumerating %lu modules", boot_info->module_count);
+    for(uint16_t i = 0; i < boot_info->module_count; i++) {
+        tartarus_module_t *module = &boot_info->modules[i];
+        log(LOG_LEVEL_DEBUG, "INIT", "| found `%s`", module->name);
+
+        if(!string_eq("kernel.ksym", module->name)) continue;
+        kernel_symbols_load((void *) HHDM(module->paddr));
+        log(LOG_LEVEL_DEBUG, "INIT", "| » Kernel symbols loaded");
+    }
+
+    // Run early init stage
     init_stage(INIT_STAGE_EARLY, false);
+
+    // Set RSDP
+    g_acpi_rsdp = boot_info->acpi_rsdp_address;
+    log(LOG_LEVEL_DEBUG, "INIT", "RSDP at %#lx", g_acpi_rsdp);
+
+    // Initialize framebuffer
+    if(boot_info->framebuffer_count == 0) panic("INIT", "no framebuffer provided");
+    // TODO: handle pixel format... and the entire way we deal with framebuffers in general
+    tartarus_framebuffer_t *framebuffer = &boot_info->framebuffers[0];
+    g_framebuffer.address = framebuffer->vaddr;
+    g_framebuffer.size = framebuffer->size;
+    g_framebuffer.width = framebuffer->width;
+    g_framebuffer.height = framebuffer->height;
+    g_framebuffer.pitch = framebuffer->pitch;
 
     // Map HHDM
     log(LOG_LEVEL_DEBUG, "INIT", "Mapping HHDM (base: %#lx, size: %#lx)", g_hhdm_offset, g_hhdm_size);

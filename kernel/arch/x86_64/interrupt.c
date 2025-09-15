@@ -137,6 +137,7 @@ int interrupt_request(enum interrupt_priority priority, interrupt_handler_t hand
 }
 
 static void init_interrupts() {
+    // TODO: statically initialize?
     for(unsigned long i = 0; i < sizeof(g_idt) / sizeof(idt_entry_t); i++) {
         g_idt[i].low_offset = (uint16_t) g_x86_64_isr_stubs[i];
         g_idt[i].middle_offset = (uint16_t) (g_x86_64_isr_stubs[i] >> 16);
@@ -150,4 +151,4 @@ static void init_interrupts() {
     }
 }
 
-INIT_TARGET(interrupts, INIT_STAGE_BEFORE_EARLY, init_interrupts);
+INIT_TARGET(interrupts, INIT_STAGE_BOOT, init_interrupts);

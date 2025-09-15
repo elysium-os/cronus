@@ -46,6 +46,6 @@ static void qemu_debug_init() {
     log_sink_add(&g_qemu_debug_sink);
 }
 
-INIT_TARGET(qemu_debug, INIT_STAGE_BEFORE_EARLY, qemu_debug_init);
+INIT_TARGET(qemu_debug, INIT_STAGE_BOOT, qemu_debug_init);
 
 #endif

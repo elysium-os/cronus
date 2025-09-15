@@ -19,7 +19,17 @@
 #define INIT_TARGET_PERCORE(NAME, STAGE, FN, ...) INIT_TARGET_FULL(NAME, STAGE, FN, true, __VA_ARGS__)
 
 typedef enum {
-    INIT_STAGE_BEFORE_EARLY,
+    /**
+     * Extremely early init stage with no subsystems guaranteed.
+     */
+    INIT_STAGE_BOOT,
+
+    /**
+     * Early init stage.
+     *
+     * Guarantees:
+     * - Earlymem is initialized.
+     */
     INIT_STAGE_EARLY,
 
     INIT_STAGE_BEFORE_MAIN,
@@ -40,6 +50,8 @@ typedef struct [[gnu::packed]] {
     bool per_core;
     bool completed;
 } init_target_t;
+
+extern init_stage_t g_init_stage_current;
 
 /// Reset per_core targets for a new ap.
 void init_reset_ap();

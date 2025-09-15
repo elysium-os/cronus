@@ -151,7 +151,7 @@ static void initialize_cpu() {
 
     log(LOG_LEVEL_INFO, "INIT", "Initializing AP %lu", g_init_ap_cpu_id);
 
-    init_stage(INIT_STAGE_BEFORE_EARLY, true);
+    init_stage(INIT_STAGE_BOOT, true);
     initialize_cpu();
     init_stage(INIT_STAGE_EARLY, true);
 
