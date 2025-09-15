@@ -5,6 +5,7 @@
 #include "arch/sched.h"
 #include "common/assert.h"
 #include "common/lock/spinlock.h"
+#include "lib/barrier.h"
 #include "lib/container.h"
 #include "lib/list.h"
 #include "sched/reaper.h"
@@ -64,6 +65,7 @@ void sched_preempt_inc() {
     ASSERT(current_cpu->sched.status.preempt_counter < UINT32_MAX);
     current_cpu->sched.status.preempt_counter++;
     interrupt_state_restore(previous_state);
+    BARRIER;
 }
 
 void sched_preempt_dec() {
@@ -81,6 +83,7 @@ void sched_preempt_dec() {
     interrupt_state_restore(previous_state);
 
     if(yield_now) sched_yield(THREAD_STATE_READY);
+    BARRIER;
 }
 
 void internal_sched_thread_drop(thread_t *thread) {

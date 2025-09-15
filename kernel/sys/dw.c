@@ -2,6 +2,7 @@
 
 #include "arch/cpu.h"
 #include "common/assert.h"
+#include "lib/barrier.h"
 #include "lib/container.h"
 #include "memory/slab.h"
 #include "sys/init.h"
@@ -47,6 +48,7 @@ void dw_status_disable() {
     ASSERT(current_cpu->flags.deferred_work_status < UINT32_MAX);
     current_cpu->flags.deferred_work_status++;
     interrupt_state_restore(previous_state);
+    BARRIER;
 }
 
 void dw_status_enable() {
@@ -56,6 +58,7 @@ void dw_status_enable() {
     bool process_work = current_cpu->flags.deferred_work_status == 0;
     interrupt_state_restore(previous_state);
     if(process_work) dw_process();
+    BARRIER;
 }
 
 static void dw_init() {
