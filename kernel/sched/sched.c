@@ -60,30 +60,16 @@ void sched_yield(enum thread_state yield_state) {
 }
 
 void sched_preempt_inc() {
-    interrupt_state_t previous_state = interrupt_state_mask();
-    cpu_t *current_cpu = cpu_current();
-    ASSERT(current_cpu->sched.status.preempt_counter < UINT32_MAX);
-    current_cpu->sched.status.preempt_counter++;
-    interrupt_state_restore(previous_state);
+    uint32_t count = CPU_CURRENT_INC(sched.status.preempt_counter);
+    ASSERT(count < UINT32_MAX);
     BARRIER;
 }
 
 void sched_preempt_dec() {
-    interrupt_state_t previous_state = interrupt_state_mask();
-
-    cpu_t *current_cpu = cpu_current();
-    ASSERT(current_cpu->sched.status.preempt_counter != 0);
-    current_cpu->sched.status.preempt_counter--;
-
-    bool yield_now = false;
-    if(current_cpu->sched.status.preempt_counter == 0 && current_cpu->sched.status.yield_immediately) {
-        current_cpu->sched.status.yield_immediately = false;
-        yield_now = true;
-    }
-    interrupt_state_restore(previous_state);
-
-    if(yield_now) sched_yield(THREAD_STATE_READY);
     BARRIER;
+    uint32_t count = CPU_CURRENT_DEC(sched.status.preempt_counter);
+    ASSERT(count > 0);
+    if(count == 1 && CPU_CURRENT_EXCHANGE(sched.status.yield_immediately, false)) sched_yield(THREAD_STATE_READY);
 }
 
 void internal_sched_thread_drop(thread_t *thread) {

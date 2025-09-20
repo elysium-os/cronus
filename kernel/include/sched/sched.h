@@ -10,7 +10,7 @@ typedef struct sched {
 
     struct {
         uint32_t preempt_counter;
-        uint64_t yield_immediately : 1;
+        bool yield_immediately;
     } status;
 
     struct thread *idle_thread;

@@ -20,8 +20,7 @@ dw_item_t *dw_create(dw_function_t fn, void *data) {
 
 void dw_queue(dw_item_t *item) {
     interrupt_state_t previous_state = interrupt_state_mask();
-    cpu_t *current_cpu = cpu_current();
-    list_push(&current_cpu->dw_items, &item->list_node);
+    list_push(&cpu_current()->dw_items, &item->list_node);
     interrupt_state_restore(previous_state);
 }
 
@@ -43,22 +42,16 @@ repeat:
 }
 
 void dw_status_disable() {
-    interrupt_state_t previous_state = interrupt_state_mask();
-    cpu_t *current_cpu = cpu_current();
-    ASSERT(current_cpu->flags.deferred_work_status < UINT32_MAX);
-    current_cpu->flags.deferred_work_status++;
-    interrupt_state_restore(previous_state);
+    uint32_t status = CPU_CURRENT_INC(flags.deferred_work_status);
+    ASSERT(status < UINT32_MAX);
     BARRIER;
 }
 
 void dw_status_enable() {
-    interrupt_state_t previous_state = interrupt_state_mask();
-    cpu_t *current_cpu = cpu_current();
-    current_cpu->flags.deferred_work_status--;
-    bool process_work = current_cpu->flags.deferred_work_status == 0;
-    interrupt_state_restore(previous_state);
-    if(process_work) dw_process();
     BARRIER;
+    uint32_t status = CPU_CURRENT_DEC(flags.deferred_work_status);
+    ASSERT(status != 0);
+    if(status == 1) dw_process();
 }
 
 static void dw_init() {

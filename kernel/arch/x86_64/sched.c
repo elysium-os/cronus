@@ -78,9 +78,7 @@ static long g_next_tid = BOOTSTRAP_TID + 1;
 }
 
 static void sched_entry([[maybe_unused]] void *data) {
-    interrupt_state_t previous_state = interrupt_state_mask();
-    cpu_current()->sched.status.yield_immediately = true;
-    interrupt_state_restore(previous_state);
+    CPU_CURRENT_WRITE(sched.status.yield_immediately, true);
 }
 
 [[noreturn]] static void sched_idle() {

@@ -459,11 +459,11 @@ bool vm_fault(uintptr_t address, vm_fault_t fault) {
     if(fault != VM_FAULT_NOT_PRESENT) return false;
     if(ADDRESS_IN_BOUNDS(address, g_vm_global_address_space->start, g_vm_global_address_space->end)) return false;
 
-    process_t *proc = sched_thread_current()->proc;
-    if(proc == nullptr) return false;
-
     thread_t *current_thread = sched_thread_current();
     ASSERT(!current_thread->vm_fault.in_flight);
+
+    process_t *proc = current_thread->proc;
+    if(proc == nullptr) return false;
 
     current_thread->vm_fault.in_flight = true;
     current_thread->vm_fault.address = address;
