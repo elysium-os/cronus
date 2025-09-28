@@ -181,8 +181,16 @@ void __ubsan_handle_divrem_overflow(data_location_type_t *data, uintptr_t lhs, u
 }
 
 void __ubsan_handle_negate_overflow(data_location_type_t *data, uintptr_t old) {
-    log(LOG_LEVEL_WARN, "UBSAN", "negate_overflow @ %s:%u:%u {old: %#lx, type: %u-bit %s %s}", data->location.filename, data->location.line, data->location.column, old, info_to_bits(data->type->info), kind_to_type(data->type->kind), data->type->name
-    );
+    log(LOG_LEVEL_WARN,
+        "UBSAN",
+        "negate_overflow @ %s:%u:%u {old: %#lx, type: %u-bit %s %s}",
+        data->location.filename,
+        data->location.line,
+        data->location.column,
+        old,
+        info_to_bits(data->type->info),
+        kind_to_type(data->type->kind),
+        data->type->name);
 }
 
 void __ubsan_handle_shift_out_of_bounds(data_shift_out_of_bounds_t *data, uintptr_t lhs, uintptr_t rhs) {
