@@ -40,11 +40,13 @@ void sched_yield(enum thread_state yield_state) {
     interrupt_state_t previous_state = interrupt_state_mask();
 
     ASSERT(yield_state != THREAD_STATE_ACTIVE);
-    ASSERT(!cpu_current()->flags.in_interrupt_hard && !cpu_current()->flags.in_interrupt_soft);
+    ASSERT(CPU_CURRENT_READ(sched.status.preempt_counter) == 0);
+    ASSERT(CPU_CURRENT_READ(flags.deferred_work_status) == 0);
+    ASSERT(!CPU_CURRENT_READ(flags.in_interrupt_hard) && !CPU_CURRENT_READ(flags.in_interrupt_soft));
 
     thread_t *current = sched_thread_current();
 
-    thread_t *next = sched_thread_next(&cpu_current()->sched);
+    thread_t *next = sched_thread_next(&CPU_CURRENT_PTR()->sched);
     if(next == nullptr && current != current->scheduler->idle_thread) next = current->scheduler->idle_thread;
     if(next != nullptr) {
         ASSERT(current != next);
@@ -60,21 +62,23 @@ void sched_yield(enum thread_state yield_state) {
 }
 
 void sched_preempt_inc() {
-    uint32_t count = CPU_CURRENT_INC(sched.status.preempt_counter);
-    ASSERT(count < UINT32_MAX);
+    ASSERT(CPU_CURRENT_READ(sched.status.preempt_counter) < UINT32_MAX);
+    CPU_CURRENT_INC(sched.status.preempt_counter);
     BARRIER;
 }
 
 void sched_preempt_dec() {
     BARRIER;
-    uint32_t count = CPU_CURRENT_DEC(sched.status.preempt_counter);
+    size_t count = CPU_CURRENT_READ(sched.status.preempt_counter);
     ASSERT(count > 0);
-    if(count == 1 && CPU_CURRENT_EXCHANGE(sched.status.yield_immediately, false)) sched_yield(THREAD_STATE_READY);
+    bool do_yield = count == 1 && CPU_CURRENT_EXCHANGE(sched.status.yield_immediately, false);
+    CPU_CURRENT_DEC(sched.status.preempt_counter);
+    if(do_yield) sched_yield(THREAD_STATE_READY); // FLIMSY: not sure if we need to account for the RC
 }
 
 void internal_sched_thread_drop(thread_t *thread) {
     ASSERT(!interrupt_state());
-    ASSERT(thread->scheduler == &cpu_current()->sched);
+    ASSERT(thread->scheduler == &CPU_CURRENT_PTR()->sched);
 
     if(thread == thread->scheduler->idle_thread) return;
 

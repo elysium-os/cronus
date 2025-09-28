@@ -219,7 +219,7 @@ void init_smp(tartarus_boot_info_t *boot_info) {
     }
 
     log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%lu/%lu cpus initialized)", g_cpu_count, g_cpu_count);
-    log(LOG_LEVEL_DEBUG, "INIT", "BSP seqid is %lu", X86_64_CPU_CURRENT.sequential_id);
+    log(LOG_LEVEL_DEBUG, "INIT", "BSP seqid is %lu", X86_64_CPU_CURRENT_READ(sequential_id));
 }
 
 static void cpuinfo() {
@@ -256,7 +256,7 @@ static void setup_tss() {
     x86_64_interrupt_set_ist(2, 1); // Non-maskable
     x86_64_interrupt_set_ist(18, 2); // Machine check
 
-    X86_64_CPU_CURRENT.tss = tss;
+    X86_64_CPU_CURRENT_WRITE(tss, tss);
 
     x86_64_gdt_load_tss(tss);
 }
@@ -300,11 +300,11 @@ static void initialize_timers() {
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_TSC));
     // ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_TSC_INVARIANT)); // TODO: doesnt work on tcg
 
-    X86_64_CPU_CURRENT.lapic_timer_frequency = calibrate_lapic_timer();
-    X86_64_CPU_CURRENT.tsc_timer_frequency = calibrate_tsc();
+    X86_64_CPU_CURRENT_WRITE(lapic_timer_frequency, calibrate_lapic_timer());
+    X86_64_CPU_CURRENT_WRITE(tsc_timer_frequency, calibrate_tsc());
 
-    log(LOG_LEVEL_DEBUG, "INIT", "CPU[%lu] Local Apic Timer calibrated, freq: %lu", X86_64_CPU_CURRENT.sequential_id, X86_64_CPU_CURRENT.lapic_timer_frequency);
-    log(LOG_LEVEL_DEBUG, "INIT", "CPU[%lu] TSC calibrated, freq: %lu", X86_64_CPU_CURRENT.sequential_id, X86_64_CPU_CURRENT.tsc_timer_frequency);
+    log(LOG_LEVEL_DEBUG, "INIT", "CPU[%lu] Local Apic Timer calibrated, freq: %lu", X86_64_CPU_CURRENT_READ(sequential_id), X86_64_CPU_CURRENT_READ(lapic_timer_frequency));
+    log(LOG_LEVEL_DEBUG, "INIT", "CPU[%lu] TSC calibrated, freq: %lu", X86_64_CPU_CURRENT_READ(sequential_id), X86_64_CPU_CURRENT_READ(tsc_timer_frequency));
 }
 
 INIT_TARGET_PERCORE(timers, INIT_STAGE_BEFORE_DEV, initialize_timers, "acpi_tables");

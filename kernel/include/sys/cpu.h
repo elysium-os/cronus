@@ -14,8 +14,8 @@ typedef struct cpu {
     list_t dw_items;
     struct {
         uint32_t deferred_work_status;
-        uint64_t threaded          : 1;
-        uint64_t in_interrupt_hard : 1;
-        uint64_t in_interrupt_soft : 1;
+        bool threaded;
+        bool in_interrupt_hard;
+        bool in_interrupt_soft;
     } flags;
 } cpu_t;

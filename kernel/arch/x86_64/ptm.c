@@ -1,5 +1,6 @@
 #include "x86_64/ptm.h"
 
+#include "arch/cpu.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
 #include "common/assert.h"
@@ -13,7 +14,6 @@
 #include "memory/page.h"
 #include "memory/pmm.h"
 #include "sys/init.h"
-#include "x86_64/cpu/cpu.h"
 #include "x86_64/cpu/cr.h"
 #include "x86_64/exception.h"
 #include "x86_64/tlb.h"
@@ -336,7 +336,7 @@ void x86_64_ptm_page_fault_handler(x86_64_interrupt_frame_t *frame) {
     vm_fault_t fault = VM_FAULT_UNKNOWN;
     if((frame->err_code & PAGEFAULT_FLAG_PRESENT) == 0) fault = VM_FAULT_NOT_PRESENT;
 
-    if(X86_64_CPU_CURRENT.common.flags.threaded && vm_fault(x86_64_cr2_read(), fault)) return;
+    if(CPU_CURRENT_READ(flags.threaded) && vm_fault(x86_64_cr2_read(), fault)) return;
     x86_64_exception_unhandled(frame);
 }
 

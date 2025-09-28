@@ -1,5 +1,6 @@
 #include "x86_64/tlb.h"
 
+#include "arch/cpu.h"
 #include "arch/page.h"
 #include "arch/time.h"
 #include "common/assert.h"
@@ -26,14 +27,14 @@ static uintptr_t g_shootdown_address;
 static size_t g_shootdown_length;
 
 static void invalidate(uintptr_t addr, size_t length) {
-    LOG_TRACE("PTM", "invalidating on CPU(%lu) for %#lx - %#lx", X86_64_CPU_CURRENT.sequential_id, addr, addr + length);
+    LOG_TRACE("PTM", "invalidating on CPU(%lu) for %#lx - %#lx", X86_64_CPU_CURRENT_READ(sequential_id), addr, addr + length);
     for(; length > 0; length -= PAGE_GRANULARITY, addr += PAGE_GRANULARITY) asm volatile("invlpg (%0)" : : "r"(addr) : "memory");
 }
 
 static void tlb_shootdown_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
     interrupt_state_t prev_state = spinlock_acquire_noint(&g_status_lock);
 
-    if(g_shootdown_status[X86_64_CPU_CURRENT.sequential_id]) {
+    if(g_shootdown_status[X86_64_CPU_CURRENT_READ(sequential_id)]) {
         spinlock_release_noint(&g_status_lock, prev_state);
         return;
     }
@@ -41,7 +42,7 @@ static void tlb_shootdown_handler([[maybe_unused]] x86_64_interrupt_frame_t *fra
     uintptr_t address = g_shootdown_address;
     size_t length = g_shootdown_length;
 
-    __atomic_store_n(&g_shootdown_status[X86_64_CPU_CURRENT.sequential_id], true, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_shootdown_status[X86_64_CPU_CURRENT_READ(sequential_id)], true, __ATOMIC_RELEASE);
     spinlock_release_noint(&g_status_lock, prev_state);
 
     invalidate(address, length);
@@ -50,8 +51,8 @@ static void tlb_shootdown_handler([[maybe_unused]] x86_64_interrupt_frame_t *fra
 }
 
 void x86_64_tlb_shootdown(uintptr_t addr, size_t length) {
-    LOG_TRACE("PTM", "shootdown from CPU(%lu) for %#lx - %#lx [threaded: %u]", X86_64_CPU_CURRENT.sequential_id, addr, addr + length, X86_64_CPU_CURRENT.common.flags.threaded);
-    if(!X86_64_CPU_CURRENT.common.flags.threaded) {
+    LOG_TRACE("PTM", "shootdown from CPU(%lu) for %#lx - %#lx [threaded: %u]", X86_64_CPU_CURRENT_READ(sequential_id), addr, addr + length, CPU_CURRENT_READ(flags.threaded));
+    if(!CPU_CURRENT_READ(flags.threaded)) {
         invalidate(addr, length);
         return;
     }
@@ -77,7 +78,7 @@ void x86_64_tlb_shootdown(uintptr_t addr, size_t length) {
             last = time;
             for(size_t i = 0; i < g_cpu_count; i++) {
                 x86_64_cpu_t *cpu = &g_x86_64_cpus[i];
-                if(cpu == X86_64_CPU_CURRENT.self) continue;
+                if(cpu == X86_64_CPU_CURRENT_READ(self)) continue;
 
                 if(__atomic_load_n(&g_shootdown_status[cpu->sequential_id], __ATOMIC_ACQUIRE)) continue;
 
@@ -89,7 +90,7 @@ void x86_64_tlb_shootdown(uintptr_t addr, size_t length) {
     }
 
     spinlock_release_nodw(&g_shootdown_lock);
-    LOG_TRACE("PTM", "shootdown finished for CPU(%lu). cpus (%lu/%lu)", X86_64_CPU_CURRENT.sequential_id, g_shootdown_complete_count, g_cpu_count);
+    LOG_TRACE("PTM", "shootdown finished for CPU(%lu). cpus (%lu/%lu)", X86_64_CPU_CURRENT_READ(sequential_id), g_shootdown_complete_count, g_cpu_count);
 }
 
 static void init_tlb() {

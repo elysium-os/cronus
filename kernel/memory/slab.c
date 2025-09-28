@@ -122,8 +122,10 @@ slab_cache_t *slab_cache_create(const char *name, size_t object_size, pmm_order_
 void *slab_allocate(slab_cache_t *cache) {
     if(!cache->cpu_cache_enabled) return slab_direct_alloc(cache);
 
+    sched_preempt_inc();
     slab_cache_cpu_t *cc = &cache->cpu_cache[cpu_id()];
     spinlock_acquire_nodw(&cc->lock);
+    sched_preempt_dec();
 
 alloc:
     if(cc->primary->round_count > 0) {
@@ -157,8 +159,10 @@ alloc:
 void slab_free(slab_cache_t *cache, void *obj) {
     if(!cache->cpu_cache_enabled) return slab_direct_free(cache, obj);
 
+    sched_preempt_inc();
     slab_cache_cpu_t *cc = &cache->cpu_cache[cpu_id()];
     spinlock_acquire_nodw(&cc->lock);
+    sched_preempt_dec();
 
 free:
     if(cc->primary->round_count < MAGAZINE_SIZE) {

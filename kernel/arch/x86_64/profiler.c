@@ -20,7 +20,7 @@ static rb_value_t record_value(rb_node_t *node) {
 }
 
 [[gnu::no_instrument_function]] void x86_64_profiler_start() {
-    x86_64_thread_t *thread = X86_64_CPU_CURRENT.current_thread;
+    x86_64_thread_t *thread = X86_64_CPU_CURRENT_THREAD();
     thread->profiler.active = true;
     thread->profiler.in_profiler = false;
     thread->profiler.current_frame = 0;
@@ -28,11 +28,11 @@ static rb_value_t record_value(rb_node_t *node) {
 }
 
 [[gnu::no_instrument_function]] void x86_64_profiler_stop() {
-    X86_64_CPU_CURRENT.current_thread->profiler.active = false;
+    X86_64_CPU_CURRENT_THREAD()->profiler.active = false;
 }
 
 [[gnu::no_instrument_function]] void x86_64_profiler_reset() {
-    x86_64_thread_t *thread = X86_64_CPU_CURRENT.current_thread;
+    x86_64_thread_t *thread = X86_64_CPU_CURRENT_THREAD();
     while(true) {
         rb_node_t *node = rb_search(&thread->profiler.records, 0, RB_SEARCH_TYPE_NEAREST_GTE);
         if(node == nullptr) break;
@@ -43,7 +43,7 @@ static rb_value_t record_value(rb_node_t *node) {
 }
 
 [[gnu::no_instrument_function]] void x86_64_profiler_print(const char *name) {
-    x86_64_thread_t *thread = X86_64_CPU_CURRENT.current_thread;
+    x86_64_thread_t *thread = X86_64_CPU_CURRENT_THREAD();
 
     size_t record_count = thread->profiler.records.count;
     x86_64_profiler_record_t **records = heap_alloc(sizeof(x86_64_profiler_record_t *) * record_count);
@@ -88,10 +88,11 @@ static rb_value_t record_value(rb_node_t *node) {
 [[gnu::no_instrument_function]] [[clang::no_sanitize("undefined")]] void __cyg_profile_func_enter(void *function, void *call_site) {
     uint64_t start = __builtin_ia32_rdtsc();
     if(!g_profiler_enabled) return;
-    if(!X86_64_CPU_CURRENT.current_thread->profiler.active) return;
-    if(X86_64_CPU_CURRENT.current_thread->in_interrupt_handler || X86_64_CPU_CURRENT.current_thread->profiler.in_profiler) return;
 
-    x86_64_thread_t *thread = X86_64_CPU_CURRENT.current_thread;
+    x86_64_thread_t *thread = X86_64_CPU_CURRENT_THREAD();
+    if(!thread->profiler.active) return;
+    if(thread->in_interrupt_handler || thread->profiler.in_profiler) return;
+
     thread->profiler.in_profiler = true;
 
     size_t index = thread->profiler.current_frame++;
@@ -112,10 +113,11 @@ static rb_value_t record_value(rb_node_t *node) {
 [[gnu::no_instrument_function]] [[clang::no_sanitize("undefined")]] void __cyg_profile_func_exit(void *function, void *call_site) {
     uint64_t start = __builtin_ia32_rdtsc();
     if(!g_profiler_enabled) return;
-    if(!X86_64_CPU_CURRENT.current_thread->profiler.active) return;
-    if(X86_64_CPU_CURRENT.current_thread->in_interrupt_handler || X86_64_CPU_CURRENT.current_thread->profiler.in_profiler) return;
 
-    x86_64_thread_t *thread = X86_64_CPU_CURRENT.current_thread;
+    x86_64_thread_t *thread = X86_64_CPU_CURRENT_THREAD();
+    if(!thread->profiler.active) return;
+    if(thread->in_interrupt_handler || thread->profiler.in_profiler) return;
+
     thread->profiler.in_profiler = true;
 
     size_t index = --thread->profiler.current_frame;

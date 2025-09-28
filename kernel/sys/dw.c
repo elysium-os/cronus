@@ -19,21 +19,21 @@ dw_item_t *dw_create(dw_function_t fn, void *data) {
 }
 
 void dw_queue(dw_item_t *item) {
-    interrupt_state_t previous_state = interrupt_state_mask();
-    list_push(&cpu_current()->dw_items, &item->list_node);
-    interrupt_state_restore(previous_state);
+    sched_preempt_inc();
+    list_push(&CPU_CURRENT_PTR()->dw_items, &item->list_node);
+    sched_preempt_dec();
 }
 
 void dw_process() {
-    interrupt_state_t previous_state = interrupt_state_mask();
 repeat:
-    cpu_t *current_cpu = cpu_current();
+    sched_preempt_inc();
+    cpu_t *current_cpu = CPU_CURRENT_PTR();
     if(current_cpu->dw_items.count == 0) {
-        interrupt_state_restore(previous_state);
+        sched_preempt_dec();
         return;
     }
     dw_item_t *dw_item = CONTAINER_OF(list_pop(&current_cpu->dw_items), dw_item_t, list_node);
-    interrupt_state_restore(previous_state);
+    sched_preempt_dec();
 
     dw_item->fn(dw_item->data);
 
@@ -42,15 +42,16 @@ repeat:
 }
 
 void dw_status_disable() {
-    uint32_t status = CPU_CURRENT_INC(flags.deferred_work_status);
-    ASSERT(status < UINT32_MAX);
+    ASSERT(CPU_CURRENT_READ(flags.deferred_work_status) < UINT32_MAX);
+    CPU_CURRENT_INC(flags.deferred_work_status);
     BARRIER;
 }
 
 void dw_status_enable() {
     BARRIER;
-    uint32_t status = CPU_CURRENT_DEC(flags.deferred_work_status);
-    ASSERT(status != 0);
+    size_t status = CPU_CURRENT_READ(flags.deferred_work_status);
+    ASSERT(status > 0);
+    CPU_CURRENT_DEC(flags.deferred_work_status);
     if(status == 1) dw_process();
 }
 

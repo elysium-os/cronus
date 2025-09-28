@@ -19,8 +19,8 @@ static rb_value_t rbnode_value(rb_node_t *node) {
 }
 
 void events_process() {
-    interrupt_state_t interrupt_state = interrupt_state_mask();
-    cpu_t *current_cpu = cpu_current();
+    sched_preempt_inc();
+    cpu_t *current_cpu = CPU_CURRENT_PTR();
 
     while(true) {
         rb_node_t *node = rb_search(&current_cpu->events, 0, RB_SEARCH_TYPE_NEAREST);
@@ -36,21 +36,21 @@ void events_process() {
         rb_remove(&current_cpu->events, node);
         dw_queue(event->dw_item);
 
-        if(cpu_current()->flags.in_interrupt_hard) {
+        if(CPU_CURRENT_READ(flags.in_interrupt_hard)) {
             rb_insert(&current_cpu->free_events, &event->rb_node);
         } else {
             slab_free(g_event_cache, event);
         }
     }
 
-    interrupt_state_restore(interrupt_state);
+    sched_preempt_dec();
 }
 
 void event_queue(time_t delay, dw_function_t fn, void *data) {
     ASSERT(delay > 0);
 
     interrupt_state_t interrupt_state = interrupt_state_mask();
-    cpu_t *current_cpu = cpu_current();
+    cpu_t *current_cpu = CPU_CURRENT_PTR();
 
     event_t *event;
     if(current_cpu->free_events.count != 0) {
@@ -81,8 +81,8 @@ void event_queue(time_t delay, dw_function_t fn, void *data) {
 }
 
 void event_cancel(event_t *event) {
-    interrupt_state_t interrupt_state = interrupt_state_mask();
-    rb_tree_t *events = &cpu_current()->events;
+    sched_preempt_inc();
+    rb_tree_t *events = &CPU_CURRENT_PTR()->events;
 
     rb_remove(events, &event->rb_node);
     slab_free(g_event_cache, event);
@@ -90,15 +90,14 @@ void event_cancel(event_t *event) {
     rb_node_t *first_node = rb_search(events, 0, RB_SEARCH_TYPE_NEAREST);
     if(first_node != nullptr) event_timer_arm(CONTAINER_OF(first_node, event_t, rb_node)->deadline - time_monotonic());
 
-    interrupt_state_restore(interrupt_state);
+    sched_preempt_dec();
 }
 
 void event_init_cpu_local() {
-    interrupt_state_t prev_state = interrupt_state_mask();
-    cpu_t *current_cpu = cpu_current();
-    current_cpu->events = RB_TREE_INIT(rbnode_value);
-    current_cpu->free_events = RB_TREE_INIT(rbnode_value);
-    interrupt_state_restore(prev_state);
+    sched_preempt_inc();
+    CPU_CURRENT_PTR()->events = RB_TREE_INIT(rbnode_value);
+    CPU_CURRENT_PTR()->free_events = RB_TREE_INIT(rbnode_value);
+    sched_preempt_dec();
 }
 
 static void event_cache_init() {

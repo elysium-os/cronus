@@ -11,26 +11,26 @@
 
 void spinlock_acquire(spinlock_t *lock) {
     sched_preempt_inc();
-    ASSERT(!cpu_current()->flags.in_interrupt_soft && !cpu_current()->flags.in_interrupt_hard);
+    ASSERT(!CPU_CURRENT_READ(flags.in_interrupt_soft) && !CPU_CURRENT_READ(flags.in_interrupt_hard));
     spinlock_acquire_raw(lock);
 }
 
 void spinlock_release(spinlock_t *lock) {
     spinlock_release_raw(lock);
-    ASSERT(!cpu_current()->flags.in_interrupt_soft && !cpu_current()->flags.in_interrupt_hard);
+    ASSERT(!CPU_CURRENT_READ(flags.in_interrupt_soft) && !CPU_CURRENT_READ(flags.in_interrupt_hard));
     sched_preempt_dec();
 }
 
 void spinlock_acquire_nodw(spinlock_t *lock) {
     sched_preempt_inc();
     dw_status_disable();
-    ASSERT(!cpu_current()->flags.in_interrupt_hard);
+    ASSERT(!CPU_CURRENT_READ(flags.in_interrupt_hard));
     spinlock_acquire_raw(lock);
 }
 
 void spinlock_release_nodw(spinlock_t *lock) {
     spinlock_release_raw(lock);
-    ASSERT(!cpu_current()->flags.in_interrupt_hard);
+    ASSERT(!CPU_CURRENT_READ(flags.in_interrupt_hard));
     dw_status_enable();
     sched_preempt_dec();
 }

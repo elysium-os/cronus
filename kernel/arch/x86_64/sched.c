@@ -70,7 +70,7 @@ static long g_next_tid = BOOTSTRAP_TID + 1;
     interrupt_enable();
     sched_preempt();
 
-    ASSERT(X86_64_CPU_CURRENT.common.sched.status.preempt_counter == 0 && X86_64_CPU_CURRENT.common.flags.deferred_work_status == 0);
+    ASSERT(CPU_CURRENT_READ(sched.status.preempt_counter) == 0 && CPU_CURRENT_READ(flags.deferred_work_status) == 0);
 }
 
 [[gnu::no_instrument_function]] static void kernel_thread_exit() {
@@ -99,8 +99,8 @@ static void sched_entry([[maybe_unused]] void *data) {
         ptm_load_address_space(g_vm_global_address_space);
     }
 
-    X86_64_CPU_CURRENT.current_thread = next;
-    x86_64_tss_set_rsp0(X86_64_CPU_CURRENT.tss, next->kernel_stack.base);
+    X86_64_CPU_CURRENT_WRITE(current_thread, next);
+    x86_64_tss_set_rsp0(X86_64_CPU_CURRENT_READ(tss), next->kernel_stack.base);
 
     this->state.gs = x86_64_msr_read(X86_64_MSR_KERNEL_GS_BASE);
     this->state.fs = x86_64_msr_read(X86_64_MSR_FS_BASE);
@@ -144,7 +144,7 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
 
     {
         interrupt_state_t previous_state = interrupt_state_mask();
-        x86_64_thread_t *current_thread = X86_64_CPU_CURRENT.current_thread;
+        x86_64_thread_t *current_thread = X86_64_CPU_CURRENT_THREAD();
         if(current_thread != nullptr && current_thread->state.fpu_area != nullptr) g_x86_64_fpu_save(current_thread->state.fpu_area);
         g_x86_64_fpu_restore(thread->state.fpu_area);
         uint16_t x87cw = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (0b11 << 8);
@@ -189,7 +189,7 @@ thread_t *sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t sp) 
 }
 
 thread_t *sched_thread_current() {
-    x86_64_thread_t *thread = X86_64_CPU_CURRENT.current_thread;
+    x86_64_thread_t *thread = X86_64_CPU_CURRENT_THREAD();
     ASSERT(thread != nullptr);
     return &thread->common;
 }
@@ -206,12 +206,12 @@ void sched_context_switch(thread_t *current, thread_t *next) {
     x86_64_thread_t *bootstrap_thread = heap_alloc(sizeof(x86_64_thread_t));
     memclear(bootstrap_thread, sizeof(x86_64_thread_t));
     bootstrap_thread->common.state = THREAD_STATE_DESTROY;
-    bootstrap_thread->common.scheduler = &X86_64_CPU_CURRENT.self->common.sched;
+    bootstrap_thread->common.scheduler = &CPU_CURRENT_PTR()->sched;
     bootstrap_thread->common.id = BOOTSTRAP_TID;
 
-    X86_64_CPU_CURRENT.common.flags.threaded = true;
+    CPU_CURRENT_WRITE(flags.threaded, true);
 
-    sched_switch(bootstrap_thread, X86_64_THREAD(X86_64_CPU_CURRENT.common.sched.idle_thread));
+    sched_switch(bootstrap_thread, X86_64_THREAD(CPU_CURRENT_READ(sched.idle_thread)));
     ASSERT_UNREACHABLE();
 }
 
@@ -223,9 +223,9 @@ static void setup_idle_thread() {
     init_stack->thread_init = common_thread_init;
     init_stack->thread_exit_kernel = kernel_thread_exit;
 
-    x86_64_thread_t *idle_thread = create_thread(nullptr, IDLE_TID, &X86_64_CPU_CURRENT.self->common.sched, kernel_stack, (uintptr_t) init_stack);
+    x86_64_thread_t *idle_thread = create_thread(nullptr, IDLE_TID, &CPU_CURRENT_PTR()->sched, kernel_stack, (uintptr_t) init_stack);
 
-    X86_64_CPU_CURRENT.common.sched.idle_thread = &idle_thread->common;
+    CPU_CURRENT_WRITE(sched.idle_thread, &idle_thread->common);
 }
 
 INIT_TARGET_PERCORE(idle_thread, INIT_STAGE_LATE, setup_idle_thread);

@@ -1,10 +1,10 @@
 #include "x86_64/interrupt.h"
 
+#include "arch/cpu.h"
 #include "arch/interrupt.h"
 #include "common/assert.h"
 #include "sys/dw.h"
 #include "sys/init.h"
-#include "x86_64/cpu/cpu.h"
 #include "x86_64/cpu/gdt.h"
 
 #define FLAGS_NORMAL 0x8E
@@ -68,39 +68,41 @@ void interrupt_disable() {
 }
 
 [[gnu::no_instrument_function]] void x86_64_interrupt_handler(x86_64_interrupt_frame_t *frame) {
-    bool is_threaded = X86_64_CPU_CURRENT.common.flags.threaded;
+    bool is_threaded = CPU_CURRENT_READ(flags.threaded);
     bool is_outmost_handler = false;
 
     if(is_threaded) {
-        is_outmost_handler = !X86_64_CPU_CURRENT.current_thread->in_interrupt_handler;
-        if(is_outmost_handler) X86_64_CPU_CURRENT.current_thread->in_interrupt_handler = true;
+        is_outmost_handler = !X86_64_CPU_CURRENT_THREAD()->in_interrupt_handler;
+        if(is_outmost_handler) X86_64_CPU_CURRENT_THREAD()->in_interrupt_handler = true;
 
         sched_preempt_inc();
         dw_status_disable();
     }
 
-    X86_64_CPU_CURRENT.common.flags.in_interrupt_hard = true;
+    // Handle HardINT
+    CPU_CURRENT_WRITE(flags.in_interrupt_hard, true);
     switch(g_entries[frame->int_no].type) {
+        // TODO: this thing is UGLY!
         case HANDLER_TYPE_X86_64: g_entries[frame->int_no].x86_64_handler(frame); break;
         case HANDLER_TYPE_ARCH:   g_entries[frame->int_no].arch_handler(); break;
         case HANDLER_TYPE_NONE:   break;
     }
     if(frame->int_no >= 32) g_x86_64_interrupt_irq_eoi(frame->int_no);
-    X86_64_CPU_CURRENT.common.flags.in_interrupt_hard = false;
+    CPU_CURRENT_WRITE(flags.in_interrupt_hard, false);
 
     if(is_threaded) {
         // At this point the HardINT is handled, so we can enable interrupts
-        X86_64_CPU_CURRENT.common.flags.in_interrupt_soft = true;
+        CPU_CURRENT_WRITE(flags.in_interrupt_soft, true);
         interrupt_enable();
         dw_status_enable();
         interrupt_disable();
-        X86_64_CPU_CURRENT.common.flags.in_interrupt_soft = false;
+        CPU_CURRENT_WRITE(flags.in_interrupt_soft, false);
 
         sched_preempt_dec();
 
         // Ensure preemption and dw is enabled if we return to userspace
-        ASSERT(!X86_64_INTERRUPT_IS_FROM_USER(frame) || (X86_64_CPU_CURRENT.common.sched.status.preempt_counter == 0 && X86_64_CPU_CURRENT.common.flags.deferred_work_status == 0));
-        if(is_outmost_handler) X86_64_CPU_CURRENT.current_thread->in_interrupt_handler = false;
+        ASSERT(!X86_64_INTERRUPT_IS_FROM_USER(frame) || (CPU_CURRENT_READ(sched.status.preempt_counter) == 0 && CPU_CURRENT_READ(flags.deferred_work_status) == 0));
+        if(is_outmost_handler) X86_64_CPU_CURRENT_THREAD()->in_interrupt_handler = false;
     }
 }
 
