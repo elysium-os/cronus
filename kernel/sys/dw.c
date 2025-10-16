@@ -11,6 +11,14 @@
 
 static slab_cache_t *g_item_cache;
 
+static bool dw_enable() {
+    BARRIER;
+    size_t status = CPU_CURRENT_READ(flags.deferred_work_status);
+    ASSERT(status > 0);
+    CPU_CURRENT_DEC(flags.deferred_work_status);
+    return status == 1;
+}
+
 dw_item_t *dw_create(dw_function_t fn, void *data) {
     dw_item_t *item = slab_allocate(g_item_cache);
     item->fn = fn;
@@ -20,16 +28,20 @@ dw_item_t *dw_create(dw_function_t fn, void *data) {
 
 void dw_queue(dw_item_t *item) {
     sched_preempt_inc();
+    dw_status_disable();
     list_push(&CPU_CURRENT_PTR()->dw_items, &item->list_node);
+    dw_enable();
     sched_preempt_dec();
 }
 
 void dw_process() {
+    dw_status_disable();
 repeat:
     sched_preempt_inc();
     cpu_t *current_cpu = CPU_CURRENT_PTR();
     if(current_cpu->dw_items.count == 0) {
         sched_preempt_dec();
+        dw_enable();
         return;
     }
     dw_item_t *dw_item = CONTAINER_OF(list_pop(&current_cpu->dw_items), dw_item_t, list_node);
@@ -48,11 +60,7 @@ void dw_status_disable() {
 }
 
 void dw_status_enable() {
-    BARRIER;
-    size_t status = CPU_CURRENT_READ(flags.deferred_work_status);
-    ASSERT(status > 0);
-    CPU_CURRENT_DEC(flags.deferred_work_status);
-    if(status == 1) dw_process();
+    if(dw_enable()) dw_process();
 }
 
 static void dw_init() {
