@@ -1,7 +1,7 @@
 #include "arch/cpu.h"
 #include "arch/page.h"
-#include "arch/sched.h"
 #include "arch/time.h"
+#include "arch/interrupt.h"
 #include "common/assert.h"
 #include "common/lock/mutex.h"
 #include "common/log.h"
@@ -359,7 +359,7 @@ void uacpi_kernel_reset_event(uacpi_handle handle) {
 // CRITICAL: this doesnt even get registered
 static uacpi_interrupt_handler_t g_interrupt_handlers[256] = {};
 
-static void kernelapi_interrupt_handler(x86_64_interrupt_frame_t *frame) {
+static void kernelapi_interrupt_handler(arch_interrupt_frame_t *frame) {
     uacpi_interrupt_handler_t *handler = &g_interrupt_handlers[frame->int_no];
     ASSERT(handler != nullptr);
     handler->fn(handler->ctx);

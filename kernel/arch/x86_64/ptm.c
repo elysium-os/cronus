@@ -16,6 +16,7 @@
 #include "sys/init.h"
 #include "x86_64/cpu/cr.h"
 #include "x86_64/exception.h"
+#include "x86_64/interrupt.h"
 #include "x86_64/tlb.h"
 
 #include <stddef.h>
@@ -332,7 +333,7 @@ bool ptm_physical(vm_address_space_t *address_space, uintptr_t vaddr, PARAM_OUT(
     return true;
 }
 
-void x86_64_ptm_page_fault_handler(x86_64_interrupt_frame_t *frame) {
+void x86_64_ptm_page_fault_handler(arch_interrupt_frame_t *frame) {
     vm_fault_t fault = VM_FAULT_UNKNOWN;
     if((frame->err_code & PAGEFAULT_FLAG_PRESENT) == 0) fault = VM_FAULT_NOT_PRESENT;
 

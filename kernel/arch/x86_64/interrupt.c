@@ -11,12 +11,6 @@
 #define FLAGS_TRAP 0x8F
 #define IDT_SIZE 256
 
-typedef enum {
-    HANDLER_TYPE_NONE,
-    HANDLER_TYPE_X86_64,
-    HANDLER_TYPE_ARCH,
-} handler_type_t;
-
 typedef struct [[gnu::packed]] {
     uint16_t low_offset;
     uint16_t segment_selector;
@@ -27,47 +21,27 @@ typedef struct [[gnu::packed]] {
     uint32_t rsv0;
 } idt_entry_t;
 
-typedef struct {
-    handler_type_t type;
-    union {
-        x86_64_interrupt_handler_t x86_64_handler;
-        interrupt_handler_t arch_handler;
-    };
-} interrupt_entry_t;
+typedef void (*interrupt_handler_t)(arch_interrupt_frame_t *frame);
 
 static uint64_t g_priority_map[] = { [INTERRUPT_PRIORITY_LOW] = 0x2, [INTERRUPT_PRIORITY_NORMAL] = 0x5, [INTERRUPT_PRIORITY_EVENT] = 0x7, [INTERRUPT_PRIORITY_CRITICAL] = 0xF };
 
 extern uint64_t g_x86_64_isr_stubs[IDT_SIZE];
 
 static idt_entry_t g_idt[IDT_SIZE];
-static interrupt_entry_t g_entries[IDT_SIZE];
+static void (*g_entries[IDT_SIZE])(arch_interrupt_frame_t *frame);
 
 x86_64_interrupt_irq_eoi_t g_x86_64_interrupt_irq_eoi;
 
 static int find_vector(interrupt_priority_t priority) {
     int offset = g_priority_map[priority] << 4;
     for(int i = offset; i < IDT_SIZE && i < offset + 16; i++) {
-        if(g_entries[i].type != HANDLER_TYPE_NONE) continue;
+        if(g_entries[i] != nullptr) continue;
         return i;
     }
     return -1;
 }
 
-bool interrupt_state() {
-    uint64_t rflags;
-    asm volatile("pushfq\npopq %0" : "=rm"(rflags));
-    return (rflags & (1 << 9)) != 0;
-}
-
-void interrupt_enable() {
-    asm volatile("sti");
-}
-
-void interrupt_disable() {
-    asm volatile("cli");
-}
-
-[[gnu::no_instrument_function]] void x86_64_interrupt_handler(x86_64_interrupt_frame_t *frame) {
+[[gnu::no_instrument_function]] void x86_64_interrupt_handler(arch_interrupt_frame_t *frame) {
     bool is_threaded = CPU_CURRENT_READ(flags.threaded);
     bool is_outmost_handler = false;
 
@@ -81,12 +55,7 @@ void interrupt_disable() {
 
     // Handle HardINT
     CPU_CURRENT_WRITE(flags.in_interrupt_hard, true);
-    switch(g_entries[frame->int_no].type) {
-        // TODO: this thing is UGLY!
-        case HANDLER_TYPE_X86_64: g_entries[frame->int_no].x86_64_handler(frame); break;
-        case HANDLER_TYPE_ARCH:   g_entries[frame->int_no].arch_handler(); break;
-        case HANDLER_TYPE_NONE:   break;
-    }
+    g_entries[frame->int_no](frame);
     if(frame->int_no >= 32) g_x86_64_interrupt_irq_eoi(frame->int_no);
     CPU_CURRENT_WRITE(flags.in_interrupt_hard, false);
 
@@ -118,23 +87,19 @@ void x86_64_interrupt_load_idt() {
     asm volatile("lidt %0" : : "m"(idtr));
 }
 
-void x86_64_interrupt_set(uint8_t vector, x86_64_interrupt_handler_t handler) {
-    g_entries[vector].type = HANDLER_TYPE_X86_64;
-    g_entries[vector].x86_64_handler = handler;
+void x86_64_interrupt_set(uint8_t vector, void (*handler)(arch_interrupt_frame_t *frame)) {
+    g_entries[vector] = handler;
 }
 
-int x86_64_interrupt_request(interrupt_priority_t priority, x86_64_interrupt_handler_t handler) {
+int x86_64_interrupt_request(interrupt_priority_t priority, void (*handler)(arch_interrupt_frame_t *frame)) {
     int vector = find_vector(priority);
     if(vector >= 0) x86_64_interrupt_set(vector, handler);
     return vector;
 }
 
-int interrupt_request(enum interrupt_priority priority, interrupt_handler_t handler) {
+int interrupt_request(enum interrupt_priority priority, void (*handler)(arch_interrupt_frame_t *frame)) {
     int vector = find_vector(priority);
-    if(vector >= 0) {
-        g_entries[vector].type = HANDLER_TYPE_ARCH;
-        g_entries[vector].arch_handler = handler;
-    }
+    if(vector >= 0) g_entries[vector] = handler;
     return vector;
 }
 
@@ -149,7 +114,7 @@ static void init_interrupts() {
         g_idt[i].ist = 0;
         g_idt[i].rsv0 = 0;
 
-        g_entries[i].type = HANDLER_TYPE_NONE;
+        g_entries[i] = nullptr;
     }
 }
 

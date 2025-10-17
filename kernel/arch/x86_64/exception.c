@@ -6,6 +6,7 @@
 #include "sys/init.h"
 #include "x86_64/cpu/cr.h"
 #include "x86_64/debug.h"
+#include "x86_64/interrupt.h"
 
 static char *g_exception_messages[] = {
     "Division by Zero",    "Debug",       "Non-Maskable Interrupt",   "Breakpoint", "Overflow",          "Out of Bounds",     "Invalid Opcode",  "No Coprocessor", "Double Fault", "Coprocessor Segment Overrun", "Bad TSS",
@@ -17,7 +18,7 @@ static const char *get_message(uint8_t int_no) {
     return g_exception_messages[int_no];
 }
 
-[[noreturn]] void x86_64_exception_unhandled(x86_64_interrupt_frame_t *frame) {
+[[noreturn]] void x86_64_exception_unhandled(arch_interrupt_frame_t *frame) {
     log(LOG_LEVEL_FATAL, "EXCEPTION", "Unhandled Exception `%s` [CPU SEQID: %lu]", get_message(frame->int_no), cpu_id());
 
     x86_64_debug_stack_frame_t initial_stack_frame;

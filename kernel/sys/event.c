@@ -18,7 +18,7 @@ static rb_value_t rbnode_value(rb_node_t *node) {
     return (rb_value_t) CONTAINER_OF(node, event_t, rb_node)->deadline;
 }
 
-void events_process() {
+void events_process(arch_interrupt_frame_t *) {
     sched_preempt_inc();
     cpu_t *current_cpu = CPU_CURRENT_PTR();
 

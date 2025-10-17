@@ -31,7 +31,7 @@ static void invalidate(uintptr_t addr, size_t length) {
     for(; length > 0; length -= PAGE_GRANULARITY, addr += PAGE_GRANULARITY) asm volatile("invlpg (%0)" : : "r"(addr) : "memory");
 }
 
-static void tlb_shootdown_handler([[maybe_unused]] x86_64_interrupt_frame_t *frame) {
+static void tlb_shootdown_handler(arch_interrupt_frame_t *) {
     interrupt_state_t prev_state = spinlock_acquire_noint(&g_status_lock);
 
     if(g_shootdown_status[X86_64_CPU_CURRENT_READ(sequential_id)]) {
