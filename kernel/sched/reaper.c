@@ -55,7 +55,7 @@ repeat:
 }
 
 thread_t *reaper_create() {
-    return sched_thread_create_kernel(reaper_thread);
+    return arch_sched_thread_create_kernel(reaper_thread);
 }
 
 void reaper_queue_thread(thread_t *thread) {

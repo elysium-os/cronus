@@ -8,7 +8,7 @@
 #include <stdint.h>
 
 uintptr_t x86_64_sysv_stack_setup(vm_address_space_t *address_space, size_t stack_size, char **argv, char **envp, x86_64_auxv_t *auxv) {
-    ASSERT(stack_size % PAGE_GRANULARITY == 0);
+    ASSERT(stack_size % ARCH_PAGE_GRANULARITY == 0);
 
 #define WRITE_QWORD(VALUE)                                               \
     {                                                                    \

@@ -5,7 +5,7 @@
 
 #include <stddef.h>
 
-void debug_stack_trace(log_level_t level, const char *tag) {
+void arch_debug_stack_trace(log_level_t level, const char *tag) {
     x86_64_debug_stack_frame_t *stack_frame;
     asm volatile("movq %%rbp, %0" : "=r"(stack_frame));
     x86_64_debug_stack_trace_from(level, tag, stack_frame);

@@ -16,19 +16,19 @@ typedef enum interrupt_priority {
 
 /// Mask interrupts and return the previous state.
 static inline interrupt_state_t interrupt_state_mask() {
-    interrupt_state_t previous_state = interrupt_state();
-    interrupt_disable();
+    interrupt_state_t previous_state = arch_interrupt_state();
+    arch_interrupt_disable();
     return previous_state;
 }
 
 /// Restore interrupt state.
 static inline void interrupt_state_restore(interrupt_state_t state) {
-    interrupt_state_t current_state = interrupt_state();
+    interrupt_state_t current_state = arch_interrupt_state();
     if(current_state == state) return;
 
     if(state == INTERRUPT_STATE_ENABLED) {
-        interrupt_enable();
+        arch_interrupt_enable();
     } else {
-        interrupt_disable();
+        arch_interrupt_disable();
     }
 }

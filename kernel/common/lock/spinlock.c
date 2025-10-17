@@ -11,26 +11,26 @@
 
 void spinlock_acquire(spinlock_t *lock) {
     sched_preempt_inc();
-    ASSERT(!CPU_CURRENT_READ(flags.in_interrupt_soft) && !CPU_CURRENT_READ(flags.in_interrupt_hard));
+    ASSERT(!ARCH_CPU_CURRENT_READ(flags.in_interrupt_soft) && !ARCH_CPU_CURRENT_READ(flags.in_interrupt_hard));
     spinlock_acquire_raw(lock);
 }
 
 void spinlock_release(spinlock_t *lock) {
     spinlock_release_raw(lock);
-    ASSERT(!CPU_CURRENT_READ(flags.in_interrupt_soft) && !CPU_CURRENT_READ(flags.in_interrupt_hard));
+    ASSERT(!ARCH_CPU_CURRENT_READ(flags.in_interrupt_soft) && !ARCH_CPU_CURRENT_READ(flags.in_interrupt_hard));
     sched_preempt_dec();
 }
 
 void spinlock_acquire_nodw(spinlock_t *lock) {
     sched_preempt_inc();
     dw_status_disable();
-    ASSERT(!CPU_CURRENT_READ(flags.in_interrupt_hard));
+    ASSERT(!ARCH_CPU_CURRENT_READ(flags.in_interrupt_hard));
     spinlock_acquire_raw(lock);
 }
 
 void spinlock_release_nodw(spinlock_t *lock) {
     spinlock_release_raw(lock);
-    ASSERT(!CPU_CURRENT_READ(flags.in_interrupt_hard));
+    ASSERT(!ARCH_CPU_CURRENT_READ(flags.in_interrupt_hard));
     dw_status_enable();
     sched_preempt_dec();
 }
@@ -58,7 +58,7 @@ void spinlock_acquire_raw(spinlock_t *lock) {
         if(spinlock_try_acquire(lock)) return;
 
         while(__atomic_load_n(lock, __ATOMIC_RELAXED)) {
-            cpu_relax();
+            arch_cpu_relax();
 #ifdef __ENV_DEVELOPMENT
             ASSERT(dead++ != DEADLOCK_AT);
 #endif

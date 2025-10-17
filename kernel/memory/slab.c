@@ -27,7 +27,7 @@ static slab_t *cache_make_slab(slab_cache_t *cache) {
     slab->freelist = nullptr;
     slab->free_count = 0;
 
-    size_t slab_size = PMM_ORDER_TO_PAGECOUNT(cache->block_order) * PAGE_GRANULARITY - sizeof(slab_t);
+    size_t slab_size = PMM_ORDER_TO_PAGECOUNT(cache->block_order) * ARCH_PAGE_GRANULARITY - sizeof(slab_t);
     ASSERT(slab_size / cache->object_size > 0);
     for(size_t i = 0; i < slab_size / cache->object_size; i++) {
         void **obj = (void **) (((uintptr_t) slab) + sizeof(slab_t) + (i * cache->object_size));
@@ -60,7 +60,7 @@ static void *slab_direct_alloc(slab_cache_t *cache) {
 static void slab_direct_free(slab_cache_t *cache, void *obj) {
     spinlock_acquire_nodw(&cache->slabs_lock);
 
-    slab_t *slab = (slab_t *) (((uintptr_t) obj) & ~(PMM_ORDER_TO_PAGECOUNT(cache->block_order) * PAGE_GRANULARITY - 1));
+    slab_t *slab = (slab_t *) (((uintptr_t) obj) & ~(PMM_ORDER_TO_PAGECOUNT(cache->block_order) * ARCH_PAGE_GRANULARITY - 1));
     *(void **) obj = slab->freelist;
     slab->freelist = obj;
     if(slab->free_count == 0) {
@@ -123,7 +123,7 @@ void *slab_allocate(slab_cache_t *cache) {
     if(!cache->cpu_cache_enabled) return slab_direct_alloc(cache);
 
     sched_preempt_inc();
-    slab_cache_cpu_t *cc = &cache->cpu_cache[cpu_id()];
+    slab_cache_cpu_t *cc = &cache->cpu_cache[arch_cpu_id()];
     spinlock_acquire_nodw(&cc->lock);
     sched_preempt_dec();
 
@@ -160,7 +160,7 @@ void slab_free(slab_cache_t *cache, void *obj) {
     if(!cache->cpu_cache_enabled) return slab_direct_free(cache, obj);
 
     sched_preempt_inc();
-    slab_cache_cpu_t *cc = &cache->cpu_cache[cpu_id()];
+    slab_cache_cpu_t *cc = &cache->cpu_cache[arch_cpu_id()];
     spinlock_acquire_nodw(&cc->lock);
     sched_preempt_dec();
 

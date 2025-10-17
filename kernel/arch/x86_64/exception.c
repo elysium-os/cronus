@@ -19,7 +19,7 @@ static const char *get_message(uint8_t int_no) {
 }
 
 [[noreturn]] void x86_64_exception_unhandled(arch_interrupt_frame_t *frame) {
-    log(LOG_LEVEL_FATAL, "EXCEPTION", "Unhandled Exception `%s` [CPU SEQID: %lu]", get_message(frame->int_no), cpu_id());
+    log(LOG_LEVEL_FATAL, "EXCEPTION", "Unhandled Exception `%s` [CPU SEQID: %lu]", get_message(frame->int_no), arch_cpu_id());
 
     x86_64_debug_stack_frame_t initial_stack_frame;
     initial_stack_frame.rbp = (x86_64_debug_stack_frame_t *) frame->rbp;
@@ -47,7 +47,7 @@ static const char *get_message(uint8_t int_no) {
         frame->rcx,
         frame->rbx,
         frame->rax);
-    cpu_halt();
+    arch_cpu_halt();
     ASSERT_UNREACHABLE();
 }
 

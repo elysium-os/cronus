@@ -13,9 +13,9 @@ static slab_cache_t *g_item_cache;
 
 static bool dw_enable() {
     BARRIER;
-    size_t status = CPU_CURRENT_READ(flags.deferred_work_status);
+    size_t status = ARCH_CPU_CURRENT_READ(flags.deferred_work_status);
     ASSERT(status > 0);
-    CPU_CURRENT_DEC(flags.deferred_work_status);
+    ARCH_CPU_CURRENT_DEC(flags.deferred_work_status);
     return status == 1;
 }
 
@@ -29,7 +29,7 @@ dw_item_t *dw_create(dw_function_t fn, void *data) {
 void dw_queue(dw_item_t *item) {
     sched_preempt_inc();
     dw_status_disable();
-    list_push(&CPU_CURRENT_PTR()->dw_items, &item->list_node);
+    list_push(&ARCH_CPU_CURRENT_PTR()->dw_items, &item->list_node);
     dw_enable();
     sched_preempt_dec();
 }
@@ -38,7 +38,7 @@ void dw_process() {
     dw_status_disable();
 repeat:
     sched_preempt_inc();
-    cpu_t *current_cpu = CPU_CURRENT_PTR();
+    cpu_t *current_cpu = ARCH_CPU_CURRENT_PTR();
     if(current_cpu->dw_items.count == 0) {
         sched_preempt_dec();
         dw_enable();
@@ -54,8 +54,8 @@ repeat:
 }
 
 void dw_status_disable() {
-    ASSERT(CPU_CURRENT_READ(flags.deferred_work_status) < UINT32_MAX);
-    CPU_CURRENT_INC(flags.deferred_work_status);
+    ASSERT(ARCH_CPU_CURRENT_READ(flags.deferred_work_status) < UINT32_MAX);
+    ARCH_CPU_CURRENT_INC(flags.deferred_work_status);
     BARRIER;
 }
 

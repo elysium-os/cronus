@@ -24,7 +24,7 @@ void mutex_acquire(mutex_t *mutex) {
 
     interrupt_state_t previous_state = spinlock_acquire_noint(&mutex->lock);
     if(EXPECT_LIKELY(__atomic_exchange_n(&mutex->state, MUTEX_STATE_CONTESTED, __ATOMIC_ACQ_REL) != MUTEX_STATE_UNLOCKED)) {
-        list_push_back(&mutex->wait_queue, &sched_thread_current()->list_node_wait);
+        list_push_back(&mutex->wait_queue, &arch_sched_thread_current()->list_node_wait);
 
         spinlock_release_raw(&mutex->lock); // TODO: race condition here ?
         sched_yield(THREAD_STATE_BLOCK);

@@ -28,7 +28,7 @@ static size_t g_shootdown_length;
 
 static void invalidate(uintptr_t addr, size_t length) {
     LOG_TRACE("PTM", "invalidating on CPU(%lu) for %#lx - %#lx", X86_64_CPU_CURRENT_READ(sequential_id), addr, addr + length);
-    for(; length > 0; length -= PAGE_GRANULARITY, addr += PAGE_GRANULARITY) asm volatile("invlpg (%0)" : : "r"(addr) : "memory");
+    for(; length > 0; length -= ARCH_PAGE_GRANULARITY, addr += ARCH_PAGE_GRANULARITY) asm volatile("invlpg (%0)" : : "r"(addr) : "memory");
 }
 
 static void tlb_shootdown_handler(arch_interrupt_frame_t *) {
@@ -51,13 +51,13 @@ static void tlb_shootdown_handler(arch_interrupt_frame_t *) {
 }
 
 void x86_64_tlb_shootdown(uintptr_t addr, size_t length) {
-    LOG_TRACE("PTM", "shootdown from CPU(%lu) for %#lx - %#lx [threaded: %u]", X86_64_CPU_CURRENT_READ(sequential_id), addr, addr + length, CPU_CURRENT_READ(flags.threaded));
-    if(!CPU_CURRENT_READ(flags.threaded)) {
+    LOG_TRACE("PTM", "shootdown from CPU(%lu) for %#lx - %#lx [threaded: %u]", X86_64_CPU_CURRENT_READ(sequential_id), addr, addr + length, ARCH_CPU_CURRENT_READ(flags.threaded));
+    if(!ARCH_CPU_CURRENT_READ(flags.threaded)) {
         invalidate(addr, length);
         return;
     }
 
-    ASSERT(interrupt_state());
+    ASSERT(arch_interrupt_state());
 
     spinlock_acquire_nodw(&g_shootdown_lock);
     interrupt_state_t prev_state = spinlock_acquire_noint(&g_status_lock);
@@ -73,7 +73,7 @@ void x86_64_tlb_shootdown(uintptr_t addr, size_t length) {
 
     size_t last = 0;
     while(__atomic_load_n(&g_shootdown_complete_count, __ATOMIC_ACQUIRE) != g_cpu_count) {
-        time_t time = time_monotonic();
+        time_t time = arch_time_monotonic();
         if(time - last > RETRY_AFTER_NS) {
             last = time;
             for(size_t i = 0; i < g_cpu_count; i++) {

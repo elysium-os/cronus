@@ -42,7 +42,7 @@ static int find_vector(interrupt_priority_t priority) {
 }
 
 [[gnu::no_instrument_function]] void x86_64_interrupt_handler(arch_interrupt_frame_t *frame) {
-    bool is_threaded = CPU_CURRENT_READ(flags.threaded);
+    bool is_threaded = ARCH_CPU_CURRENT_READ(flags.threaded);
     bool is_outmost_handler = false;
 
     if(is_threaded) {
@@ -54,23 +54,23 @@ static int find_vector(interrupt_priority_t priority) {
     }
 
     // Handle HardINT
-    CPU_CURRENT_WRITE(flags.in_interrupt_hard, true);
+    ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_hard, true);
     g_entries[frame->int_no](frame);
     if(frame->int_no >= 32) g_x86_64_interrupt_irq_eoi(frame->int_no);
-    CPU_CURRENT_WRITE(flags.in_interrupt_hard, false);
+    ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_hard, false);
 
     if(is_threaded) {
         // At this point the HardINT is handled, so we can enable interrupts
-        CPU_CURRENT_WRITE(flags.in_interrupt_soft, true);
-        interrupt_enable();
+        ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_soft, true);
+        arch_interrupt_enable();
         dw_status_enable();
-        interrupt_disable();
-        CPU_CURRENT_WRITE(flags.in_interrupt_soft, false);
+        arch_interrupt_disable();
+        ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_soft, false);
 
         sched_preempt_dec();
 
         // Ensure preemption and dw is enabled if we return to userspace
-        ASSERT(!X86_64_INTERRUPT_IS_FROM_USER(frame) || (CPU_CURRENT_READ(sched.status.preempt_counter) == 0 && CPU_CURRENT_READ(flags.deferred_work_status) == 0));
+        ASSERT(!X86_64_INTERRUPT_IS_FROM_USER(frame) || (ARCH_CPU_CURRENT_READ(sched.status.preempt_counter) == 0 && ARCH_CPU_CURRENT_READ(flags.deferred_work_status) == 0));
         if(is_outmost_handler) X86_64_CPU_CURRENT_THREAD()->in_interrupt_handler = false;
     }
 }
@@ -97,7 +97,7 @@ int x86_64_interrupt_request(interrupt_priority_t priority, void (*handler)(arch
     return vector;
 }
 
-int interrupt_request(enum interrupt_priority priority, void (*handler)(arch_interrupt_frame_t *frame)) {
+int arch_interrupt_request(enum interrupt_priority priority, void (*handler)(arch_interrupt_frame_t *frame)) {
     int vector = find_vector(priority);
     if(vector >= 0) g_entries[vector] = handler;
     return vector;

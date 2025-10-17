@@ -40,16 +40,16 @@ static void thread_init() {
 }
 
 [[gnu::no_instrument_function]] [[noreturn]] void init(tartarus_boot_info_t *boot_info) {
-    init_bsp_local(boot_info->cpus[boot_info->bsp_index].sequential_id);
+    arch_init_bsp_local(boot_info->cpus[boot_info->bsp_index].sequential_id);
     event_init_cpu_local();
-    init_bsp();
+    arch_init_bsp();
 
     init_stage(INIT_STAGE_BOOT, false);
 
     log(LOG_LEVEL_INFO, "INIT", "Elysium " MACROS_STRINGIFY(__ARCH) " " MACROS_STRINGIFY(__VERSION) " (" __DATE__ " " __TIME__ ")");
 
     // Initialize HHDM
-    ASSERT(boot_info->hhdm_offset % PAGE_GRANULARITY == 0 && boot_info->hhdm_offset % PAGE_GRANULARITY == 0);
+    ASSERT(boot_info->hhdm_offset % ARCH_PAGE_GRANULARITY == 0 && boot_info->hhdm_offset % ARCH_PAGE_GRANULARITY == 0);
     g_hhdm_offset = boot_info->hhdm_offset;
     g_hhdm_size = boot_info->hhdm_size;
 
@@ -84,7 +84,7 @@ static void thread_init() {
             case TARTARUS_MM_TYPE_BAD:                    continue;
         }
 
-        ASSERT(entry->base % PAGE_GRANULARITY == 0 && entry->length % PAGE_GRANULARITY == 0);
+        ASSERT(entry->base % ARCH_PAGE_GRANULARITY == 0 && entry->length % ARCH_PAGE_GRANULARITY == 0);
 
         earlymem_region_add(entry->base, entry->length); // TODO: coalesce these regions so that we dont end up with weird max_orders in the buddy
     }
@@ -130,7 +130,7 @@ static void thread_init() {
         }
 
         ASSERT(entry->base + entry->length <= g_hhdm_size);
-        ptm_map(g_vm_global_address_space, g_hhdm_offset + entry->base, entry->base, entry->length, VM_PROT_RW, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
+        arch_ptm_map(g_vm_global_address_space, g_hhdm_offset + entry->base, entry->base, entry->length, VM_PROT_RW, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
     }
 
     g_hhdm_region.address_space = g_vm_global_address_space;
@@ -157,12 +157,12 @@ static void thread_init() {
             default:                                      continue;
         }
 
-        uintptr_t start = page_cache_start + MATH_FLOOR((entry->base / PAGE_GRANULARITY) * sizeof(page_t), PAGE_GRANULARITY);
-        uintptr_t end = page_cache_start + MATH_CEIL(((entry->base + entry->length) / PAGE_GRANULARITY) * sizeof(page_t), PAGE_GRANULARITY);
+        uintptr_t start = page_cache_start + MATH_FLOOR((entry->base / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
+        uintptr_t end = page_cache_start + MATH_CEIL(((entry->base + entry->length) / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
         log(LOG_LEVEL_DEBUG, "INIT", "Mapping page cache segment %#lx -> %#lx [%#lx]", start, end, end - start);
 
-        for(page_cache_end = start; page_cache_end < end; page_cache_end += PAGE_GRANULARITY) {
-            ptm_map(g_vm_global_address_space, page_cache_end, earlymem_alloc_page(), PAGE_GRANULARITY, VM_PROT_RW, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
+        for(page_cache_end = start; page_cache_end < end; page_cache_end += ARCH_PAGE_GRANULARITY) {
+            arch_ptm_map(g_vm_global_address_space, page_cache_end, earlymem_alloc_page(), ARCH_PAGE_GRANULARITY, VM_PROT_RW, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
         }
     }
     size_t page_cache_size = page_cache_end - page_cache_start;
@@ -197,9 +197,9 @@ static void thread_init() {
             (segment->flags & TARTARUS_KERNEL_SEGMENT_FLAG_WRITE) != 0 ? 'W' : ' ',
             (segment->flags & TARTARUS_KERNEL_SEGMENT_FLAG_EXECUTE) != 0 ? 'X' : ' ');
 
-        ASSERT(segment->vaddr % PAGE_GRANULARITY == 0 && segment->size % PAGE_GRANULARITY == 0);
+        ASSERT(segment->vaddr % ARCH_PAGE_GRANULARITY == 0 && segment->size % ARCH_PAGE_GRANULARITY == 0);
 
-        ptm_map(
+        arch_ptm_map(
             g_vm_global_address_space,
             segment->vaddr,
             segment->paddr,
@@ -227,11 +227,11 @@ static void thread_init() {
     }
 
     // Map the framebuffer
-    ptm_map(g_vm_global_address_space, (uintptr_t) g_framebuffer.address, framebuffer->paddr, MATH_CEIL(g_framebuffer.size, PAGE_GRANULARITY), VM_PROT_RW, VM_CACHE_NONE, VM_PRIVILEGE_KERNEL, true);
+    arch_ptm_map(g_vm_global_address_space, (uintptr_t) g_framebuffer.address, framebuffer->paddr, MATH_CEIL(g_framebuffer.size, ARCH_PAGE_GRANULARITY), VM_PROT_RW, VM_CACHE_NONE, VM_PRIVILEGE_KERNEL, true);
 
     // Load the new address space
     log(LOG_LEVEL_DEBUG, "INIT", "Loading global address space...");
-    ptm_load_address_space(g_vm_global_address_space);
+    arch_ptm_load_address_space(g_vm_global_address_space);
 
     // Initialize physical memory
     log(LOG_LEVEL_DEBUG, "INIT", "Initializing physical memory proper");
@@ -256,7 +256,7 @@ static void thread_init() {
     //       merging with free ones for max order to settle properly.
     LIST_ITERATE(&g_earlymem_regions, node) {
         earlymem_region_t *region = CONTAINER_OF(node, earlymem_region_t, list_node);
-        for(size_t offset = 0; offset < region->length; offset += PAGE_GRANULARITY) {
+        for(size_t offset = 0; offset < region->length; offset += ARCH_PAGE_GRANULARITY) {
             if(!earlymem_region_isfree(region, offset)) continue;
             pmm_free(&PAGE(region->base + offset)->block);
         }
@@ -271,7 +271,7 @@ static void thread_init() {
 
     // Main init
     init_stage(INIT_STAGE_BEFORE_MAIN, false);
-    init_cpu_locals(boot_info);
+    arch_init_cpu_locals(boot_info);
     init_stage(INIT_STAGE_MAIN, false);
 
     // Dev init
@@ -336,14 +336,14 @@ static void thread_init() {
 
     // SMP init
     log(LOG_LEVEL_DEBUG, "INIT", "Starting APs...");
-    init_smp(boot_info);
+    arch_init_smp(boot_info);
 
     // Schedule init threads
     sched_thread_schedule(reaper_create());
-    sched_thread_schedule(sched_thread_create_kernel(thread_init));
+    sched_thread_schedule(arch_sched_thread_create_kernel(thread_init));
 
     // Scheduler handoff
     log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye now!");
-    sched_handoff_cpu();
+    arch_sched_handoff_cpu();
     ASSERT_UNREACHABLE();
 }

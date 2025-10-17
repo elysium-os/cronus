@@ -12,18 +12,18 @@ typedef struct [[gnu::packed]] arch_interrupt_frame {
 
 /// Get the current interrupt state.
 /// @returns true for enabled, false for disabled
-static inline bool interrupt_state() {
+static inline bool arch_interrupt_state() {
     uint64_t rflags;
     asm volatile("pushfq\npopq %0" : "=rm"(rflags));
     return (rflags & (1 << 9)) != 0;
 }
 
 /// Enable interrupts.
-static inline void interrupt_enable() {
+static inline void arch_interrupt_enable() {
     asm volatile("sti");
 }
 
 /// Disable interrupts.
-static inline void interrupt_disable() {
+static inline void arch_interrupt_disable() {
     asm volatile("cli");
 }

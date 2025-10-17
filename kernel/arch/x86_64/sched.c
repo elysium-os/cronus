@@ -65,12 +65,12 @@ static long g_next_tid = BOOTSTRAP_TID + 1;
 /// will stay in RDI throughout the asm routine and will still
 /// be present upon entry here.
 [[gnu::no_instrument_function]] static void common_thread_init(x86_64_thread_t *prev) {
-    log(LOG_LEVEL_DEBUG, "SCHED", "common thread init for %lu", sched_thread_current()->id);
+    log(LOG_LEVEL_DEBUG, "SCHED", "common thread init for %lu", arch_sched_thread_current()->id);
     internal_sched_thread_drop(&prev->common);
-    interrupt_enable();
-    sched_preempt();
+    arch_interrupt_enable();
+    arch_sched_preempt();
 
-    ASSERT(CPU_CURRENT_READ(sched.status.preempt_counter) == 0 && CPU_CURRENT_READ(flags.deferred_work_status) == 0);
+    ASSERT(ARCH_CPU_CURRENT_READ(sched.status.preempt_counter) == 0 && ARCH_CPU_CURRENT_READ(flags.deferred_work_status) == 0);
 }
 
 [[gnu::no_instrument_function]] static void kernel_thread_exit() {
@@ -78,7 +78,7 @@ static long g_next_tid = BOOTSTRAP_TID + 1;
 }
 
 static void sched_entry([[maybe_unused]] void *data) {
-    CPU_CURRENT_WRITE(sched.status.yield_immediately, true);
+    ARCH_CPU_CURRENT_WRITE(sched.status.yield_immediately, true);
 }
 
 [[noreturn]] static void sched_idle() {
@@ -90,13 +90,13 @@ static void sched_entry([[maybe_unused]] void *data) {
 }
 
 [[gnu::no_instrument_function]] static void sched_switch(x86_64_thread_t *this, x86_64_thread_t *next) {
-    ASSERT(!interrupt_state());
+    ASSERT(!arch_interrupt_state());
     ASSERT(next != nullptr);
 
     if(next->common.proc != nullptr) {
-        ptm_load_address_space(next->common.proc->address_space);
+        arch_ptm_load_address_space(next->common.proc->address_space);
     } else {
-        ptm_load_address_space(g_vm_global_address_space);
+        arch_ptm_load_address_space(g_vm_global_address_space);
     }
 
     X86_64_CPU_CURRENT_WRITE(current_thread, next);
@@ -133,7 +133,7 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
     thread->kernel_stack = kernel_stack;
     thread->state.fs = 0;
     thread->state.gs = 0;
-    thread->state.fpu_area = (void *) HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(MATH_DIV_CEIL(g_x86_64_fpu_area_size, PAGE_GRANULARITY), PMM_FLAG_ZERO)))); // TODO: wasting a page here...
+    thread->state.fpu_area = (void *) HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(MATH_DIV_CEIL(g_x86_64_fpu_area_size, ARCH_PAGE_GRANULARITY), PMM_FLAG_ZERO)))); // TODO: wasting a page here...
     thread->in_interrupt_handler = false;
 
 #ifdef __ENV_DEVELOPMENT
@@ -165,8 +165,8 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
     return thread;
 }
 
-thread_t *sched_thread_create_kernel(void (*func)()) {
-    x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * PAGE_GRANULARITY };
+thread_t *arch_sched_thread_create_kernel(void (*func)()) {
+    x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));
     init_stack->entry = func;
@@ -176,8 +176,8 @@ thread_t *sched_thread_create_kernel(void (*func)()) {
     return &create_thread(nullptr, __atomic_fetch_add(&g_next_tid, 1, __ATOMIC_RELAXED), pick_next_scheduler(), kernel_stack, (uintptr_t) init_stack)->common;
 }
 
-thread_t *sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t sp) {
-    x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * PAGE_GRANULARITY };
+thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t sp) {
+    x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_user_t *init_stack = (init_stack_user_t *) (kernel_stack.base - sizeof(init_stack_user_t));
     init_stack->entry = (void (*)()) ip;
@@ -188,44 +188,44 @@ thread_t *sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t sp) 
     return &create_thread(proc, __atomic_fetch_add(&g_next_tid, 1, __ATOMIC_RELAXED), pick_next_scheduler(), kernel_stack, (uintptr_t) init_stack)->common;
 }
 
-thread_t *sched_thread_current() {
+thread_t *arch_sched_thread_current() {
     x86_64_thread_t *thread = X86_64_CPU_CURRENT_THREAD();
     ASSERT(thread != nullptr);
     return &thread->common;
 }
 
-void sched_preempt() {
+void arch_sched_preempt() {
     event_queue(1000000, sched_entry, nullptr);
 }
 
-void sched_context_switch(thread_t *current, thread_t *next) {
+void arch_sched_context_switch(thread_t *current, thread_t *next) {
     sched_switch(X86_64_THREAD(current), X86_64_THREAD(next));
 }
 
-[[noreturn]] void sched_handoff_cpu() {
+[[noreturn]] void arch_sched_handoff_cpu() {
     x86_64_thread_t *bootstrap_thread = heap_alloc(sizeof(x86_64_thread_t));
     memclear(bootstrap_thread, sizeof(x86_64_thread_t));
     bootstrap_thread->common.state = THREAD_STATE_DESTROY;
-    bootstrap_thread->common.scheduler = &CPU_CURRENT_PTR()->sched;
+    bootstrap_thread->common.scheduler = &ARCH_CPU_CURRENT_PTR()->sched;
     bootstrap_thread->common.id = BOOTSTRAP_TID;
 
-    CPU_CURRENT_WRITE(flags.threaded, true);
+    ARCH_CPU_CURRENT_WRITE(flags.threaded, true);
 
-    sched_switch(bootstrap_thread, X86_64_THREAD(CPU_CURRENT_READ(sched.idle_thread)));
+    sched_switch(bootstrap_thread, X86_64_THREAD(ARCH_CPU_CURRENT_READ(sched.idle_thread)));
     ASSERT_UNREACHABLE();
 }
 
 static void setup_idle_thread() {
-    x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * PAGE_GRANULARITY };
+    x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));
     init_stack->entry = sched_idle;
     init_stack->thread_init = common_thread_init;
     init_stack->thread_exit_kernel = kernel_thread_exit;
 
-    x86_64_thread_t *idle_thread = create_thread(nullptr, IDLE_TID, &CPU_CURRENT_PTR()->sched, kernel_stack, (uintptr_t) init_stack);
+    x86_64_thread_t *idle_thread = create_thread(nullptr, IDLE_TID, &ARCH_CPU_CURRENT_PTR()->sched, kernel_stack, (uintptr_t) init_stack);
 
-    CPU_CURRENT_WRITE(sched.idle_thread, &idle_thread->common);
+    ARCH_CPU_CURRENT_WRITE(sched.idle_thread, &idle_thread->common);
 }
 
 INIT_TARGET_PERCORE(idle_thread, INIT_STAGE_LATE, setup_idle_thread);

@@ -46,7 +46,7 @@ static slab_cache_t *find_cache(size_t size) {
 
 void *heap_alloc(size_t size) {
     if(EXPECT_UNLIKELY(size == 0)) return nullptr;
-    if(EXPECT_UNLIKELY(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1])) return (void *) HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(MATH_DIV_CEIL(size, PAGE_GRANULARITY), PMM_FLAG_NONE))));
+    if(EXPECT_UNLIKELY(size > g_slab_other_sizes[SLAB_OTHER_COUNT - 1])) return (void *) HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(MATH_DIV_CEIL(size, ARCH_PAGE_GRANULARITY), PMM_FLAG_NONE))));
     return slab_allocate(find_cache(size));
 }
 

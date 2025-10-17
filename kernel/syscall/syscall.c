@@ -14,14 +14,14 @@
 #define MAX_DEBUG_LENGTH 512
 
 int syscall_buffer_out(void *dest, void *src, size_t count) {
-    ASSERT(sched_thread_current()->proc != nullptr);
-    return vm_copy_to(sched_thread_current()->proc->address_space, (uintptr_t) dest, src, count);
+    ASSERT(arch_sched_thread_current()->proc != nullptr);
+    return vm_copy_to(arch_sched_thread_current()->proc->address_space, (uintptr_t) dest, src, count);
 }
 
 void *syscall_buffer_in(void *src, size_t count) {
-    ASSERT(sched_thread_current()->proc != nullptr);
+    ASSERT(arch_sched_thread_current()->proc != nullptr);
     void *buffer = heap_alloc(count);
-    size_t read_count = vm_copy_from(buffer, sched_thread_current()->proc->address_space, (uintptr_t) src, count);
+    size_t read_count = vm_copy_from(buffer, arch_sched_thread_current()->proc->address_space, (uintptr_t) src, count);
     if(read_count != count) {
         heap_free(buffer, count);
         return nullptr;
@@ -46,7 +46,7 @@ char *syscall_string_in(char *src, size_t length) {
 }
 
 [[noreturn]] void syscall_exit(int code, bool is_panic) {
-    log(LOG_LEVEL_DEBUG, "SYSCALL", "exit(code: %i, is_panic: %s, tid: %li)", code, is_panic ? "true" : "false", sched_thread_current()->id);
+    log(LOG_LEVEL_DEBUG, "SYSCALL", "exit(code: %i, is_panic: %s, tid: %li)", code, is_panic ? "true" : "false", arch_sched_thread_current()->id);
     sched_yield(THREAD_STATE_DESTROY);
     ASSERT_UNREACHABLE();
 }

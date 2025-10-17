@@ -32,7 +32,7 @@ vm_address_space_t *g_vm_global_address_space;
 static spinlock_t g_region_cache_lock = SPINLOCK_INIT;
 static list_t g_region_cache = LIST_INIT;
 
-static_assert(PAGE_GRANULARITY > (sizeof(vm_region_t) * 2));
+static_assert(ARCH_PAGE_GRANULARITY > (sizeof(vm_region_t) * 2));
 
 static vm_region_t *region_insert(vm_address_space_t *address_space, vm_region_t *region);
 
@@ -76,26 +76,26 @@ static bool find_hole(vm_address_space_t *address_space, uintptr_t address, size
 }
 
 static void region_map(vm_region_t *region, uintptr_t address, uintptr_t length) {
-    ASSERT(address % PAGE_GRANULARITY == 0 && length % PAGE_GRANULARITY == 0);
+    ASSERT(address % ARCH_PAGE_GRANULARITY == 0 && length % ARCH_PAGE_GRANULARITY == 0);
     ASSERT(address < region->base || address + length >= region->base);
 
     bool is_global = region->address_space == g_vm_global_address_space;
     switch(region->type) {
         case VM_REGION_TYPE_ANON:
-            for(size_t i = 0; i < length; i += PAGE_GRANULARITY) {
+            for(size_t i = 0; i < length; i += ARCH_PAGE_GRANULARITY) {
                 uintptr_t virtual_address = address + i;
                 uintptr_t physical_address = PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(region->type_data.anon.back_zeroed ? PMM_FLAG_ZERO : PMM_FLAG_NONE)));
-                ptm_map(region->address_space, virtual_address, physical_address, PAGE_GRANULARITY, region->protection, region->cache_behavior, is_global ? VM_PRIVILEGE_KERNEL : VM_PRIVILEGE_USER, is_global);
+                arch_ptm_map(region->address_space, virtual_address, physical_address, ARCH_PAGE_GRANULARITY, region->protection, region->cache_behavior, is_global ? VM_PRIVILEGE_KERNEL : VM_PRIVILEGE_USER, is_global);
             }
             break;
         case VM_REGION_TYPE_DIRECT:
-            ptm_map(region->address_space, address, region->type_data.direct.physical_address + (address - region->base), length, region->protection, region->cache_behavior, is_global ? VM_PRIVILEGE_KERNEL : VM_PRIVILEGE_USER, is_global);
+            arch_ptm_map(region->address_space, address, region->type_data.direct.physical_address + (address - region->base), length, region->protection, region->cache_behavior, is_global ? VM_PRIVILEGE_KERNEL : VM_PRIVILEGE_USER, is_global);
             break;
     }
 }
 
 static void region_unmap(vm_region_t *region, uintptr_t address, uintptr_t length) {
-    ASSERT(address % PAGE_GRANULARITY == 0 && length % PAGE_GRANULARITY == 0);
+    ASSERT(address % ARCH_PAGE_GRANULARITY == 0 && length % ARCH_PAGE_GRANULARITY == 0);
     ASSERT(address >= region->base && address + length <= region->base + region->length);
 
     switch(region->type) {
@@ -105,7 +105,7 @@ static void region_unmap(vm_region_t *region, uintptr_t address, uintptr_t lengt
             break;
         case VM_REGION_TYPE_DIRECT: break;
     }
-    ptm_unmap(region->address_space, address, length);
+    arch_ptm_unmap(region->address_space, address, length);
 }
 
 /// Check whether the flags of a region are compatible with each other.
@@ -121,7 +121,7 @@ static bool regions_mergeable(vm_region_t *left, vm_region_t *right) {
             if(left->type_data.anon.back_zeroed != right->type_data.anon.back_zeroed) return false;
             break;
         case VM_REGION_TYPE_DIRECT:
-            if(!SEGMENT_IN_BOUNDS(left->type_data.direct.physical_address, left->length, 0, MEM_PHYS_MAX)) return false;
+            if(!SEGMENT_IN_BOUNDS(left->type_data.direct.physical_address, left->length, 0, ARCH_MEM_PHYS_MAX)) return false;
             if(left->type_data.direct.physical_address + left->length != right->type_data.direct.physical_address) return false;
             break;
     }
@@ -139,15 +139,15 @@ static vm_region_t *region_alloc(bool global_lock_acquired) {
         if(!global_lock_acquired) spinlock_acquire_nodw(&g_vm_global_address_space->lock);
 
         uintptr_t address;
-        if(!find_hole(g_vm_global_address_space, 0, PAGE_GRANULARITY, &address)) panic("VM", "out of global address space");
+        if(!find_hole(g_vm_global_address_space, 0, ARCH_PAGE_GRANULARITY, &address)) panic("VM", "out of global address space");
 
-        ptm_map(g_vm_global_address_space, address, PAGE_PADDR(PAGE_FROM_BLOCK(page)), PAGE_GRANULARITY, VM_PROT_RW, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
+        arch_ptm_map(g_vm_global_address_space, address, PAGE_PADDR(PAGE_FROM_BLOCK(page)), ARCH_PAGE_GRANULARITY, VM_PROT_RW, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
 
         vm_region_t *region = (vm_region_t *) address;
         region[0].address_space = g_vm_global_address_space;
         region[0].type = VM_REGION_TYPE_ANON;
         region[0].base = address;
-        region[0].length = PAGE_GRANULARITY;
+        region[0].length = ARCH_PAGE_GRANULARITY;
         region[0].protection = VM_PROT_RW;
         region[0].cache_behavior = VM_CACHE_STANDARD;
         region[0].dynamically_backed = false;
@@ -156,7 +156,7 @@ static vm_region_t *region_alloc(bool global_lock_acquired) {
         if(!global_lock_acquired) spinlock_release_nodw(&g_vm_global_address_space->lock);
 
         spinlock_acquire_nodw(&g_region_cache_lock);
-        for(unsigned int i = 1; i < PAGE_GRANULARITY / sizeof(vm_region_t); i++) list_push(&g_region_cache, &region[i].list_node);
+        for(unsigned int i = 1; i < ARCH_PAGE_GRANULARITY / sizeof(vm_region_t); i++) list_push(&g_region_cache, &region[i].list_node);
     }
 
     list_node_t *node = list_pop(&g_region_cache);
@@ -241,7 +241,7 @@ static vm_region_t *addr_to_region(vm_address_space_t *address_space, uintptr_t 
 static bool address_space_fix_page(vm_address_space_t *address_space, uintptr_t vaddr) {
     vm_region_t *region = addr_to_region(address_space, vaddr);
     if(region == nullptr || !region->dynamically_backed) return false;
-    region_map(region, MATH_FLOOR(vaddr, PAGE_GRANULARITY), PAGE_GRANULARITY);
+    region_map(region, MATH_FLOOR(vaddr, ARCH_PAGE_GRANULARITY), ARCH_PAGE_GRANULARITY);
     return true;
 }
 
@@ -278,10 +278,10 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
     LOG_TRACE("VM", "map(hint: %#lx, length: %#lx, prot: %c%c%c, flags: %lu, cache: %u, type: %u)", (uintptr_t) hint, length, prot.read ? 'R' : '-', prot.write ? 'W' : '-', prot.exec ? 'E' : '-', flags, cache, type);
 
     uintptr_t address = (uintptr_t) hint;
-    if(length == 0 || length % PAGE_GRANULARITY != 0) return nullptr;
-    if(address % PAGE_GRANULARITY != 0) {
+    if(length == 0 || length % ARCH_PAGE_GRANULARITY != 0) return nullptr;
+    if(address % ARCH_PAGE_GRANULARITY != 0) {
         if(flags & VM_FLAG_FIXED) return nullptr;
-        address += PAGE_GRANULARITY - (address % PAGE_GRANULARITY);
+        address += ARCH_PAGE_GRANULARITY - (address % ARCH_PAGE_GRANULARITY);
     }
 
     vm_region_t *region = region_alloc(false);
@@ -294,7 +294,7 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
     }
 
     ASSERT(SEGMENT_IN_BOUNDS(address, length, address_space->start, address_space->end));
-    ASSERT(address % PAGE_GRANULARITY == 0 && length % PAGE_GRANULARITY == 0);
+    ASSERT(address % ARCH_PAGE_GRANULARITY == 0 && length % ARCH_PAGE_GRANULARITY == 0);
 
     region->address_space = address_space;
     region->type = type;
@@ -307,7 +307,7 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
     switch(region->type) {
         case VM_REGION_TYPE_ANON: region->type_data.anon.back_zeroed = (flags & VM_FLAG_ZERO) != 0; break;
         case VM_REGION_TYPE_DIRECT:
-            ASSERT(direct_physical_address % PAGE_GRANULARITY == 0);
+            ASSERT(direct_physical_address % ARCH_PAGE_GRANULARITY == 0);
             region->type_data.direct.physical_address = direct_physical_address;
             LOG_TRACE("VM", "physical address of region: %#lx", direct_physical_address);
             break;
@@ -327,7 +327,7 @@ static void rewrite_common(vm_address_space_t *address_space, void *address, siz
     LOG_TRACE("VM", "rewrite(as_start: %#lx, address: %#lx, length: %#lx)", address_space->start, (uintptr_t) address, length);
     if(length == 0) return;
 
-    ASSERT((uintptr_t) address % PAGE_GRANULARITY == 0 && length % PAGE_GRANULARITY == 0);
+    ASSERT((uintptr_t) address % ARCH_PAGE_GRANULARITY == 0 && length % ARCH_PAGE_GRANULARITY == 0);
     ASSERT(SEGMENT_IN_BOUNDS((uintptr_t) address, length, address_space->start, address_space->end));
 
     spinlock_acquire_nodw(&address_space->lock);
@@ -378,7 +378,7 @@ static void rewrite_common(vm_address_space_t *address_space, void *address, siz
             region = region_insert(address_space, region);
 
             bool is_global = region->address_space == g_vm_global_address_space;
-            ptm_rewrite(region->address_space, split_base, split_length, region->protection, region->cache_behavior, is_global ? VM_PRIVILEGE_KERNEL : VM_PRIVILEGE_USER, is_global);
+            arch_ptm_rewrite(region->address_space, split_base, split_length, region->protection, region->cache_behavior, is_global ? VM_PRIVILEGE_KERNEL : VM_PRIVILEGE_USER, is_global);
 
         l_skip:
 
@@ -428,7 +428,7 @@ static void rewrite_common(vm_address_space_t *address_space, void *address, siz
         region = region_insert(address_space, region);
 
         bool is_global = region->address_space == g_vm_global_address_space;
-        ptm_rewrite(region->address_space, split_base, split_length, region->protection, region->cache_behavior, is_global ? VM_PRIVILEGE_KERNEL : VM_PRIVILEGE_USER, is_global);
+        arch_ptm_rewrite(region->address_space, split_base, split_length, region->protection, region->cache_behavior, is_global ? VM_PRIVILEGE_KERNEL : VM_PRIVILEGE_USER, is_global);
 
     r_skip:
     }
@@ -459,7 +459,7 @@ bool vm_fault(uintptr_t address, vm_fault_t fault) {
     if(fault != VM_FAULT_NOT_PRESENT) return false;
     if(ADDRESS_IN_BOUNDS(address, g_vm_global_address_space->start, g_vm_global_address_space->end)) return false;
 
-    thread_t *current_thread = sched_thread_current();
+    thread_t *current_thread = arch_sched_thread_current();
     ASSERT(!current_thread->vm_fault.in_flight);
 
     process_t *proc = current_thread->proc;
@@ -479,15 +479,15 @@ size_t vm_copy_to(vm_address_space_t *dest_as, uintptr_t dest_addr, void *src, s
     if(!memory_exists(dest_as, dest_addr, count)) return 0;
     size_t i = 0;
     while(i < count) {
-        size_t offset = (dest_addr + i) % PAGE_GRANULARITY;
+        size_t offset = (dest_addr + i) % ARCH_PAGE_GRANULARITY;
         uintptr_t phys;
-        if(!ptm_physical(dest_as, dest_addr + i, &phys)) {
+        if(!arch_ptm_physical(dest_as, dest_addr + i, &phys)) {
             if(!address_space_fix_page(dest_as, dest_addr + i)) return i;
-            bool success = ptm_physical(dest_as, dest_addr + i, &phys);
+            bool success = arch_ptm_physical(dest_as, dest_addr + i, &phys);
             ASSERT(success);
         }
 
-        size_t len = MATH_MIN(count - i, PAGE_GRANULARITY - offset);
+        size_t len = MATH_MIN(count - i, ARCH_PAGE_GRANULARITY - offset);
         memcpy((void *) HHDM(phys), src, len);
         i += len;
         src += len;
@@ -499,15 +499,15 @@ size_t vm_copy_from(void *dest, vm_address_space_t *src_as, uintptr_t src_addr, 
     if(!memory_exists(src_as, src_addr, count)) return 0;
     size_t i = 0;
     while(i < count) {
-        size_t offset = (src_addr + i) % PAGE_GRANULARITY;
+        size_t offset = (src_addr + i) % ARCH_PAGE_GRANULARITY;
         uintptr_t phys;
-        if(!ptm_physical(src_as, src_addr + i, &phys)) {
+        if(!arch_ptm_physical(src_as, src_addr + i, &phys)) {
             if(!address_space_fix_page(src_as, src_addr + i)) return i;
-            bool success = ptm_physical(src_as, src_addr + i, &phys);
+            bool success = arch_ptm_physical(src_as, src_addr + i, &phys);
             ASSERT(success);
         }
 
-        size_t len = MATH_MIN(count - i, PAGE_GRANULARITY - offset);
+        size_t len = MATH_MIN(count - i, ARCH_PAGE_GRANULARITY - offset);
         memcpy(dest, (void *) HHDM(phys), len);
         i += len;
         dest += len;

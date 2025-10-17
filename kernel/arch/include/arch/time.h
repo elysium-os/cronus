@@ -2,4 +2,4 @@
 
 #include "sys/time.h"
 
-time_t time_monotonic();
+time_t arch_time_monotonic();

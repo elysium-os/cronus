@@ -40,45 +40,45 @@ void sched_yield(enum thread_state yield_state) {
     interrupt_state_t previous_state = interrupt_state_mask();
 
     ASSERT(yield_state != THREAD_STATE_ACTIVE);
-    ASSERT(CPU_CURRENT_READ(sched.status.preempt_counter) == 0);
-    ASSERT(CPU_CURRENT_READ(flags.deferred_work_status) == 0);
-    ASSERT(!CPU_CURRENT_READ(flags.in_interrupt_hard) && !CPU_CURRENT_READ(flags.in_interrupt_soft));
+    ASSERT(ARCH_CPU_CURRENT_READ(sched.status.preempt_counter) == 0);
+    ASSERT(ARCH_CPU_CURRENT_READ(flags.deferred_work_status) == 0);
+    ASSERT(!ARCH_CPU_CURRENT_READ(flags.in_interrupt_hard) && !ARCH_CPU_CURRENT_READ(flags.in_interrupt_soft));
 
-    thread_t *current = sched_thread_current();
+    thread_t *current = arch_sched_thread_current();
 
-    thread_t *next = sched_thread_next(&CPU_CURRENT_PTR()->sched);
+    thread_t *next = sched_thread_next(&ARCH_CPU_CURRENT_PTR()->sched);
     if(next == nullptr && current != current->scheduler->idle_thread) next = current->scheduler->idle_thread;
     if(next != nullptr) {
         ASSERT(current != next);
         current->state = yield_state;
-        sched_context_switch(current, next);
+        arch_sched_context_switch(current, next);
     } else {
         ASSERT(current->state == yield_state);
     }
 
-    sched_preempt();
+    arch_sched_preempt();
 
     interrupt_state_restore(previous_state);
 }
 
 void sched_preempt_inc() {
-    ASSERT(CPU_CURRENT_READ(sched.status.preempt_counter) < UINT32_MAX);
-    CPU_CURRENT_INC(sched.status.preempt_counter);
+    ASSERT(ARCH_CPU_CURRENT_READ(sched.status.preempt_counter) < UINT32_MAX);
+    ARCH_CPU_CURRENT_INC(sched.status.preempt_counter);
     BARRIER;
 }
 
 void sched_preempt_dec() {
     BARRIER;
-    size_t count = CPU_CURRENT_READ(sched.status.preempt_counter);
+    size_t count = ARCH_CPU_CURRENT_READ(sched.status.preempt_counter);
     ASSERT(count > 0);
-    bool do_yield = count == 1 && CPU_CURRENT_EXCHANGE(sched.status.yield_immediately, false);
-    CPU_CURRENT_DEC(sched.status.preempt_counter);
+    bool do_yield = count == 1 && ARCH_CPU_CURRENT_EXCHANGE(sched.status.yield_immediately, false);
+    ARCH_CPU_CURRENT_DEC(sched.status.preempt_counter);
     if(do_yield) sched_yield(THREAD_STATE_READY); // FLIMSY: not sure if we need to account for the RC
 }
 
 void internal_sched_thread_drop(thread_t *thread) {
-    ASSERT(!interrupt_state());
-    ASSERT(thread->scheduler == &CPU_CURRENT_PTR()->sched);
+    ASSERT(!arch_interrupt_state());
+    ASSERT(thread->scheduler == &ARCH_CPU_CURRENT_PTR()->sched);
 
     if(thread == thread->scheduler->idle_thread) return;
 

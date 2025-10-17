@@ -23,11 +23,11 @@ static uintptr_t g_common_paddr = 0;
 static void *g_common_vaddr = nullptr;
 
 [[clang::always_inline]] static void lapic_write(uint32_t reg, uint32_t data) {
-    mmio_write32((void *) ((uintptr_t) g_common_vaddr + reg), data);
+    arch_mmio_write32((void *) ((uintptr_t) g_common_vaddr + reg), data);
 }
 
 [[clang::always_inline]] static uint32_t lapic_read(uint32_t reg) {
-    return mmio_read32((void *) ((uintptr_t) g_common_vaddr + reg));
+    return arch_mmio_read32((void *) ((uintptr_t) g_common_vaddr + reg));
 }
 
 void x86_64_lapic_init() {

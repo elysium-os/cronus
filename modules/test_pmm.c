@@ -21,7 +21,7 @@ void __module_initialize() {
     uintptr_t paddr = PAGE_PADDR(PAGE_FROM_BLOCK(zeroed));
 
     uint8_t *data = (uint8_t *) HHDM(paddr);
-    for(size_t i = 0; i < PAGE_GRANULARITY; i++) ASSERT(data[i] == 0);
+    for(size_t i = 0; i < ARCH_PAGE_GRANULARITY; i++) ASSERT(data[i] == 0);
 }
 
 void __module_uninitialize() {
