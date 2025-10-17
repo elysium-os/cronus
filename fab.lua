@@ -18,9 +18,8 @@ end
 
 -- Includes
 local include_dirs = {
-    builtins.c.include_dir("kernel/include"),
     builtins.c.include_dir(path("kernel/arch", opt_arch, "include")),
-    builtins.c.include_dir("kernel/arch/include")
+    builtins.c.include_dir("kernel/include")
 }
 
 -- Flags
