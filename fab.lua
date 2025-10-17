@@ -8,18 +8,18 @@ local opt_build_kernel = fab.option("build_kernel", { "yes", "no" }) or "yes"
 local opt_build_modules = fab.option("build_modules", "string") or ""
 
 -- Sources
-local kernel_sources = sources(fab.glob("kernel/**/*.c", "kernel/arch/**"))
+local kernel_sources = sources(fab.glob("**/*.c", "arch/**", "modules/**"))
 
-table.extend(kernel_sources, sources(fab.glob(path("kernel/arch", opt_arch, "**/*.c"))))
+table.extend(kernel_sources, sources(fab.glob(path("arch", opt_arch, "**/*.c"))))
 
 if opt_arch == "x86_64" then
-    table.extend(kernel_sources, sources(fab.glob("kernel/arch/x86_64/**/*.asm")))
+    table.extend(kernel_sources, sources(fab.glob("arch/x86_64/**/*.asm")))
 end
 
 -- Includes
 local include_dirs = {
-    builtins.c.include_dir(path("kernel/arch", opt_arch, "include")),
-    builtins.c.include_dir("kernel/include")
+    builtins.c.include_dir(path("arch", opt_arch, "include")),
+    builtins.c.include_dir("include")
 }
 
 -- Flags
@@ -167,7 +167,7 @@ if opt_arch == "x86_64" then
         table.extend(objects, cc:generate(uacpi_sources, cflags_uacpi, include_dirs))
 
         local kernel = linker:link("kernel.elf", objects, {
-            "-T" .. fab.path_rel("kernel/support/link.x86_64.ld"),
+            "-T" .. fab.path_rel("support/link.x86_64.ld"),
             "-znoexecstack"
         })
 
