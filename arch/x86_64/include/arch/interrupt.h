@@ -1,7 +1,8 @@
 #pragma once
 
-#include <stdint.h>
 #include "../../../../include/arch/interrupt.h"
+
+#include <stdint.h>
 
 typedef struct [[gnu::packed]] arch_interrupt_frame {
     uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
