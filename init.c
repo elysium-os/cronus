@@ -23,7 +23,6 @@
 #include "sys/event.h"
 #include "sys/kernel_symbol.h"
 #include "sys/module.h"
-#include "x86_64/profiler.h"
 
 #include <tartarus.h>
 #include <uacpi/uacpi.h>
