@@ -37,13 +37,13 @@ void list_push_back(list_t *list, list_node_t *node) {
 
 list_node_t *list_pop_front(list_t *list) {
     list_node_t *node = list->head;
-    list_node_delete(list, node);
+    if(node != nullptr) list_node_delete(list, node);
     return node;
 }
 
 list_node_t *list_pop_back(list_t *list) {
     list_node_t *node = list->tail;
-    list_node_delete(list, node);
+    if(node != nullptr) list_node_delete(list, node);
     return node;
 }
 
