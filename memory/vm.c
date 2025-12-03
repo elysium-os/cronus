@@ -324,7 +324,7 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
 }
 
 static void rewrite_common(vm_address_space_t *address_space, void *address, size_t length, rewrite_type_t type, vm_protection_t prot, vm_cache_t cache) {
-    LOG_TRACE("VM", "rewrite(as_start: %#lx, address: %#lx, length: %#lx)", address_space->start, (uintptr_t) address, length);
+    LOG_TRACE("VM", "rewrite(as_start: %#lx, address: %#lx, length: %#lx, prot: %c%c%c)", address_space->start, (uintptr_t) address, length, prot.read ? 'R' : '-', prot.write ? 'W' : '-', prot.exec ? 'X' : '-');
     if(length == 0) return;
 
     ASSERT((uintptr_t) address % ARCH_PAGE_GRANULARITY == 0 && length % ARCH_PAGE_GRANULARITY == 0);

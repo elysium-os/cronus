@@ -185,6 +185,8 @@ void arch_ptm_load_address_space(vm_address_space_t *address_space) {
 }
 
 void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t paddr, size_t length, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global) {
+    LOG_TRACE("PTM", "map(as: %#lx-%#lx, vaddr: %#lx, paddr: %#lx, length: %#lx, prot: %c%c%c)", address_space->start, address_space->end, vaddr, paddr, length, prot.read ? 'R' : '-', prot.write ? 'W' : '-', prot.exec ? 'X' : '-');
+
     ASSERT(vaddr % ARCH_PAGE_GRANULARITY == 0);
     ASSERT(paddr % ARCH_PAGE_GRANULARITY == 0);
     ASSERT(length % ARCH_PAGE_GRANULARITY == 0);
@@ -211,6 +213,8 @@ void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t 
 }
 
 void arch_ptm_rewrite(vm_address_space_t *address_space, uintptr_t vaddr, size_t length, vm_protection_t prot, vm_cache_t cache, vm_privilege_t privilege, bool global) {
+    LOG_TRACE("PTM", "rewrite(as: %#lx-%#lx, vaddr: %#lx, length: %#lx, prot: %c%c%c)", address_space->start, address_space->end, vaddr, length, prot.read ? 'R' : '-', prot.write ? 'W' : '-', prot.exec ? 'X' : '-');
+
     ASSERT(vaddr % ARCH_PAGE_GRANULARITY == 0);
     ASSERT(length % ARCH_PAGE_GRANULARITY == 0);
 
@@ -272,6 +276,8 @@ void arch_ptm_rewrite(vm_address_space_t *address_space, uintptr_t vaddr, size_t
 }
 
 void arch_ptm_unmap(vm_address_space_t *address_space, uintptr_t vaddr, size_t length) {
+    LOG_TRACE("PTM", "unmap(as: %#lx-%#lx, vaddr: %#lx, length: %#lx)", address_space->start, address_space->end, vaddr, length);
+
     ASSERT(vaddr % ARCH_PAGE_GRANULARITY == 0);
     ASSERT(length % ARCH_PAGE_GRANULARITY == 0);
 
