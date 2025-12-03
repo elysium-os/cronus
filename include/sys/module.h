@@ -2,6 +2,7 @@
 
 #include "fs/vfs.h"
 #include "lib/list.h"
+#include "memory/vm.h"
 
 #include <stddef.h>
 
@@ -24,6 +25,7 @@ typedef enum {
 typedef struct {
     void *base;
     size_t size;
+    vm_protection_t prot;
     list_node_t list_node;
 } module_region_t;
 

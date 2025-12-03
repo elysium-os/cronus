@@ -97,17 +97,16 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
                     continue;
                 }
 
-                vm_protection_t prot = { .read = true, .write = true }; // TODO: remap memory as unwritable once data is read
-                if((shdrs[i].flags & ELF64_SHF_WRITE) != 0) prot.write = true;
-                if((shdrs[i].flags & ELF64_SHF_EXECINSTR) != 0) prot.exec = true;
-
                 size_t aligned_size = MATH_CEIL(shdrs[i].size, ARCH_PAGE_GRANULARITY);
-                void *addr = vm_map_anon(g_vm_global_address_space, nullptr, aligned_size, prot, VM_CACHE_STANDARD, VM_FLAG_NONE);
+                void *addr = vm_map_anon(g_vm_global_address_space, nullptr, aligned_size, (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_FLAG_NONE);
                 if(addr == nullptr) return MODULE_RESULT_ERR_VM;
 
                 module_region_t *region = heap_alloc(sizeof(module_region_t));
                 region->base = addr;
                 region->size = aligned_size;
+                region->prot.read = true;
+                region->prot.write = (shdrs[i].flags & ELF64_SHF_WRITE) != 0;
+                region->prot.exec = (shdrs[i].flags & ELF64_SHF_EXECINSTR) != 0;
                 list_push(&temp_module->module_regions, &region->list_node);
 
                 res = module_file->ops->rw(module_file, &(vfs_rw_t) { .rw = VFS_RW_READ, .size = shdrs[i].size, .offset = shdrs[i].offset, .buffer = addr }, &read_count);
@@ -179,6 +178,11 @@ module_result_t module_load(vfs_node_t *module_file, PARAM_OUT(module_t **) modu
 
             if(!arch_elf_do_relocation_addend(rela, symbol, section_address)) return MODULE_RESULT_ERR_INVALID_RELOCATION;
         }
+    }
+
+    LIST_ITERATE(&temp_module->module_regions, node) {
+        module_region_t *region = CONTAINER_OF(node, module_region_t, list_node);
+        vm_rewrite_prot(g_vm_global_address_space, region->base, region->size, region->prot);
     }
 
     for(size_t j = 1; j < shdrs[symtab_index].size / shdrs[symtab_index].entsize; j++) {
