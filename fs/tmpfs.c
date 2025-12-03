@@ -1,7 +1,6 @@
 #include "fs/tmpfs.h"
 
 #include "common/assert.h"
-#include "common/log.h"
 #include "fs/vfs.h"
 #include "lib/mem.h"
 #include "lib/string.h"
