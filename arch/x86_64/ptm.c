@@ -237,6 +237,8 @@ void arch_ptm_rewrite(vm_address_space_t *address_space, uintptr_t vaddr, size_t
 
             if(prot.write) entry |= ENTRY_FLAG_RW;
             if(prot.exec) entry &= ~ENTRY_FLAG_NX;
+            __atomic_store_n(&current_table[index], entry, __ATOMIC_SEQ_CST);
+
             current_table = (uint64_t *) HHDM(current_table[index] & ENTRYL_ADDRESS_MASK);
         }
 
