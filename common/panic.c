@@ -7,7 +7,7 @@
 
 [[noreturn]] void panic(const char *tag, const char *fmt, ...) {
     arch_interrupt_disable();
-    log(LOG_LEVEL_FATAL, tag, "Kernel Panic (CPU: %lu)", arch_cpu_id());
+    log(LOG_LEVEL_FATAL, tag, "Kernel Panic (CPU: %lu)", ARCH_CPU_CURRENT_READ(sequential_id));
     va_list list;
     va_start(list, format);
     log_list(LOG_LEVEL_FATAL, tag, fmt, list);

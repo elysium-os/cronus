@@ -13,6 +13,8 @@
 extern nullptr_t ld_init_targets_start[];
 extern nullptr_t ld_init_targets_end[];
 
+cpu_t *g_cpu_list;
+
 init_stage_t g_init_stage_current = INIT_STAGE_BOOT;
 
 static const char *stage_stringify(init_stage_t stage) {
@@ -49,7 +51,7 @@ static void run_init_target(init_target_t *target, bool is_ap) {
     if((is_ap && !target->per_core) || target->completed) return;
 
     if(target->per_core) {
-        log(LOG_LEVEL_DEBUG, "INIT", "Target `%s/%s` (per-core %lu)", stage_stringify(target->stage), target->name, arch_cpu_id());
+        log(LOG_LEVEL_DEBUG, "INIT", "Target `%s/%s` (per-core %lu)", stage_stringify(target->stage), target->name, ARCH_CPU_CURRENT_READ(sequential_id));
     } else {
         log(LOG_LEVEL_DEBUG, "INIT", "Target `%s/%s`", stage_stringify(target->stage), target->name);
     }

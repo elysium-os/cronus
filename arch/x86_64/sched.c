@@ -21,7 +21,6 @@
 #include "sys/event.h"
 #include "sys/init.h"
 #include "sys/interrupt.h"
-#include "x86_64/cpu/cpu.h"
 #include "x86_64/cpu/fpu.h"
 #include "x86_64/cpu/msr.h"
 #include "x86_64/profiler.h"
@@ -99,8 +98,8 @@ static void sched_entry([[maybe_unused]] void *data) {
         arch_ptm_load_address_space(g_vm_global_address_space);
     }
 
-    X86_64_CPU_CURRENT_WRITE(current_thread, next);
-    x86_64_tss_set_rsp0(X86_64_CPU_CURRENT_READ(tss), next->kernel_stack.base);
+    ARCH_CPU_CURRENT_WRITE(arch.current_thread, next);
+    x86_64_tss_set_rsp0(ARCH_CPU_CURRENT_READ(arch.tss), next->kernel_stack.base);
 
     this->state.gs = x86_64_msr_read(X86_64_MSR_KERNEL_GS_BASE);
     this->state.fs = x86_64_msr_read(X86_64_MSR_FS_BASE);
@@ -119,7 +118,7 @@ static sched_t *pick_next_scheduler() {
     // TODO: this is NOT a good way of doing this
     static size_t current_cpu_id = 0;
     size_t cpu_id = __atomic_fetch_add(&current_cpu_id, 1, __ATOMIC_RELAXED);
-    return &g_x86_64_cpus[cpu_id % g_cpu_count].common.sched;
+    return &g_cpu_list[cpu_id % g_cpu_count].sched;
 }
 
 static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *scheduler, x86_64_thread_stack_t kernel_stack, uintptr_t rsp) {
@@ -144,7 +143,7 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
 
     {
         interrupt_state_t previous_state = interrupt_state_mask();
-        x86_64_thread_t *current_thread = X86_64_CPU_CURRENT_THREAD();
+        x86_64_thread_t *current_thread = ARCH_CPU_CURRENT_THREAD();
         if(current_thread != nullptr && current_thread->state.fpu_area != nullptr) g_x86_64_fpu_save(current_thread->state.fpu_area);
         g_x86_64_fpu_restore(thread->state.fpu_area);
         uint16_t x87cw = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (0b11 << 8);
@@ -189,7 +188,7 @@ thread_t *arch_sched_thread_create_user(process_t *proc, uintptr_t ip, uintptr_t
 }
 
 thread_t *arch_sched_thread_current() {
-    x86_64_thread_t *thread = X86_64_CPU_CURRENT_THREAD();
+    x86_64_thread_t *thread = ARCH_CPU_CURRENT_THREAD();
     ASSERT(thread != nullptr);
     return &thread->common;
 }

@@ -46,8 +46,8 @@ static int find_vector(interrupt_priority_t priority) {
     bool is_outmost_handler = false;
 
     if(is_threaded) {
-        is_outmost_handler = !X86_64_CPU_CURRENT_THREAD()->in_interrupt_handler;
-        if(is_outmost_handler) X86_64_CPU_CURRENT_THREAD()->in_interrupt_handler = true;
+        is_outmost_handler = !ARCH_CPU_CURRENT_THREAD()->in_interrupt_handler;
+        if(is_outmost_handler) ARCH_CPU_CURRENT_THREAD()->in_interrupt_handler = true;
 
         sched_preempt_inc();
         dw_status_disable();
@@ -71,7 +71,7 @@ static int find_vector(interrupt_priority_t priority) {
 
         // Ensure preemption and dw is enabled if we return to userspace
         ASSERT(!X86_64_INTERRUPT_IS_FROM_USER(frame) || (ARCH_CPU_CURRENT_READ(sched.status.preempt_counter) == 0 && ARCH_CPU_CURRENT_READ(flags.deferred_work_status) == 0));
-        if(is_outmost_handler) X86_64_CPU_CURRENT_THREAD()->in_interrupt_handler = false;
+        if(is_outmost_handler) ARCH_CPU_CURRENT_THREAD()->in_interrupt_handler = false;
     }
 }
 

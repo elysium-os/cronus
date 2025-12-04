@@ -123,7 +123,7 @@ void *slab_allocate(slab_cache_t *cache) {
     if(!cache->cpu_cache_enabled) return slab_direct_alloc(cache);
 
     sched_preempt_inc();
-    slab_cache_cpu_t *cc = &cache->cpu_cache[arch_cpu_id()];
+    slab_cache_cpu_t *cc = &cache->cpu_cache[ARCH_CPU_CURRENT_READ(sequential_id)];
     spinlock_acquire_nodw(&cc->lock);
     sched_preempt_dec();
 
@@ -160,7 +160,7 @@ void slab_free(slab_cache_t *cache, void *obj) {
     if(!cache->cpu_cache_enabled) return slab_direct_free(cache, obj);
 
     sched_preempt_inc();
-    slab_cache_cpu_t *cc = &cache->cpu_cache[arch_cpu_id()];
+    slab_cache_cpu_t *cc = &cache->cpu_cache[ARCH_CPU_CURRENT_READ(sequential_id)];
     spinlock_acquire_nodw(&cc->lock);
     sched_preempt_dec();
 

@@ -1,17 +1,17 @@
 #include "arch/event.h"
 
+#include "arch/cpu.h"
 #include "common/log.h"
 #include "common/panic.h"
 #include "lib/math.h"
 #include "sys/event.h"
 #include "sys/init.h"
-#include "x86_64/cpu/cpu.h"
 #include "x86_64/cpu/lapic.h"
 
 static int g_event_interrupt_vector = -1;
 
 void arch_event_timer_arm(time_t delay) {
-    uint64_t ticks = MATH_CLAMP(X86_64_CPU_CURRENT_READ(lapic_timer_frequency) * delay / TIME_NANOSECONDS_IN_SECOND, 1ull, UINT32_MAX);
+    uint64_t ticks = MATH_CLAMP(ARCH_CPU_CURRENT_READ(arch.lapic_timer_frequency) * delay / TIME_NANOSECONDS_IN_SECOND, 1ull, UINT32_MAX);
     LOG_TRACE("EVENT", "Timer arm %lu (ticks: %lu)", delay, ticks);
     x86_64_lapic_timer_start(ticks);
 }

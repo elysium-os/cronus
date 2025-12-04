@@ -10,7 +10,6 @@
 #include "memory/heap.h"
 #include "sys/cpu.h"
 #include "sys/init.h"
-#include "x86_64/cpu/cpu.h"
 #include "x86_64/cpu/lapic.h"
 #include "x86_64/interrupt.h"
 
@@ -34,7 +33,7 @@ static void invalidate(uintptr_t addr, size_t length) {
 static void tlb_shootdown_handler(arch_interrupt_frame_t *) {
     interrupt_state_t prev_state = spinlock_acquire_noint(&g_status_lock);
 
-    if(g_shootdown_status[X86_64_CPU_CURRENT_READ(sequential_id)]) {
+    if(g_shootdown_status[ARCH_CPU_CURRENT_READ(sequential_id)]) {
         spinlock_release_noint(&g_status_lock, prev_state);
         return;
     }
@@ -42,7 +41,7 @@ static void tlb_shootdown_handler(arch_interrupt_frame_t *) {
     uintptr_t address = g_shootdown_address;
     size_t length = g_shootdown_length;
 
-    __atomic_store_n(&g_shootdown_status[X86_64_CPU_CURRENT_READ(sequential_id)], true, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_shootdown_status[ARCH_CPU_CURRENT_READ(sequential_id)], true, __ATOMIC_RELEASE);
     spinlock_release_noint(&g_status_lock, prev_state);
 
     invalidate(address, length);
@@ -77,12 +76,12 @@ void x86_64_tlb_shootdown(uintptr_t addr, size_t length) {
         if(time - last > RETRY_AFTER_NS) {
             last = time;
             for(size_t i = 0; i < g_cpu_count; i++) {
-                x86_64_cpu_t *cpu = &g_x86_64_cpus[i];
-                if(cpu == X86_64_CPU_CURRENT_READ(self)) continue;
+                cpu_t *cpu = &g_cpu_list[i];
+                if(cpu == ARCH_CPU_CURRENT_READ(self)) continue;
 
                 if(__atomic_load_n(&g_shootdown_status[cpu->sequential_id], __ATOMIC_ACQUIRE)) continue;
 
-                x86_64_lapic_ipi(cpu->lapic_id, g_shootdown_vector | X86_64_LAPIC_IPI_ASSERT);
+                x86_64_lapic_ipi(cpu->arch.lapic_id, g_shootdown_vector | X86_64_LAPIC_IPI_ASSERT);
             }
         };
 
