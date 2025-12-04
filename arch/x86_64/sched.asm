@@ -1,5 +1,3 @@
-%define THREAD_RSP_OFFSET 0
-
 global x86_64_sched_context_switch
 x86_64_sched_context_switch:
     push rbx

@@ -8,12 +8,12 @@ local opt_build_kernel = fab.option("build_kernel", { "yes", "no" }) or "yes"
 local opt_build_modules = fab.option("build_modules", "string") or ""
 
 -- Sources
-local kernel_sources = sources(fab.glob("**/*.c", "arch/**", "modules/**"))
+local kernel_sources = sources(fab.glob("**/*.c", "arch/**", "modules/**", "**/support/**"))
 
-table.extend(kernel_sources, sources(fab.glob(path("arch", opt_arch, "**/*.c"))))
+table.extend(kernel_sources, sources(fab.glob(path("arch", opt_arch, "**/*.c"), "**/support/**")))
 
 if opt_arch == "x86_64" then
-    table.extend(kernel_sources, sources(fab.glob("arch/x86_64/**/*.asm")))
+    table.extend(kernel_sources, sources(fab.glob("arch/x86_64/**/*.asm", "**/support/**")))
 end
 
 -- Includes
@@ -38,11 +38,13 @@ local c_flags = {
     "-Wimplicit-fallthrough",
     "-Wmissing-field-initializers",
 
+    "-fdiagnostics-color=always"
+}
+
+local c_env_flags = {
     "-D__VERSION=" .. version,
     "-D__ARCH_" .. opt_arch:upper(),
     "-D__ARCH=" .. opt_arch,
-
-    "-fdiagnostics-color=always"
 }
 
 table.extend(c_flags, {
@@ -55,6 +57,9 @@ if opt_build_type == "release" then
     table.extend(c_flags, {
         "-O3",
         "-flto",
+    })
+
+    table.extend(c_env_flags, {
         "-D__ENV_PRODUCTION",
         "-D__ENV=production"
     })
@@ -68,6 +73,9 @@ if opt_build_type == "debug" then
         "-finstrument-functions",
         "-fno-lto",
         "-fno-omit-frame-pointer",
+    })
+
+    table.extend(c_env_flags, {
         "-D__ENV_DEVELOPMENT",
         "-D__ENV=development"
     })
@@ -136,6 +144,19 @@ if opt_arch == "x86_64" then
     --- Includes
     table.insert(include_dirs, builtins.c.include_dir(path(freestanding_c_headers.path, "x86_64/include")))
 
+    -- ASM GEN
+    local asmgen = cc:compile("x86_64_asmgen", sources("arch/x86_64/support/asmgen.c"),
+        { "-std=gnu23", table.unpack(c_env_flags) },
+        include_dirs)
+
+    local asmgen_rule = fab.rule({
+        name = "asmgen",
+        description = "Generating X86_64 assembly includes",
+        command = { fab.get_executable(asmgen), "@OUT@" },
+    })
+
+    local asmgen_includes = asmgen_rule:build("x86_64_asm_defs.rsp", {}, {}, { asmgen })
+
     -- Flags
     table.extend(c_flags, {
         "--target=x86_64-none-elf",
@@ -148,11 +169,18 @@ if opt_arch == "x86_64" then
         table.insert(c_flags, "-fno-sanitize=alignment")
     end
 
-    local nasm_flags = { "-f", "elf64", "-Werror" }
+    local nasm_flags = { "-f", "elf64", "-Werror", "-@", asmgen_includes.path }
 
-    local cflags_kernel = { "-mcmodel=kernel", table.unpack(c_flags) }
+    local cflags_kernel = { "-mcmodel=kernel" }
+    table.extend(cflags_kernel, c_flags)
+    table.extend(cflags_kernel, c_env_flags)
+
+    local cflags_module = { "-mcmodel=large", "-fno-pic" }
+    table.extend(cflags_module, c_flags)
+    table.extend(cflags_module, c_env_flags)
+
     local cflags_uacpi = table.shallow_clone(cflags_kernel)
-    local cflags_module = { "-mcmodel=large", "-fno-pic", table.unpack(c_flags) }
+
     if opt_build_type == "debug" then
         table.insert(cflags_kernel, "-Werror")
         table.insert(cflags_module, "-Werror")
@@ -162,7 +190,7 @@ if opt_arch == "x86_64" then
     if opt_build_kernel == "yes" then
         local objects = builtins.generate(kernel_sources, {
             c = function(sources) return cc:generate(sources, cflags_kernel, include_dirs) end,
-            asm = function(sources) return nasm:generate(sources, nasm_flags) end
+            asm = function(sources) return nasm:generate(sources, nasm_flags, { asmgen_includes }) end
         })
         table.extend(objects, cc:generate(uacpi_sources, cflags_uacpi, include_dirs))
 

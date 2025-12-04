@@ -1,7 +1,3 @@
-%define CURRENT_THREAD_OFFSET 48
-%define SYSCALL_RSP_OFFSET 8
-%define KERNEL_STACK_BASE_OFFSET 16
-
 extern syscall_exit
 extern syscall_debug
 extern syscall_system_info
