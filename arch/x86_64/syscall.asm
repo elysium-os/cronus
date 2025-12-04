@@ -20,9 +20,9 @@ global x86_64_syscall_entry
 x86_64_syscall_entry:
     swapgs
 
-    mov r15, qword [gs:CURRENT_THREAD_OFFSET]
-    mov qword [r15 + SYSCALL_RSP_OFFSET], rsp
-    mov rsp, qword [r15 + KERNEL_STACK_BASE_OFFSET]
+    mov r15, qword [gs:ASMGEN_CURRENT_THREAD_OFFSET]
+    mov qword [r15 + ASMGEN_SYSCALL_RSP_OFFSET], rsp
+    mov rsp, qword [r15 + ASMGEN_KERNEL_STACK_BASE_OFFSET]
 
     push rcx
     push rdx
@@ -75,7 +75,7 @@ x86_64_syscall_entry:
     pop rdx
     pop rcx
 
-    mov rsp, qword [r15 + SYSCALL_RSP_OFFSET]
+    mov rsp, qword [r15 + ASMGEN_SYSCALL_RSP_OFFSET]
     xor r15, r15
 
     swapgs

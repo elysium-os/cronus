@@ -7,8 +7,8 @@ x86_64_sched_context_switch:
     push r13
     push r12
 
-    mov qword [rdi + THREAD_RSP_OFFSET], rsp
-    mov rsp, qword [rsi + THREAD_RSP_OFFSET]
+    mov qword [rdi + ASMGEN_THREAD_RSP_OFFSET], rsp
+    mov rsp, qword [rsi + ASMGEN_THREAD_RSP_OFFSET]
 
     xor r12, r12
     mov ds, r12

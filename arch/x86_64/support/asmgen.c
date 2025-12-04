@@ -23,10 +23,10 @@ int main(int argc, char **argv) {
         const char *key;
         size_t value;
     } defines[] = {
-        { .key = "CURRENT_THREAD_OFFSET",    .value = offsetof(x86_64_cpu_t,    current_thread) },
-        { .key = "THREAD_RSP_OFFSET",        .value = offsetof(x86_64_thread_t, rsp)            },
-        { .key = "SYSCALL_RSP_OFFSET",       .value = offsetof(x86_64_thread_t, syscall_rsp)    },
-        { .key = "KERNEL_STACK_BASE_OFFSET", .value = offsetof(x86_64_thread_t, kernel_stack)   },
+        { .key = "ASMGEN_CURRENT_THREAD_OFFSET",    .value = offsetof(x86_64_cpu_t,    current_thread) },
+        { .key = "ASMGEN_THREAD_RSP_OFFSET",        .value = offsetof(x86_64_thread_t, rsp)            },
+        { .key = "ASMGEN_SYSCALL_RSP_OFFSET",       .value = offsetof(x86_64_thread_t, syscall_rsp)    },
+        { .key = "ASMGEN_KERNEL_STACK_BASE_OFFSET", .value = offsetof(x86_64_thread_t, kernel_stack)   },
     };
 
     for(size_t i = 0; i < sizeof(defines) / sizeof(*defines); i++) {
