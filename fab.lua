@@ -195,7 +195,7 @@ if opt_arch == "x86_64" then
         table.extend(objects, cc:generate(uacpi_sources, cflags_uacpi, include_dirs))
 
         local kernel = linker:link("kernel.elf", objects, {
-            "-T" .. fab.path_rel("support/link.x86_64.ld"),
+            "-T" .. fab.path_rel("arch/x86_64/support/link.ld"),
             "-znoexecstack"
         })
 
