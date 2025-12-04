@@ -77,7 +77,7 @@ typedef struct {
     struct type_descriptor_t *type;
 } data_function_type_mismatch_t;
 
-const char *kind_to_type(uint16_t kind) {
+[[clang::no_sanitize("undefined")]] const char *kind_to_type(uint16_t kind) {
     const char *type;
     switch(kind) {
         case 0:  type = "integer"; break;
@@ -87,31 +87,31 @@ const char *kind_to_type(uint16_t kind) {
     return type;
 }
 
-unsigned int info_to_bits(uint16_t info) {
+[[clang::no_sanitize("undefined")]] unsigned int info_to_bits(uint16_t info) {
     return 1 << (info >> 1);
 }
 
-void __ubsan_handle_load_invalid_value(data_load_invalid_value_t *data, uintptr_t value) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_load_invalid_value(data_load_invalid_value_t *data, uintptr_t value) {
     log(LOG_LEVEL_WARN, "UBSAN", "load_invalid_value @ %s:%u:%u {value: %#lx}", data->location.filename, data->location.line, data->location.column, value);
 }
 
-void __ubsan_handle_nonnull_arg(data_nonnull_arg_t *data) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_nonnull_arg(data_nonnull_arg_t *data) {
     log(LOG_LEVEL_WARN, "UBSAN", "handle_nonnull_arg @ %s:%u:%u {arg_index: %i}", data->location.filename, data->location.line, data->location.column, data->arg_index);
 }
 
-void __ubsan_handle_nullability_arg(data_nonnull_arg_t *data) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_nullability_arg(data_nonnull_arg_t *data) {
     log(LOG_LEVEL_WARN, "UBSAN", "nullability_arg @ %s:%u:%u {arg_index: %i}", data->location.filename, data->location.line, data->location.column, data->arg_index);
 }
 
-void __ubsan_handle_nonnull_return_v1(data_only_location_t *data [[maybe_unused]], source_location_t *location) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_nonnull_return_v1(data_only_location_t *data [[maybe_unused]], source_location_t *location) {
     log(LOG_LEVEL_WARN, "UBSAN", "nonnull_return @ %s:%u:%u", location->filename, location->line, location->column);
 }
 
-void __ubsan_handle_nullability_return_v1(data_only_location_t *data [[maybe_unused]], source_location_t *location) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_nullability_return_v1(data_only_location_t *data [[maybe_unused]], source_location_t *location) {
     log(LOG_LEVEL_WARN, "UBSAN", "nullability_return @ %s:%u:%u", location->filename, location->line, location->column);
 }
 
-void __ubsan_handle_vla_bound_not_positive(data_location_type_t *data, uintptr_t bound) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_vla_bound_not_positive(data_location_type_t *data, uintptr_t bound) {
     log(LOG_LEVEL_WARN,
         "UBSAN",
         "vla_bound_not_positive @ %s:%u:%u {bound: %#lx, type: %u-bit %s %s}",
@@ -124,7 +124,7 @@ void __ubsan_handle_vla_bound_not_positive(data_location_type_t *data, uintptr_t
         data->type->name);
 }
 
-void __ubsan_handle_add_overflow(data_location_type_t *data, uintptr_t lhs, uintptr_t rhs) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_add_overflow(data_location_type_t *data, uintptr_t lhs, uintptr_t rhs) {
     log(LOG_LEVEL_WARN,
         "UBSAN",
         "add_overflow @ %s:%u:%u {lhs: %#lx, rhs: %#lx, type: %u-bit %s %s}",
@@ -138,7 +138,7 @@ void __ubsan_handle_add_overflow(data_location_type_t *data, uintptr_t lhs, uint
         data->type->name);
 }
 
-void __ubsan_handle_sub_overflow(data_location_type_t *data, uintptr_t lhs, uintptr_t rhs) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_sub_overflow(data_location_type_t *data, uintptr_t lhs, uintptr_t rhs) {
     log(LOG_LEVEL_WARN,
         "UBSAN",
         "sub_overflow @ %s:%u:%u {lhs: %#lx, rhs: %#lx, type: %u-bit %s %s}",
@@ -152,7 +152,7 @@ void __ubsan_handle_sub_overflow(data_location_type_t *data, uintptr_t lhs, uint
         data->type->name);
 }
 
-void __ubsan_handle_mul_overflow(data_location_type_t *data, uintptr_t lhs, uintptr_t rhs) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_mul_overflow(data_location_type_t *data, uintptr_t lhs, uintptr_t rhs) {
     log(LOG_LEVEL_WARN,
         "UBSAN",
         "mul_overflow @ %s:%u:%u {lhs: %#lx, rhs: %#lx, type: %u-bit %s %s}",
@@ -166,7 +166,7 @@ void __ubsan_handle_mul_overflow(data_location_type_t *data, uintptr_t lhs, uint
         data->type->name);
 }
 
-void __ubsan_handle_divrem_overflow(data_location_type_t *data, uintptr_t lhs, uintptr_t rhs) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_divrem_overflow(data_location_type_t *data, uintptr_t lhs, uintptr_t rhs) {
     log(LOG_LEVEL_WARN,
         "UBSAN",
         "divrem_overflow @ %s:%u:%u {lhs: %#lx, rhs: %#lx, type: %u-bit %s %s}",
@@ -180,20 +180,12 @@ void __ubsan_handle_divrem_overflow(data_location_type_t *data, uintptr_t lhs, u
         data->type->name);
 }
 
-void __ubsan_handle_negate_overflow(data_location_type_t *data, uintptr_t old) {
-    log(LOG_LEVEL_WARN,
-        "UBSAN",
-        "negate_overflow @ %s:%u:%u {old: %#lx, type: %u-bit %s %s}",
-        data->location.filename,
-        data->location.line,
-        data->location.column,
-        old,
-        info_to_bits(data->type->info),
-        kind_to_type(data->type->kind),
-        data->type->name);
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_negate_overflow(data_location_type_t *data, uintptr_t old) {
+    log(LOG_LEVEL_WARN, "UBSAN", "negate_overflow @ %s:%u:%u {old: %#lx, type: %u-bit %s %s}", data->location.filename, data->location.line, data->location.column, old, info_to_bits(data->type->info), kind_to_type(data->type->kind), data->type->name
+    );
 }
 
-void __ubsan_handle_shift_out_of_bounds(data_shift_out_of_bounds_t *data, uintptr_t lhs, uintptr_t rhs) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_shift_out_of_bounds(data_shift_out_of_bounds_t *data, uintptr_t lhs, uintptr_t rhs) {
     log(LOG_LEVEL_WARN,
         "UBSAN",
         "shift_out_of_bounds @ %s:%u:%u {lhs: %#lx, rhs: %#lx, rhs_type: %u-bit %s %s, lhs_type: %u-bit %s %s}",
@@ -210,7 +202,7 @@ void __ubsan_handle_shift_out_of_bounds(data_shift_out_of_bounds_t *data, uintpt
         data->lhs_type->name);
 }
 
-void __ubsan_handle_out_of_bounds(data_out_of_bounds_t *data, uint64_t index) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_out_of_bounds(data_out_of_bounds_t *data, uint64_t index) {
     log(LOG_LEVEL_WARN,
         "UBSAN",
         "out_of_bounds @ %s:%u:%u {index: %#lx, array_type: %u-bit %s %s, index_type: %u-bit %s %s}",
@@ -226,7 +218,7 @@ void __ubsan_handle_out_of_bounds(data_out_of_bounds_t *data, uint64_t index) {
         data->index_type->name);
 }
 
-void __ubsan_handle_type_mismatch_v1(data_type_mismatch_t *data, void *pointer) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_type_mismatch_v1(data_type_mismatch_t *data, void *pointer) {
     static const char *kind_strs[] = { "load of",     "store to",  "reference binding to",    "member access within", "member call on",      "constructor call on", "downcast of",
                                        "downcast of", "upcast of", "cast to virtual base of", "nonnull binding to",   "dynamic operation on" };
 
@@ -247,11 +239,11 @@ void __ubsan_handle_type_mismatch_v1(data_type_mismatch_t *data, void *pointer) 
     }
 }
 
-void __ubsan_handle_alignment_assumption(data_alignment_assumption_t *data, void *, void *, void *) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_alignment_assumption(data_alignment_assumption_t *data, void *, void *, void *) {
     log(LOG_LEVEL_WARN, "UBSAN", "alignment_assumption @ %s:%u:%u", data->location.filename, data->location.line, data->location.column);
 }
 
-void __ubsan_handle_implicit_conversion(data_implicit_conversion_t *data, void *, void *) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_implicit_conversion(data_implicit_conversion_t *data, void *, void *) {
     log(LOG_LEVEL_WARN,
         "UBSAN",
         "implicit_conversion @ %s:%u:%u {from_type: %u-bit %s %s, to_type: %u-bit %s %s}",
@@ -266,22 +258,22 @@ void __ubsan_handle_implicit_conversion(data_implicit_conversion_t *data, void *
         data->to_type->name);
 }
 
-void __ubsan_handle_invalid_builtin(data_invalid_builtin_t *data) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_invalid_builtin(data_invalid_builtin_t *data) {
     log(LOG_LEVEL_WARN, "UBSAN", "invalid_builtin @ %s:%u:%u", data->location.filename, data->location.line, data->location.column);
 }
 
-void __ubsan_handle_pointer_overflow(data_only_location_t *data, void *, void *) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_pointer_overflow(data_only_location_t *data, void *, void *) {
     log(LOG_LEVEL_WARN, "UBSAN", "pointer_overflow @ %s:%u:%u", data->location.filename, data->location.line, data->location.column);
 }
 
-[[noreturn]] void __ubsan_handle_builtin_unreachable(data_only_location_t *data) {
+[[clang::no_sanitize("undefined"), noreturn]] void __ubsan_handle_builtin_unreachable(data_only_location_t *data) {
     panic("UBSAN", "builtin_unreachable @ %s:%u:%u", data->location.filename, data->location.line, data->location.column);
 }
 
-[[noreturn]] void __ubsan_handle_missing_return(data_only_location_t *data) {
+[[clang::no_sanitize("undefined"), noreturn]] void __ubsan_handle_missing_return(data_only_location_t *data) {
     panic("UBSAN", "missing_return @ %s:%u:%u", data->location.filename, data->location.line, data->location.column);
 }
 
-void __ubsan_handle_function_type_mismatch(data_function_type_mismatch_t *data, [[maybe_unused]] void *value) {
+[[clang::no_sanitize("undefined")]] void __ubsan_handle_function_type_mismatch(data_function_type_mismatch_t *data, [[maybe_unused]] void *value) {
     log(LOG_LEVEL_WARN, "UBSAN", "function type mismatch @ %s:%u:%u", data->location.filename, data->location.line, data->location.column);
 }
