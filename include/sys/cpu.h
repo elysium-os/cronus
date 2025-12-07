@@ -1,28 +1,30 @@
 #pragma once
 
-#include "arch/cpu_data.h"
-#include "lib/list.h"
-#include "sched/sched.h"
+#include "arch/cpu.h"
+#include "common/attr.h"
 
 #include <stdint.h>
 
-typedef struct cpu {
-    struct cpu *self;
+#define CPU_LOCAL_PTR(VAR, TYPE)                                                                                         \
+    ({                                                                                                                   \
+        static_assert(__builtin_types_compatible_p(typeof(VAR), TYPE));                                                  \
+        (TYPE *) (ATOMIC_LOAD(&gc_cpu_self, ATOMIC_RELAXED) + (uintptr_t) (&VAR) - (uintptr_t) ld_cpu_local_init_start); \
+    })
 
-    size_t sequential_id;
+typedef struct {
+    ATTR(atomic) bool in_interrupt_hard;
+    ATTR(atomic) bool in_interrupt_soft;
+    ATTR(atomic) size_t deferred_work_status;
+    ATTR(atomic) bool threaded;
+} cpu_flags_t;
 
-    sched_t sched;
-    rb_tree_t events;
-    rb_tree_t free_events; // Events to be freed
-    list_t dw_items;
-    struct {
-        uint32_t deferred_work_status;
-        bool threaded;
-        bool in_interrupt_hard;
-        bool in_interrupt_soft;
-    } flags;
-    arch_cpu_data_t arch;
-} cpu_t;
+extern nullptr_t ld_cpu_local_init_start[];
+extern nullptr_t ld_cpu_local_init_end[];
+extern nullptr_t ld_cpu_local_bsp_start[];
+extern nullptr_t ld_cpu_local_bsp_end[];
+
+ATTR(cpu_local, atomic) uintptr_t gc_cpu_self;
+ATTR(cpu_local, atomic) size_t gc_cpu_sequential_id;
+ATTR(cpu_local) cpu_flags_t gc_cpu_flags;
 
 extern size_t g_cpu_count;
-extern cpu_t *g_cpu_list;

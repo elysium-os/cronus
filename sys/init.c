@@ -1,9 +1,9 @@
 #include "sys/init.h"
 
-#include "arch/cpu.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "lib/string.h"
+#include "sys/cpu.h"
 
 #include <stddef.h>
 
@@ -12,8 +12,6 @@
 
 extern nullptr_t ld_init_targets_start[];
 extern nullptr_t ld_init_targets_end[];
-
-cpu_t *g_cpu_list;
 
 init_stage_t g_init_stage_current = INIT_STAGE_BOOT;
 
@@ -51,7 +49,7 @@ static void run_init_target(init_target_t *target, bool is_ap) {
     if((is_ap && !target->per_core) || target->completed) return;
 
     if(target->per_core) {
-        log(LOG_LEVEL_DEBUG, "INIT", "Target `%s/%s` (per-core %lu)", stage_stringify(target->stage), target->name, ARCH_CPU_CURRENT_READ(sequential_id));
+        log(LOG_LEVEL_DEBUG, "INIT", "Target `%s/%s` (per-core %lu)", stage_stringify(target->stage), target->name, gc_cpu_sequential_id);
     } else {
         log(LOG_LEVEL_DEBUG, "INIT", "Target `%s/%s`", stage_stringify(target->stage), target->name);
     }

@@ -19,11 +19,13 @@ SECTIONS
         *(.text .text.*)
     } :text
 
-    . += CONSTANT(MAXPAGESIZE);
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     .rodata : {
         *(.rodata .rodata.*)
     } :rodata
+
+    . = ALIGN(8);
 
     ld_cpu_local_init_start = .;
 
@@ -33,7 +35,7 @@ SECTIONS
 
     ld_cpu_local_init_end = .;
 
-    . += CONSTANT(MAXPAGESIZE);
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     .data : {
         *(.data .data.*)
@@ -43,6 +45,12 @@ SECTIONS
         *(COMMON)
         *(.bss .bss.*)
     } :data
+
+    . = ALIGN(8);
+
+    ld_cpu_local_bsp_start = .;
+    . += ld_cpu_local_init_end - ld_cpu_local_init_start;
+    ld_cpu_local_bsp_end = .;
 
     ld_init_targets_start = .;
 

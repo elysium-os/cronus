@@ -170,11 +170,6 @@ static void initialize_cpu() {
     ASSERT_UNREACHABLE();
 }
 
-void arch_init_bsp_local(size_t seqid) {
-    initialize_cpu_local(&g_early_bsp, seqid);
-    x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
-}
-
 void arch_init_bsp() {
     initialize_cpu();
 }

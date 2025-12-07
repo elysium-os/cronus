@@ -3,9 +3,6 @@
 #include <stddef.h>
 #include <tartarus.h>
 
-/// Initialize the bsp (early cpu local).
-void arch_init_bsp_local(size_t seqid);
-
 /// Initialize the bsp (cpu state).
 void arch_init_bsp();
 

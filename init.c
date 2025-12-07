@@ -1,5 +1,6 @@
 #include "sys/init.h"
 
+#include "arch/cpu.h"
 #include "arch/init.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
@@ -20,6 +21,7 @@
 #include "memory/pmm.h"
 #include "memory/vm.h"
 #include "sched/reaper.h"
+#include "sys/cpu.h"
 #include "sys/event.h"
 #include "sys/kernel_symbol.h"
 #include "sys/module.h"
@@ -39,13 +41,20 @@ static void thread_init() {
 }
 
 [[gnu::no_instrument_function]] [[noreturn]] void init(tartarus_boot_info_t *boot_info) {
-    arch_init_bsp_local(boot_info->cpus[boot_info->bsp_index].sequential_id);
+    memcpy(ld_cpu_local_bsp_start, ld_cpu_local_init_start, (uintptr_t) ld_cpu_local_init_end - (uintptr_t) ld_cpu_local_init_start);
+    arch_cpu_local_write(ld_cpu_local_bsp_start);
+
+    ATOMIC_STORE(&gc_cpu_sequential_id, boot_info->cpus[boot_info->bsp_index].sequential_id, ATOMIC_RELAXED);
+
     event_init_cpu_local();
     arch_init_bsp();
 
     init_stage(INIT_STAGE_BOOT, false);
 
     log(LOG_LEVEL_INFO, "INIT", "Elysium " MACROS_STRINGIFY(__ARCH) " " MACROS_STRINGIFY(__VERSION) " (" __DATE__ " " __TIME__ ")");
+
+    log(LOG_LEVEL_INFO, "INIT", "CPU Local Size: %lu", (uintptr_t) ld_cpu_local_init_end - (uintptr_t) ld_cpu_local_init_start);
+    log(LOG_LEVEL_INFO, "INIT", "CPU BSP Size: %lu", (uintptr_t) ld_cpu_local_bsp_end - (uintptr_t) ld_cpu_local_bsp_start);
 
     // Initialize HHDM
     ASSERT(boot_info->hhdm_offset % ARCH_PAGE_GRANULARITY == 0 && boot_info->hhdm_offset % ARCH_PAGE_GRANULARITY == 0);

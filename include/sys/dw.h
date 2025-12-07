@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/attr.h"
 #include "lib/list.h"
 
 typedef void (*dw_function_t)(void *data);
@@ -9,6 +10,8 @@ typedef struct {
     void *data;
     list_node_t list_node;
 } dw_item_t;
+
+ATTR(cpu_local, atomic) size_t gc_dw_deferred_work_status;
 
 /// Create an item of deferred work.
 dw_item_t *dw_create(dw_function_t fn, void *data);

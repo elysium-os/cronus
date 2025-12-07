@@ -1,21 +1,23 @@
 #include "sys/dw.h"
 
-#include "arch/cpu.h"
 #include "common/assert.h"
 #include "lib/barrier.h"
 #include "lib/container.h"
 #include "memory/slab.h"
+#include "sched/sched.h"
+#include "sys/cpu.h"
 #include "sys/init.h"
 
 #include <stdint.h>
 
 static slab_cache_t *g_item_cache;
+ATTR(cpu_local) list_t gc_dw_items;
+ATTR(cpu_local, atomic) size_t gc_dw_deferred_work_status;
 
 static bool dw_enable() {
     BARRIER;
-    size_t status = ARCH_CPU_CURRENT_READ(flags.deferred_work_status);
+    size_t status = ATOMIC_FETCH_SUB(&gc_dw_deferred_work_status, 1, ATOMIC_ACQUIRE);
     ASSERT(status > 0);
-    ARCH_CPU_CURRENT_DEC(flags.deferred_work_status);
     return status == 1;
 }
 
@@ -29,7 +31,7 @@ dw_item_t *dw_create(dw_function_t fn, void *data) {
 void dw_queue(dw_item_t *item) {
     sched_preempt_inc();
     dw_status_disable();
-    list_push(&ARCH_CPU_CURRENT_PTR()->dw_items, &item->list_node);
+    list_push(CPU_LOCAL_PTR(gc_dw_items, list_t), &item->list_node);
     dw_enable();
     sched_preempt_dec();
 }
@@ -38,13 +40,12 @@ void dw_process() {
     dw_status_disable();
 repeat:
     sched_preempt_inc();
-    cpu_t *current_cpu = ARCH_CPU_CURRENT_PTR();
-    if(current_cpu->dw_items.count == 0) {
+    if(gc_dw_items.count == 0) {
         sched_preempt_dec();
         dw_enable();
         return;
     }
-    dw_item_t *dw_item = CONTAINER_OF(list_pop(&current_cpu->dw_items), dw_item_t, list_node);
+    dw_item_t *dw_item = CONTAINER_OF(list_pop(CPU_LOCAL_PTR(gc_dw_items, list_t)), dw_item_t, list_node);
     sched_preempt_dec();
 
     dw_item->fn(dw_item->data);
@@ -54,8 +55,8 @@ repeat:
 }
 
 void dw_status_disable() {
-    ASSERT(ARCH_CPU_CURRENT_READ(flags.deferred_work_status) < UINT32_MAX);
-    ARCH_CPU_CURRENT_INC(flags.deferred_work_status);
+    size_t prev_status = ATOMIC_FETCH_ADD(&gc_dw_deferred_work_status, 1, ATOMIC_RELEASE);
+    ASSERT(prev_status < UINT32_MAX);
     BARRIER;
 }
 

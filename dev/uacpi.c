@@ -1,7 +1,7 @@
 #include "arch/cpu.h"
+#include "arch/interrupt.h"
 #include "arch/page.h"
 #include "arch/time.h"
-#include "arch/interrupt.h"
 #include "common/assert.h"
 #include "common/lock/mutex.h"
 #include "common/log.h"
@@ -12,6 +12,7 @@
 #include "lib/mem.h"
 #include "lib/string.h"
 #include "memory/heap.h"
+#include "memory/vm.h"
 #include "sys/time.h"
 
 #include <uacpi/kernel_api.h>
