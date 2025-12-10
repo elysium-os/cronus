@@ -1,5 +1,4 @@
 #include "arch/page.h"
-#include "arch/ptm.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "memory/hhdm.h"
