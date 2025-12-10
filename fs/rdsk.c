@@ -87,7 +87,7 @@ static vfs_node_t *get_dir_vfs_node(vfs_t *vfs, rdsk_index_t index) {
     info_t *info = (info_t *) vfs->private_data;
     if(info->dir_cache[index - 1]) return info->dir_cache[index - 1];
     vfs_node_t *node = heap_alloc(sizeof(vfs_node_t));
-    memset(node, 0, sizeof(vfs_node_t));
+    mem_set(node, 0, sizeof(vfs_node_t));
     node->vfs = vfs;
     node->type = VFS_NODE_TYPE_DIR;
     node->private_data = get_dir(vfs, index);
@@ -100,7 +100,7 @@ static vfs_node_t *get_file_vfs_node(vfs_t *vfs, rdsk_index_t index) {
     info_t *info = (info_t *) vfs->private_data;
     if(info->file_cache[index - 1]) return info->file_cache[index - 1];
     vfs_node_t *node = heap_alloc(sizeof(vfs_node_t));
-    memset(node, 0, sizeof(vfs_node_t));
+    mem_set(node, 0, sizeof(vfs_node_t));
     node->vfs = vfs;
     node->type = VFS_NODE_TYPE_FILE;
     node->private_data = get_file(vfs, index);
@@ -141,7 +141,7 @@ static vfs_result_t rdsk_rw(vfs_node_t *node, vfs_rw_t *rw, PARAM_OUT(size_t *) 
     }
     size_t count = FILE(node)->size - rw->offset;
     if(count > rw->size) count = rw->size;
-    memcpy(rw->buffer, (void *) (((uintptr_t) INFO(node->vfs)->header + FILE(node)->data_offset) + rw->offset), count);
+    mem_copy(rw->buffer, (void *) (((uintptr_t) INFO(node->vfs)->header + FILE(node)->data_offset) + rw->offset), count);
     *rw_count = count;
     return VFS_RESULT_OK;
 }
@@ -242,9 +242,9 @@ static vfs_result_t rdsk_mount(vfs_t *vfs) {
     info->dir_cache_size = header->dirtable_entry_count;
     info->file_cache_size = header->filetable_entry_count;
     info->dir_cache = heap_alloc(sizeof(vfs_node_t *) * info->dir_cache_size);
-    memset(info->dir_cache, 0, sizeof(vfs_node_t *) * info->dir_cache_size);
+    mem_set(info->dir_cache, 0, sizeof(vfs_node_t *) * info->dir_cache_size);
     info->file_cache = heap_alloc(sizeof(vfs_node_t *) * info->file_cache_size);
-    memset(info->file_cache, 0, sizeof(vfs_node_t *) * info->file_cache_size);
+    mem_set(info->file_cache, 0, sizeof(vfs_node_t *) * info->file_cache_size);
 
     vfs->private_data = info;
     return VFS_RESULT_OK;

@@ -182,7 +182,7 @@ void arch_init_bsp() {
 void arch_init_cpu_locals(tartarus_boot_info_t *boot_info) {
     log(LOG_LEVEL_DEBUG, "INIT", "Setting up proper CPU locals (%lu locals)", g_cpu_count);
     g_cpu_list = heap_alloc(sizeof(cpu_t) * g_cpu_count);
-    memclear(g_cpu_list, sizeof(cpu_t) * g_cpu_count);
+    mem_clear(g_cpu_list, sizeof(cpu_t) * g_cpu_count);
 
     for(size_t i = 0; i < boot_info->cpu_count; i++) {
         if(boot_info->cpus[i].init_state == TARTARUS_CPU_STATE_FAIL) continue;
@@ -192,7 +192,7 @@ void arch_init_cpu_locals(tartarus_boot_info_t *boot_info) {
         } else {
             log(LOG_LEVEL_DEBUG, "INIT", "Initialized BSP proper (local %lu)", boot_info->cpus[i].sequential_id);
             cpu_t *cpu = &g_cpu_list[boot_info->cpus[i].sequential_id];
-            memcpy(cpu, &g_early_bsp, sizeof(cpu_t));
+            mem_copy(cpu, &g_early_bsp, sizeof(cpu_t));
             cpu->self = cpu;
             cpu->arch.lapic_id = x86_64_lapic_id();
             x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
@@ -245,7 +245,7 @@ INIT_TARGET(arch_asserts, INIT_STAGE_EARLY, arch_asserts);
 
 static void setup_tss() {
     x86_64_tss_t *tss = heap_alloc(sizeof(x86_64_tss_t));
-    memclear(tss, sizeof(x86_64_tss_t));
+    mem_clear(tss, sizeof(x86_64_tss_t));
     tss->iomap_base = sizeof(x86_64_tss_t);
 
     x86_64_tss_set_ist(tss, 0, HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_NONE))) + ARCH_PAGE_GRANULARITY));

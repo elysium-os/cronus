@@ -112,7 +112,7 @@ pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags) {
     block->free = false;
     zone->free_page_count -= PMM_ORDER_TO_PAGECOUNT(order);
 
-    if((flags & PMM_FLAG_ZERO) != 0) memclear((void *) HHDM(BLOCK_PADDR(block)), PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY);
+    if((flags & PMM_FLAG_ZERO) != 0) mem_clear((void *) HHDM(BLOCK_PADDR(block)), PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY);
 
     LOG_TRACE("PMM", "alloc success(%#lx -> %#llx)", BLOCK_PADDR(block), BLOCK_PADDR(block) + PMM_ORDER_TO_PAGECOUNT(order) * ARCH_PAGE_GRANULARITY);
 

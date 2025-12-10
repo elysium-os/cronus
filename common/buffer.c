@@ -17,5 +17,5 @@ void buffer_free(buffer_t *buffer) {
 }
 
 void buffer_clear(buffer_t *buffer) {
-    memclear(&buffer->data, buffer->size);
+    mem_clear(&buffer->data, buffer->size);
 }

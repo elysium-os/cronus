@@ -80,7 +80,7 @@ static x86_64_ptm_address_space_t g_global_address_space;
 static uintptr_t alloc_page() {
     if(EXPECT_UNLIKELY(g_earlymem_active)) {
         uintptr_t address = earlymem_alloc_page();
-        memclear((void *) HHDM(address), ARCH_PAGE_GRANULARITY);
+        mem_clear((void *) HHDM(address), ARCH_PAGE_GRANULARITY);
         return address;
     }
     return PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_ZERO)));
@@ -175,7 +175,7 @@ vm_address_space_t *arch_ptm_address_space_create() {
     address_space->common.start = USERSPACE_START;
     address_space->common.end = USERSPACE_END;
 
-    memcpy((void *) HHDM(address_space->pt_top + 256 * sizeof(uint64_t)), (void *) HHDM(X86_64_PTM_AS(g_vm_global_address_space)->pt_top + 256 * sizeof(uint64_t)), 256 * sizeof(uint64_t));
+    mem_copy((void *) HHDM(address_space->pt_top + 256 * sizeof(uint64_t)), (void *) HHDM(X86_64_PTM_AS(g_vm_global_address_space)->pt_top + 256 * sizeof(uint64_t)), 256 * sizeof(uint64_t));
 
     return &address_space->common;
 }

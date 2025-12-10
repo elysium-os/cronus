@@ -69,7 +69,7 @@ vfs_result_t vfs_lookup_ext(vfs_path_t *path, vfs_lookup_create_t create_mode, b
                 }
                 int comp_length = comp_end - comp_start;
                 char *component = heap_alloc(comp_length + 1);
-                memcpy(component, path->relative_path + comp_start, comp_length);
+                mem_copy(component, path->relative_path + comp_start, comp_length);
                 component[comp_length] = 0;
                 comp_start = comp_end + 1;
 

@@ -1,7 +1,7 @@
 #include "arch/cpu.h"
+#include "arch/interrupt.h"
 #include "arch/page.h"
 #include "arch/time.h"
-#include "arch/interrupt.h"
 #include "common/assert.h"
 #include "common/lock/mutex.h"
 #include "common/log.h"
@@ -196,7 +196,7 @@ void *uacpi_kernel_alloc(uacpi_size size) {
 #ifdef UACPI_NATIVE_ALLOC_ZEROED
 void *uacpi_kernel_alloc_zeroed(uacpi_size size) {
     void *ptr = uacpi_kernel_alloc(size);
-    memclear(ptr, size);
+    mem_clear(ptr, size);
     return ptr;
 }
 #endif

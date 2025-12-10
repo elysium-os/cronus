@@ -488,7 +488,7 @@ size_t vm_copy_to(vm_address_space_t *dest_as, uintptr_t dest_addr, void *src, s
         }
 
         size_t len = MATH_MIN(count - i, ARCH_PAGE_GRANULARITY - offset);
-        memcpy((void *) HHDM(phys), src, len);
+        mem_copy((void *) HHDM(phys), src, len);
         i += len;
         src += len;
     }
@@ -508,7 +508,7 @@ size_t vm_copy_from(void *dest, vm_address_space_t *src_as, uintptr_t src_addr, 
         }
 
         size_t len = MATH_MIN(count - i, ARCH_PAGE_GRANULARITY - offset);
-        memcpy(dest, (void *) HHDM(phys), len);
+        mem_copy(dest, (void *) HHDM(phys), len);
         i += len;
         dest += len;
     }

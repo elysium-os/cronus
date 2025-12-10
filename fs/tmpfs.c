@@ -92,7 +92,7 @@ static vfs_result_t tmpfs_rw(vfs_node_t *node, vfs_rw_t *rw, PARAM_OUT(size_t *)
             if(rw->offset >= file->size) return VFS_RESULT_OK;
             size_t count = file->size - rw->offset;
             if(count > rw->size) count = rw->size;
-            memcpy(rw->buffer, file->base + rw->offset, count);
+            mem_copy(rw->buffer, file->base + rw->offset, count);
             *rw_count = count;
             break;
         case VFS_RW_WRITE:
@@ -100,7 +100,7 @@ static vfs_result_t tmpfs_rw(vfs_node_t *node, vfs_rw_t *rw, PARAM_OUT(size_t *)
                 file->base = heap_realloc(file->base, file->size, rw->offset + rw->size);
                 file->size = rw->offset + rw->size;
             }
-            memcpy(file->base + rw->offset, rw->buffer, rw->size);
+            mem_copy(file->base + rw->offset, rw->buffer, rw->size);
             *rw_count = rw->size;
             break;
     }
@@ -177,8 +177,8 @@ static vfs_result_t tmpfs_truncate(vfs_node_t *node, size_t length) {
     void *buffer = nullptr;
     if(length > 0) {
         buffer = heap_alloc(length);
-        memset(buffer, 0, length);
-        if(file->base != nullptr) memcpy(buffer, file->base, file->size < length ? file->size : length);
+        mem_set(buffer, 0, length);
+        if(file->base != nullptr) mem_copy(buffer, file->base, file->size < length ? file->size : length);
     }
 
     if(file->base != nullptr) heap_free(file->base, file->size);

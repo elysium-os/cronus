@@ -69,7 +69,7 @@ elf_result_t elf_lookup_interpreter(elf_file_t *elf_file, PARAM_OUT(char **) int
 
         size_t interpreter_size = phdr->filesz + 1;
         char *interp = heap_alloc(interpreter_size);
-        memclear(interp, interpreter_size);
+        mem_clear(interp, interpreter_size);
 
         size_t read_count;
         vfs_result_t res = elf_file->file->ops->rw(elf_file->file, &(vfs_rw_t) { .rw = VFS_RW_READ, .buffer = interp, .offset = phdr->offset, .size = phdr->filesz }, &read_count);

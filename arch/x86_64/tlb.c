@@ -64,7 +64,7 @@ void x86_64_tlb_shootdown(uintptr_t addr, size_t length) {
     g_shootdown_length = length;
 
     g_shootdown_complete_count = 0;
-    memset(g_shootdown_status, false, sizeof(bool) * g_cpu_count);
+    mem_set(g_shootdown_status, false, sizeof(bool) * g_cpu_count);
     spinlock_release_noint(&g_status_lock, prev_state);
 
     invalidate(addr, length);

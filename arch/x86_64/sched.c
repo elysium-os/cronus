@@ -203,7 +203,7 @@ void arch_sched_context_switch(thread_t *current, thread_t *next) {
 
 [[noreturn]] void arch_sched_handoff_cpu() {
     x86_64_thread_t *bootstrap_thread = heap_alloc(sizeof(x86_64_thread_t));
-    memclear(bootstrap_thread, sizeof(x86_64_thread_t));
+    mem_clear(bootstrap_thread, sizeof(x86_64_thread_t));
     bootstrap_thread->common.state = THREAD_STATE_DESTROY;
     bootstrap_thread->common.scheduler = &ARCH_CPU_CURRENT_PTR()->sched;
     bootstrap_thread->common.id = BOOTSTRAP_TID;

@@ -49,12 +49,12 @@ bool arch_elf_do_relocation_addend(elf64_rela_t *rela, elf64_symbol_t *symbol, u
     LOG_TRACE("ELF", "relocation: %#lx -> %#lx (%lu)", symbol->value + rela->addend, value, reloc_size);
 
     size_t zero = 0LL;
-    if(memcmp(address, &zero, reloc_size) != 0) {
+    if(mem_compare(address, &zero, reloc_size) != 0) {
         log(LOG_LEVEL_ERROR, "ELF", "relocation %lu address is nonzero", ELF64_R_TYPE(rela->info));
         return false;
     }
 
-    memcpy(address, &value, reloc_size);
+    mem_copy(address, &value, reloc_size);
     return true;
 
 overflow:

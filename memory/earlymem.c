@@ -35,7 +35,7 @@ void earlymem_region_add(uintptr_t address, size_t length) {
     region->base = address;
     region->length = length;
     region->hint = 0;
-    memset(BITMAP(region), 0, BITMAP_SIZE(region));
+    mem_set(BITMAP(region), 0, BITMAP_SIZE(region));
     for(size_t i = 0; i < MATH_DIV_CEIL(BITMAP_SIZE(region), ARCH_PAGE_GRANULARITY); i++) bitmap_set(region, i, true);
     list_push(&g_earlymem_regions, &region->list_node);
 }

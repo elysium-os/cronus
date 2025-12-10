@@ -1,18 +1,18 @@
-global memset
-memset:
+global mem_set
+mem_set:
     mov rcx, rdx
     mov rax, rsi
     rep stosb
     ret
 
-global memcpy
-memcpy:
+global mem_copy
+mem_copy:
     mov rcx, rdx
     rep movsb
     ret
 
-global memmove
-memmove:
+global mem_move
+mem_move:
     mov rcx, rdx
     cmp rdi, rsi
     jb .move
@@ -24,8 +24,8 @@ memmove:
     cld
     ret
 
-global memclear
-memclear:
+global mem_clear
+mem_clear:
     xor rax, rax
     mov rcx, rsi
     rep stosb
