@@ -55,7 +55,7 @@ static int find_vector(interrupt_priority_t priority) {
 
     // Handle HardINT
     ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_hard, true);
-    g_entries[frame->int_no](frame);
+    if(g_entries[frame->int_no] != nullptr) g_entries[frame->int_no](frame);
     if(frame->int_no >= 32) g_x86_64_interrupt_irq_eoi(frame->int_no);
     ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_hard, false);
 
