@@ -16,9 +16,6 @@ void x86_64_interrupt_init();
 /// Set an IST for a given interrupt vector.
 void x86_64_interrupt_set_ist(uint8_t vector, uint8_t ist);
 
-/// Load the IDT.
-void x86_64_interrupt_load_idt();
-
 /// Set a handler onto an interrupt vector.
 /// @warning Will carelessly override existing handlers.
 void x86_64_interrupt_set(uint8_t vector, void (*handler)(arch_interrupt_frame_t *frame));

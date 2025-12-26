@@ -3,6 +3,7 @@
 #include "arch/cpu.h"
 #include "common/assert.h"
 #include "sys/dw.h"
+#include "sys/init.h"
 #include "sys/interrupt.h"
 
 #include <stdint.h>
@@ -65,3 +66,5 @@ void spinlock_acquire_raw(spinlock_t *lock) {
         }
     }
 }
+
+INIT_TARGET_BIND_PERCORE(spinlock, INIT_PROVIDES("spinlock"), INIT_DEPS("cpu_local"));

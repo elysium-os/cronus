@@ -3,6 +3,7 @@
 #include "common/lock/spinlock.h"
 #include "lib/container.h"
 #include "lib/string.h"
+#include "sys/init.h"
 
 static spinlock_t g_lock = SPINLOCK_INIT;
 static list_t g_sinks = LIST_INIT;
@@ -27,6 +28,7 @@ void log_sink_remove(log_sink_t *sink) {
 }
 
 [[gnu::format(printf, 3, 0)]] void log_list(log_level_t level, const char *tag, const char *fmt, va_list list) {
+    if(g_sinks.count == 0) return; // TODO: hacky
     va_list local_list;
     interrupt_state_t previous_state = spinlock_acquire_noint(&g_lock);
     LIST_ITERATE(&g_sinks, node) {
@@ -53,3 +55,5 @@ const char *log_level_stringify(log_level_t level) {
     }
     return "UNKNOWN";
 }
+
+INIT_TARGET_BIND_PERCORE(log, INIT_PROVIDES("log"), INIT_DEPS("spinlock"));

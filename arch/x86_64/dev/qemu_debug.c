@@ -35,17 +35,15 @@ static void log_debug(log_level_t level, const char *tag, const char *fmt, va_li
     x86_64_qemu_debug_putc('\n');
 }
 
-static log_sink_t g_qemu_debug_sink = {
+log_sink_t g_qemu_debug_sink = {
     .name = "QEMU",
     .filter = { .level = LOG_LEVEL_TRACE, .tags_as_include = false, .tags = nullptr, .tag_count = 0 },
     .log = log_debug
 };
 
-static void qemu_debug_init() {
-    x86_64_qemu_debug_putc('\n');
-    log_sink_add(&g_qemu_debug_sink);
-}
-
-INIT_TARGET(qemu_debug, INIT_STAGE_BOOT, qemu_debug_init);
+// INIT_TARGET(qemu_debug, INIT_PROVIDES("log", "log_early"), INIT_DEPS()) {
+//     x86_64_qemu_debug_putc('\n');
+//     log_sink_add(&g_qemu_debug_sink);
+// }
 
 #endif

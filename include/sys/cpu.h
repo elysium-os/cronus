@@ -12,8 +12,11 @@ typedef struct cpu {
     size_t sequential_id;
 
     sched_t sched;
+
+    bool event_in_flight;
     rb_tree_t events;
     rb_tree_t free_events; // Events to be freed
+
     list_t dw_items;
     struct {
         uint32_t deferred_work_status;

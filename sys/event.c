@@ -36,7 +36,7 @@ void events_process(arch_interrupt_frame_t *) {
         rb_remove(&current_cpu->events, node);
         dw_queue(event->dw_item);
 
-        if(ARCH_CPU_CURRENT_READ(flags.in_interrupt_hard)) {
+        if(ARCH_CPU_CURRENT_READ(flags.in_interrupt_hard)) { // TODO: this feels a lil scary
             rb_insert(&current_cpu->free_events, &event->rb_node);
         } else {
             slab_free(g_event_cache, event);
@@ -93,15 +93,11 @@ void event_cancel(event_t *event) {
     sched_preempt_dec();
 }
 
-void event_init_cpu_local() {
-    sched_preempt_inc();
-    ARCH_CPU_CURRENT_PTR()->events = RB_TREE_INIT(rbnode_value);
-    ARCH_CPU_CURRENT_PTR()->free_events = RB_TREE_INIT(rbnode_value);
-    sched_preempt_dec();
-}
-
-static void event_cache_init() {
+INIT_TARGET(event_cache, INIT_PROVIDES("event"), INIT_DEPS("slab", "time", "log")) {
     g_event_cache = slab_cache_create("event", sizeof(event_t), 2);
 }
 
-INIT_TARGET(event_cache, INIT_STAGE_MAIN, event_cache_init);
+INIT_TARGET_PERCORE(event_cpu_local, INIT_PROVIDES("cpu_local"), INIT_DEPS()) {
+    ARCH_CPU_CURRENT_PTR()->events = RB_TREE_INIT(rbnode_value);
+    ARCH_CPU_CURRENT_PTR()->free_events = RB_TREE_INIT(rbnode_value);
+}

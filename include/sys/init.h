@@ -1,60 +1,58 @@
 #pragma once
 
+#include "lib/macros.h"
+
 #include <stddef.h>
 
-#define INIT_TARGET_FULL(NAME, STAGE, FN, PERCORE, ...)                                                        \
-    static const char *g_init_target_##NAME##_deps[] = { __VA_ARGS__ };                                        \
-    [[gnu::used, gnu::section(".init_targets")]] static init_target_t g_init_target_##NAME = (init_target_t) { \
-        .name = #NAME,                                                                                         \
-        .stage = (STAGE),                                                                                      \
-        .dependencies = g_init_target_##NAME##_deps,                                                           \
-        .dependency_count = sizeof(g_init_target_##NAME##_deps) / sizeof(const char *),                        \
-        .fn = (FN),                                                                                            \
-        .per_core = (PERCORE),                                                                                 \
-        .completed = false,                                                                                    \
+#define INIT_TARGET_UTIL_NAME(NAME) MACROS_CONCAT(MACROS_CONCAT(g_init_target_, __LINE__), _##NAME)
+#define INIT_TARGET_UTIL_FN(NAME) MACROS_CONCAT(INIT_TARGET_UTIL_NAME(NAME), _fn)
+#define INIT_TARGET_UTIL_DEPS(NAME) MACROS_CONCAT(INIT_TARGET_UTIL_NAME(NAME), _deps)
+#define INIT_TARGET_UTIL_PROVIDES(NAME) MACROS_CONCAT(INIT_TARGET_UTIL_NAME(NAME), _provides)
+
+#define INIT_TARGET_UTIL_FULL_WITH_FN(NAME, PROVIDES, DEPS, TYPE)                \
+    static void INIT_TARGET_UTIL_FN(NAME)();                                     \
+    INIT_TARGET_UTIL_FULL(NAME, PROVIDES, DEPS, TYPE, INIT_TARGET_UTIL_FN(NAME)) \
+    static void INIT_TARGET_UTIL_FN(NAME)()
+
+#define INIT_TARGET_UTIL_FULL(NAME, PROVIDES, DEPS, TYPE, FN)                                                         \
+    static const char *INIT_TARGET_UTIL_DEPS(NAME)[] = DEPS;                                                          \
+    static const char *INIT_TARGET_UTIL_PROVIDES(NAME)[] = PROVIDES;                                                  \
+    [[gnu::used, gnu::section(".init_targets")]] static init_target_t INIT_TARGET_UTIL_NAME(NAME) = (init_target_t) { \
+        .name = #NAME,                                                                                                \
+        .fn = (FN),                                                                                                   \
+        .type = (TYPE),                                                                                               \
+        .provides = INIT_TARGET_UTIL_PROVIDES(NAME),                                                                  \
+        .provides_count = sizeof(INIT_TARGET_UTIL_PROVIDES(NAME)) / sizeof(const char *),                             \
+        .dependencies = INIT_TARGET_UTIL_DEPS(NAME),                                                                  \
+        .dependency_count = sizeof(INIT_TARGET_UTIL_DEPS(NAME)) / sizeof(const char *),                               \
     };
 
-
-#define INIT_TARGET(NAME, STAGE, FN, ...) INIT_TARGET_FULL(NAME, STAGE, FN, false, __VA_ARGS__)
-#define INIT_TARGET_PERCORE(NAME, STAGE, FN, ...) INIT_TARGET_FULL(NAME, STAGE, FN, true, __VA_ARGS__)
+#define INIT_PROVIDES(...) ((const char *[]) { __VA_ARGS__ })
+#define INIT_DEPS(...) ((const char *[]) { __VA_ARGS__ })
+#define INIT_TARGET(NAME, PROVIDES, DEPS) INIT_TARGET_UTIL_FULL_WITH_FN(NAME, PROVIDES, DEPS, INIT_TYPE_BSP_ONLY)
+#define INIT_TARGET_PERCORE(NAME, PROVIDES, DEPS) INIT_TARGET_UTIL_FULL_WITH_FN(NAME, PROVIDES, DEPS, INIT_TYPE_ALL)
+#define INIT_TARGET_BIND(NAME, PROVIDES, DEPS) INIT_TARGET_UTIL_FULL(NAME, PROVIDES, DEPS, INIT_TYPE_BSP_ONLY, nullptr)
+#define INIT_TARGET_BIND_PERCORE(NAME, PROVIDES, DEPS) INIT_TARGET_UTIL_FULL(NAME, PROVIDES, DEPS, INIT_TYPE_ALL, nullptr)
 
 typedef enum {
-    /**
-     * Extremely early init stage with no subsystems guaranteed.
-     */
-    INIT_STAGE_BOOT,
+    INIT_TYPE_ALL,
+    INIT_TYPE_BSP_ONLY,
+    INIT_TYPE_APS_ONLY,
+} init_type_t;
 
-    /**
-     * Early init stage.
-     *
-     * Guarantees:
-     * - Earlymem is initialized.
-     */
-    INIT_STAGE_EARLY,
-
-    INIT_STAGE_BEFORE_MAIN,
-    INIT_STAGE_MAIN,
-
-    INIT_STAGE_BEFORE_DEV,
-    INIT_STAGE_DEV,
-
-    INIT_STAGE_LATE,
-} init_stage_t;
-
-typedef struct [[gnu::packed]] {
+typedef struct [[gnu::packed]] init_target {
     const char *name;
-    init_stage_t stage;
+    void (*fn)();
+    init_type_t type;
+
+    const char **provides;
+    size_t provides_count;
+
     const char **dependencies;
     size_t dependency_count;
-    void (*fn)();
-    bool per_core;
+
     bool completed;
 } init_target_t;
 
-extern init_stage_t g_init_stage_current;
-
-/// Reset per_core targets for a new ap.
-void init_reset_ap();
-
-/// Run all the init targets for a stage.
-void init_stage(init_stage_t stage, bool is_ap);
+/// Run the init system.
+void init_run(bool is_ap);

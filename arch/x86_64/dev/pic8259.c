@@ -1,5 +1,6 @@
 #include "x86_64/dev/pic8259.h"
 
+#include "sys/init.h"
 #include "x86_64/cpu/port.h"
 
 #define MASTER_CMD 0x20
@@ -28,4 +29,9 @@ void x86_64_pic8259_disable() {
 void x86_64_pic8259_eoi(uint8_t interrupt_vector) {
     if(interrupt_vector >= 40) x86_64_port_outb(SLAVE_CMD, 0x20);
     x86_64_port_outb(MASTER_CMD, 0x20);
+}
+
+INIT_TARGET(pic8259_disable, INIT_PROVIDES("interrupt"), INIT_DEPS()) {
+    x86_64_pic8259_remap();
+    x86_64_pic8259_disable();
 }

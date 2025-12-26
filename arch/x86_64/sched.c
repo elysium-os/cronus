@@ -214,7 +214,7 @@ void arch_sched_context_switch(thread_t *current, thread_t *next) {
     ASSERT_UNREACHABLE();
 }
 
-static void setup_idle_thread() {
+INIT_TARGET_PERCORE(idle_thread, INIT_PROVIDES("sched"), INIT_DEPS("vm", "pmm", "heap", "spinlock", "cpu_local", "hhdm")) {
     x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));
@@ -227,4 +227,10 @@ static void setup_idle_thread() {
     ARCH_CPU_CURRENT_WRITE(sched.idle_thread, &idle_thread->common);
 }
 
-INIT_TARGET_PERCORE(idle_thread, INIT_STAGE_LATE, setup_idle_thread);
+INIT_TARGET_PERCORE(sched_cpu_local, INIT_PROVIDES("cpu_local"), INIT_DEPS()) {
+    ARCH_CPU_CURRENT_PTR()->sched = (sched_t) {
+        .lock = SPINLOCK_INIT,
+        .thread_queue = LIST_INIT,
+        .status = { .preempt_counter = 0, .yield_immediately = false },
+    };
+}

@@ -8,30 +8,23 @@
 #include "common/assert.h"
 #include "common/log.h"
 #include "fs/vfs.h"
+#include "init.h"
 #include "lib/math.h"
 #include "lib/mem.h"
 #include "memory/heap.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"
-#include "memory/pmm.h"
 #include "memory/vm.h"
 #include "sched/sched.h"
-#include "sys/event.h"
 #include "sys/init.h"
 #include "sys/time.h"
 #include "x86_64/abi/sysv/auxv.h"
 #include "x86_64/abi/sysv/sysv.h"
 #include "x86_64/cpu/cpuid.h"
-#include "x86_64/cpu/cr.h"
-#include "x86_64/cpu/gdt.h"
 #include "x86_64/cpu/lapic.h"
 #include "x86_64/cpu/msr.h"
-#include "x86_64/cpu/pat.h"
 #include "x86_64/dev/hpet.h"
-#include "x86_64/dev/ioapic.h"
-#include "x86_64/dev/pic8259.h"
 #include "x86_64/dev/pit.h"
-#include "x86_64/interrupt.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -54,9 +47,7 @@ static bool g_hpet_initialized = false;
 
 static time_frequency_t calibrate_lapic_timer() {
     uint32_t nominal_freq = 0;
-    if(!x86_64_cpuid_register(0x15, X86_64_CPUID_REGISTER_ECX, &nominal_freq) && nominal_freq != 0) {
-        return (time_frequency_t) nominal_freq;
-    }
+    if(!x86_64_cpuid_register(0x15, X86_64_CPUID_REGISTER_ECX, &nominal_freq) && nominal_freq != 0) { return (time_frequency_t) nominal_freq; }
 
     x86_64_lapic_timer_setup(X86_64_LAPIC_TIMER_TYPE_ONESHOT, true, 0xFF, X86_64_LAPIC_TIMER_DIVISOR_16);
     if(!g_hpet_initialized) {
@@ -106,62 +97,15 @@ static time_frequency_t calibrate_tsc() {
     ASSERT_UNREACHABLE();
 }
 
-
-static void initialize_cpu_local(cpu_t *cpu, size_t seqid) {
-    cpu->self = cpu;
-
-    cpu->arch.current_thread = nullptr;
-    cpu->arch.lapic_timer_frequency = 0;
-    cpu->arch.tsc_timer_frequency = 0;
-    cpu->arch.tss = nullptr;
-
-    cpu->arch.lapic_id = 0;
-    cpu->sequential_id = seqid;
-
-    cpu->dw_items = LIST_INIT;
-    cpu->sched = (sched_t) {
-        .lock = SPINLOCK_INIT,
-        .thread_queue = LIST_INIT,
-        .status = { .preempt_counter = 0, .yield_immediately = false },
-    };
-
-    cpu->flags.threaded = false;
-    cpu->flags.in_interrupt_hard = false;
-    cpu->flags.in_interrupt_soft = false;
-    cpu->flags.deferred_work_status = 0;
-}
-
-static void initialize_cpu() {
-    x86_64_gdt_init();
-    x86_64_interrupt_load_idt();
-    pat_init();
-
-    uint64_t cr4 = x86_64_cr4_read();
-    cr4 |= 1 << 7; /* CR4.PGE */
-    x86_64_cr4_write(cr4);
-}
-
 [[gnu::no_instrument_function]] [[noreturn]] static void init_ap() {
     cpu_t *cpu = &g_cpu_list[g_init_ap_cpu_id];
+    cpu->self = cpu;
+    cpu->sequential_id = g_init_ap_cpu_id;
     x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
-    event_init_cpu_local();
 
     log(LOG_LEVEL_INFO, "INIT", "Initializing AP %lu", g_init_ap_cpu_id);
 
-    init_stage(INIT_STAGE_BOOT, true);
-    initialize_cpu();
-    init_stage(INIT_STAGE_EARLY, true);
-
-    arch_ptm_load_address_space(g_vm_global_address_space);
-
-    init_stage(INIT_STAGE_BEFORE_MAIN, true);
-    cpu->arch.lapic_id = x86_64_lapic_id();
-    init_stage(INIT_STAGE_MAIN, true);
-
-    init_stage(INIT_STAGE_BEFORE_DEV, true);
-    init_stage(INIT_STAGE_DEV, true);
-
-    init_stage(INIT_STAGE_LATE, true);
+    init_run(true);
 
     log(LOG_LEVEL_DEBUG, "INIT", "AP %lu (Lapic ID: %i) init exit", g_init_ap_cpu_id, x86_64_lapic_id());
     __atomic_add_fetch(&g_init_ap_finished, true, __ATOMIC_SEQ_CST);
@@ -170,43 +114,11 @@ static void initialize_cpu() {
     ASSERT_UNREACHABLE();
 }
 
-void arch_init_bsp_local(size_t seqid) {
-    initialize_cpu_local(&g_early_bsp, seqid);
-    x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
-}
-
-void arch_init_bsp() {
-    initialize_cpu();
-}
-
-void arch_init_cpu_locals(tartarus_boot_info_t *boot_info) {
-    log(LOG_LEVEL_DEBUG, "INIT", "Setting up proper CPU locals (%lu locals)", g_cpu_count);
-    g_cpu_list = heap_alloc(sizeof(cpu_t) * g_cpu_count);
-    mem_clear(g_cpu_list, sizeof(cpu_t) * g_cpu_count);
-
-    for(size_t i = 0; i < boot_info->cpu_count; i++) {
-        if(boot_info->cpus[i].init_state == TARTARUS_CPU_STATE_FAIL) continue;
-
-        if(i != boot_info->bsp_index) {
-            initialize_cpu_local(&g_cpu_list[boot_info->cpus[i].sequential_id], boot_info->cpus[i].sequential_id);
-        } else {
-            log(LOG_LEVEL_DEBUG, "INIT", "Initialized BSP proper (local %lu)", boot_info->cpus[i].sequential_id);
-            cpu_t *cpu = &g_cpu_list[boot_info->cpus[i].sequential_id];
-            mem_copy(cpu, &g_early_bsp, sizeof(cpu_t));
-            cpu->self = cpu;
-            cpu->arch.lapic_id = x86_64_lapic_id();
-            x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
-        }
-    }
-}
-
 void arch_init_smp(tartarus_boot_info_t *boot_info) {
     for(size_t i = 0; i < boot_info->cpu_count; i++) {
         if(boot_info->cpus[i].init_state == TARTARUS_CPU_STATE_FAIL) continue;
 
         if(i == boot_info->bsp_index) continue;
-
-        init_reset_ap();
 
         g_init_ap_cpu_id = boot_info->cpus[i].sequential_id;
         g_init_ap_finished = false;
@@ -219,73 +131,15 @@ void arch_init_smp(tartarus_boot_info_t *boot_info) {
     log(LOG_LEVEL_DEBUG, "INIT", "BSP seqid is %lu", ARCH_CPU_CURRENT_READ(sequential_id));
 }
 
-static void cpuinfo() {
-    char brand1[12];
-    x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_EBX, (uint32_t *) &brand1);
-    x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_EDX, (uint32_t *) &brand1[4]);
-    x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_ECX, (uint32_t *) &brand1[8]);
+extern log_sink_t g_qemu_debug_sink;
+void arch_init_bsp() {
+    g_early_bsp.self = &g_early_bsp;
+    x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
 
-    char brand2[48];
-    for(size_t i = 0; i < 3; i++) {
-        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_EAX, (uint32_t *) &brand2[i * 16]);
-        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_EBX, (uint32_t *) &brand2[i * 16 + 4]);
-        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_ECX, (uint32_t *) &brand2[i * 16 + 8]);
-        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_EDX, (uint32_t *) &brand2[i * 16 + 12]);
-    }
-    log(LOG_LEVEL_INFO, "INIT", "Running on %.*s (%.*s)", 12, brand1, 48, brand2);
+    log_sink_add(&g_qemu_debug_sink);
 }
 
-INIT_TARGET(cpuinfo, INIT_STAGE_EARLY, cpuinfo);
-
-static void arch_asserts() {
-    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_MSR));
-}
-
-INIT_TARGET(arch_asserts, INIT_STAGE_EARLY, arch_asserts);
-
-static void setup_tss() {
-    x86_64_tss_t *tss = heap_alloc(sizeof(x86_64_tss_t));
-    mem_clear(tss, sizeof(x86_64_tss_t));
-    tss->iomap_base = sizeof(x86_64_tss_t);
-
-    x86_64_tss_set_ist(tss, 0, HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_NONE))) + ARCH_PAGE_GRANULARITY));
-    x86_64_tss_set_ist(tss, 1, HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_page(PMM_FLAG_NONE))) + ARCH_PAGE_GRANULARITY));
-    x86_64_interrupt_set_ist(2, 1); // Non-maskable
-    x86_64_interrupt_set_ist(18, 2); // Machine check
-
-    ARCH_CPU_CURRENT_WRITE(arch.tss, tss);
-
-    x86_64_gdt_load_tss(tss);
-}
-
-INIT_TARGET_PERCORE(tss, INIT_STAGE_BEFORE_MAIN, setup_tss);
-
-static void external_interrupts() {
-    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
-    // ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_ARAT)); // TODO: fails
-
-    x86_64_pic8259_remap();
-    x86_64_pic8259_disable();
-    x86_64_lapic_init();
-    g_x86_64_interrupt_irq_eoi = x86_64_lapic_eoi;
-}
-
-INIT_TARGET(external_interrupts, INIT_STAGE_BEFORE_MAIN, external_interrupts);
-INIT_TARGET_PERCORE(lapic, INIT_STAGE_BEFORE_MAIN, x86_64_lapic_init_cpu, "external_interrupts");
-
-
-static void initialize_ioapic() {
-    uacpi_table madt;
-    uacpi_status ret = uacpi_table_find_by_signature(ACPI_MADT_SIGNATURE, &madt);
-    if(uacpi_likely_success(ret)) {
-        x86_64_ioapic_init((struct acpi_madt *) madt.hdr);
-        uacpi_table_unref(&madt);
-    }
-}
-
-INIT_TARGET(ioapic, INIT_STAGE_BEFORE_DEV, initialize_ioapic, "acpi_tables")
-
-static void initialize_timers() {
+INIT_TARGET_PERCORE(timers, INIT_PROVIDES("timer"), INIT_DEPS("acpi_tables", "log")) {
     uacpi_table hpet;
     uacpi_status ret = uacpi_table_find_by_signature(ACPI_HPET_SIGNATURE, &hpet);
     if(uacpi_likely_success(ret)) {
@@ -304,9 +158,48 @@ static void initialize_timers() {
     log(LOG_LEVEL_DEBUG, "INIT", "CPU[%lu] TSC calibrated, freq: %lu", ARCH_CPU_CURRENT_READ(sequential_id), ARCH_CPU_CURRENT_READ(arch.tsc_timer_frequency));
 }
 
-INIT_TARGET_PERCORE(timers, INIT_STAGE_BEFORE_DEV, initialize_timers, "acpi_tables");
+INIT_TARGET_PERCORE(misc_cpu_local, INIT_PROVIDES("cpu_local"), INIT_DEPS()) {
+    // TODO: move into proper targets
+    ARCH_CPU_CURRENT_WRITE(arch.current_thread, (x86_64_thread_t *) nullptr);
+    ARCH_CPU_CURRENT_WRITE(arch.tss, (x86_64_tss_t *) nullptr);
+    ARCH_CPU_CURRENT_WRITE(arch.lapic_timer_frequency, (size_t) 0);
+    ARCH_CPU_CURRENT_WRITE(arch.tsc_timer_frequency, (size_t) 0);
+}
 
-static void setup_init_program() {
+INIT_TARGET(bsp_late_cpu_local, INIT_PROVIDES("late_cpu_local"), INIT_DEPS("heap", "log", "cpu_local")) {
+    log(LOG_LEVEL_DEBUG, "INIT", "Setting up proper CPU locals (%lu locals)", g_cpu_count);
+    g_cpu_list = heap_alloc(sizeof(cpu_t) * g_cpu_count);
+    mem_clear(g_cpu_list, sizeof(cpu_t) * g_cpu_count);
+
+    cpu_t *cpu = &g_cpu_list[g_init_boot_info->cpus[g_init_boot_info->bsp_index].sequential_id];
+    mem_copy(cpu, &g_early_bsp, sizeof(cpu_t));
+    cpu->self = cpu;
+    x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
+
+    log(LOG_LEVEL_DEBUG, "INIT", "Initialized BSP proper (local %lu)", cpu->sequential_id);
+}
+
+INIT_TARGET(cpu_info, INIT_PROVIDES(), INIT_DEPS("log")) {
+    char brand1[12];
+    x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_EBX, (uint32_t *) &brand1);
+    x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_EDX, (uint32_t *) &brand1[4]);
+    x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_ECX, (uint32_t *) &brand1[8]);
+
+    char brand2[48];
+    for(size_t i = 0; i < 3; i++) {
+        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_EAX, (uint32_t *) &brand2[i * 16]);
+        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_EBX, (uint32_t *) &brand2[i * 16 + 4]);
+        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_ECX, (uint32_t *) &brand2[i * 16 + 8]);
+        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_EDX, (uint32_t *) &brand2[i * 16 + 12]);
+    }
+    log(LOG_LEVEL_INFO, "INIT", "Running on %.*s (%.*s)", 12, brand1, 48, brand2);
+};
+
+INIT_TARGET(arch_asserts, INIT_PROVIDES("arch"), INIT_DEPS("log")) {
+    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_MSR));
+}
+
+INIT_TARGET(init_program, INIT_PROVIDES("init"), INIT_DEPS("heap", "vm", "pmm", "ptm", "sched", "vfs", "log")) {
     log(LOG_LEVEL_DEBUG, "INIT", "loading /usr/bin/init");
     vm_address_space_t *as = arch_ptm_address_space_create();
 
@@ -373,5 +266,3 @@ static void setup_init_program() {
 
     sched_thread_schedule(thread);
 }
-
-INIT_TARGET(init_program, INIT_STAGE_LATE, setup_init_program);

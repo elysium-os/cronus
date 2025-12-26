@@ -3,6 +3,7 @@
 #include "lib/container.h"
 #include "memory/vm.h"
 
+// CRITICAL: invert this abstraction ASAP
 #define X86_64_PTM_AS(ADDRESS_SPACE) (CONTAINER_OF((ADDRESS_SPACE), x86_64_ptm_address_space_t, common))
 
 typedef struct {

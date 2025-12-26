@@ -1,11 +1,8 @@
 build/
 
 .cache
-.clangd
 .luarc.json
+.gdbinit
 
 .zed
 .vscode
-.gdbinit
-
-log.txt

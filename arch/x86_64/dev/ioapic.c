@@ -3,8 +3,10 @@
 #include "arch/mmio.h"
 #include "common/log.h"
 #include "memory/mmio.h"
+#include "sys/init.h"
 
 #include <uacpi/acpi.h>
+#include <uacpi/tables.h>
 
 #define VER 0x1
 #define VER_MAX_REDIRECTION_ENTRY(val) (((val) >> 16) & 0xFF)
@@ -59,29 +61,6 @@ static uint32_t ioapic_read(uint32_t index) {
     return arch_mmio_read32(&g_ioapic[4]);
 }
 
-void x86_64_ioapic_init(struct acpi_madt *apic_table) {
-    uintptr_t ioapic_address = 0;
-
-    uint32_t nbytes = apic_table->hdr.length - offsetof(struct acpi_madt, entries);
-    struct acpi_entry_hdr *current_record = apic_table->entries; // (madt_record_t *) ((uintptr_t) apic_table->virt_addr + sizeof(struct acpi_sdt_hdr) + sizeof(madt_header_t));
-    while(nbytes > 0) {
-        switch(current_record->type) {
-            case ACPI_MADT_ENTRY_TYPE_IOAPIC: ioapic_address = ((struct acpi_madt_ioapic *) current_record)->address; break;
-            case ACPI_MADT_ENTRY_TYPE_INTERRUPT_SOURCE_OVERRIDE:
-                struct acpi_madt_interrupt_source_override *override_record = (struct acpi_madt_interrupt_source_override *) current_record;
-                g_legacy_irq_map[override_record->source].gsi = override_record->gsi;
-                g_legacy_irq_map[override_record->source].flags = override_record->flags;
-                break;
-        }
-        nbytes -= current_record->length;
-        current_record = (struct acpi_entry_hdr *) ((uintptr_t) current_record + current_record->length);
-    }
-
-    log(LOG_LEVEL_DEBUG, "IOAPIC", "Found ioapic at %#lx", ioapic_address);
-
-    g_ioapic = mmio_map(ioapic_address, 4096);
-}
-
 void x86_64_ioapic_map_gsi(uint8_t gsi, uint8_t lapic_id, bool low_polarity, bool trigger_mode, uint8_t vector) {
     uint32_t iored_low = IOREDx(gsi);
 
@@ -109,4 +88,36 @@ void x86_64_ioapic_map_legacy_irq(uint8_t irq, uint8_t lapic_id, bool fallback_l
         irq = g_legacy_irq_map[irq].gsi;
     }
     x86_64_ioapic_map_gsi(irq, lapic_id, fallback_low_polarity, fallback_trigger_mode, vector);
+}
+
+INIT_TARGET(ioapic, INIT_PROVIDES("ioapic"), INIT_DEPS("acpi_tables")) {
+    uacpi_table madt;
+    uacpi_status ret = uacpi_table_find_by_signature(ACPI_MADT_SIGNATURE, &madt);
+    if(uacpi_likely_success(ret)) {
+        struct acpi_madt *apic_table = (struct acpi_madt *) madt.hdr;
+
+        uintptr_t ioapic_address = 0;
+
+        uint32_t nbytes = apic_table->hdr.length - offsetof(struct acpi_madt, entries);
+        // TODO: what is this comment here, too lazy to check it now
+        struct acpi_entry_hdr *current_record = apic_table->entries; // (madt_record_t *) ((uintptr_t) apic_table->virt_addr + sizeof(struct acpi_sdt_hdr) + sizeof(madt_header_t));
+        while(nbytes > 0) {
+            switch(current_record->type) {
+                case ACPI_MADT_ENTRY_TYPE_IOAPIC: ioapic_address = ((struct acpi_madt_ioapic *) current_record)->address; break;
+                case ACPI_MADT_ENTRY_TYPE_INTERRUPT_SOURCE_OVERRIDE:
+                    struct acpi_madt_interrupt_source_override *override_record = (struct acpi_madt_interrupt_source_override *) current_record;
+                    g_legacy_irq_map[override_record->source].gsi = override_record->gsi;
+                    g_legacy_irq_map[override_record->source].flags = override_record->flags;
+                    break;
+            }
+            nbytes -= current_record->length;
+            current_record = (struct acpi_entry_hdr *) ((uintptr_t) current_record + current_record->length);
+        }
+
+        log(LOG_LEVEL_DEBUG, "IOAPIC", "Found ioapic at %#lx", ioapic_address);
+
+        g_ioapic = mmio_map(ioapic_address, 4096);
+
+        uacpi_table_unref(&madt);
+    }
 }

@@ -76,6 +76,8 @@ void list_node_delete(list_t *list, list_node_t *node) {
     if(list->head == node) list->head = node->next;
     if(list->tail == node) list->tail = node->prev;
 
+    ASSERT(list->count > 0 || (list->head == nullptr && list->tail == nullptr));
+
     if(node->prev != nullptr) node->prev->next = node->next;
     if(node->next != nullptr) node->next->prev = node->prev;
 }

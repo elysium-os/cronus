@@ -71,8 +71,10 @@ void dw_status_enable() {
     if(dw_enable()) dw_process();
 }
 
-static void dw_init() {
+INIT_TARGET(deferred_work, INIT_PROVIDES("dw"), INIT_DEPS("slab")) {
     g_item_cache = slab_cache_create("deferred_work", sizeof(dw_item_t), 2);
 }
 
-INIT_TARGET(deferred_work, INIT_STAGE_MAIN, dw_init);
+INIT_TARGET_PERCORE(dw_cpu_local, INIT_PROVIDES("cpu_local"), INIT_DEPS()) {
+    ARCH_CPU_CURRENT_PTR()->dw_items = LIST_INIT;
+}

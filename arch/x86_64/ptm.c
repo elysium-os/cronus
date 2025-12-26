@@ -103,28 +103,22 @@ static uint64_t cache_to_x86_flags(vm_cache_t cache, page_size_t page_size) {
     ASSERT_UNREACHABLE();
 }
 
+// TODO: test this code, it was broken before, it might still be broken?
 static uint64_t break_big(uint64_t *table, int index, int current_level) {
-    ASSERT(current_level > 0);
+    ASSERT(current_level == 1 || current_level == 2);
 
     uint64_t entry = table[index];
 
-    uintptr_t address = entry & ENTRYH_ADDRESS_MASK;
-    bool pat = entry & ENTRYH_FLAG_PAT;
-    entry &= ~ENTRYL_ADDRESS_MASK;
+    uintptr_t region_base = entry & ENTRYH_ADDRESS_MASK;
+    uint64_t common_flags = ENTRY_FLAG_PRESENT | (entry & ENTRY_FLAG_RW) | (entry & ENTRY_FLAG_USER) | (entry & ENTRY_FLAG_GLOBAL) | (entry & ENTRY_FLAG_NX);
+    uint64_t cache_flags = (entry & ENTRY_FLAG_WRITETHROUGH) | (entry & ENTRY_FLAG_DISABLECACHE);
+    if((entry & ENTRYH_FLAG_PAT) != 0) cache_flags |= (current_level - 1 == 0) ? ENTRYL_FLAG_PAT : ENTRYH_FLAG_PAT;
 
-    uint64_t new_entry = entry;
-    if(current_level - 1 == 0) {
-        new_entry &= ~ENTRYL_FLAG_PAT;
-        if(pat) new_entry |= ENTRYL_FLAG_PAT;
-    } else {
-        new_entry |= ENTRYH_FLAG_PAT;
-    }
+    entry = common_flags | alloc_page();
 
-    entry |= alloc_page();
-    if(pat) entry |= ENTRYL_FLAG_PAT;
-
-    uint64_t *new_table = (void *) (entry & ENTRYL_ADDRESS_MASK);
-    for(int i = 0; i < 512 * ARCH_PAGE_GRANULARITY; i += ARCH_PAGE_GRANULARITY) new_table[i] = new_entry | (address + i);
+    size_t page_size = current_level == 1 ? PAGE_SIZE_4K : PAGE_SIZE_2M;
+    uint64_t *new_table = (void *) HHDM(entry & ENTRYL_ADDRESS_MASK);
+    for(size_t i = 0; i < 512; i++) new_table[i] = common_flags | cache_flags | (region_base + (i * page_size));
 
     __atomic_store(&table[index], &entry, __ATOMIC_SEQ_CST);
 
@@ -349,7 +343,7 @@ void x86_64_ptm_page_fault_handler(arch_interrupt_frame_t *frame) {
     x86_64_exception_unhandled(frame);
 }
 
-static void ptm_init() {
+INIT_TARGET(ptm, INIT_PROVIDES("ptm", "vm", "memory"), INIT_DEPS("earlymem", "hhdm", "idt", "log")) {
     g_global_address_space.common.lock = SPINLOCK_INIT;
     g_global_address_space.common.regions = vm_create_regions();
     g_global_address_space.common.start = KERNELSPACE_START;
@@ -366,6 +360,4 @@ static void ptm_init() {
     g_vm_global_address_space = &g_global_address_space.common;
 
     x86_64_interrupt_set(0xE, x86_64_ptm_page_fault_handler);
-}
-
-INIT_TARGET(ptm, INIT_STAGE_EARLY, ptm_init);
+};

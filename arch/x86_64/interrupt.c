@@ -79,14 +79,6 @@ void x86_64_interrupt_set_ist(uint8_t vector, uint8_t ist) {
     g_idt[vector].ist = ist;
 }
 
-void x86_64_interrupt_load_idt() {
-    struct [[gnu::packed]] {
-        uint16_t limit;
-        uint64_t base;
-    } idtr = { .base = (uint64_t) &g_idt, .limit = sizeof(g_idt) - 1 };
-    asm volatile("lidt %0" : : "m"(idtr));
-}
-
 void x86_64_interrupt_set(uint8_t vector, void (*handler)(arch_interrupt_frame_t *frame)) {
     g_entries[vector] = handler;
 }
@@ -103,7 +95,7 @@ int arch_interrupt_request(enum interrupt_priority priority, void (*handler)(arc
     return vector;
 }
 
-static void init_interrupts() {
+INIT_TARGET(init_idt, INIT_PROVIDES("interrupt", "idt"), INIT_DEPS()) {
     // TODO: statically initialize?
     for(unsigned long i = 0; i < sizeof(g_idt) / sizeof(idt_entry_t); i++) {
         g_idt[i].low_offset = (uint16_t) g_x86_64_isr_stubs[i];
@@ -118,4 +110,13 @@ static void init_interrupts() {
     }
 }
 
-INIT_TARGET(interrupts, INIT_STAGE_BOOT, init_interrupts);
+INIT_TARGET_PERCORE(load_idt, INIT_PROVIDES("interrupt"), INIT_DEPS("idt")) {
+    struct [[gnu::packed]] {
+        uint16_t limit;
+        uint64_t base;
+    } idtr;
+    idtr.base = (uint64_t) &g_idt;
+    idtr.limit = sizeof(g_idt) - 1;
+
+    asm volatile("lidt %0" : : "m"(idtr));
+}

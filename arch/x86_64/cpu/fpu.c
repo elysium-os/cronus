@@ -25,7 +25,7 @@ static inline void fxrstor(void *area) {
     asm volatile("fxrstor (%0)" : : "r"(area) : "memory");
 }
 
-static void init_fpu() {
+INIT_TARGET(fpu, INIT_PROVIDES("arch"), INIT_DEPS("log")) {
     if(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_XSAVE)) {
         uint32_t area_size = 0;
         bool success = !x86_64_cpuid_register(0xD, X86_64_CPUID_REGISTER_ECX, &area_size);
@@ -39,11 +39,9 @@ static void init_fpu() {
         g_x86_64_fpu_save = fxsave;
         g_x86_64_fpu_restore = fxrstor;
     }
-}
+};
 
-INIT_TARGET(fpu, INIT_STAGE_MAIN, init_fpu);
-
-static void init_cpu_fpu() {
+INIT_TARGET_PERCORE(fpu_cpu, INIT_PROVIDES("arch"), INIT_DEPS("log")) {
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_FXSR));
 
     /* Enable FPU */
@@ -74,6 +72,4 @@ static void init_cpu_fpu() {
         }
         asm volatile("xsetbv" : : "a"(xcr0), "d"(xcr0 >> 32), "c"(0) : "memory");
     }
-}
-
-INIT_TARGET_PERCORE(fpu_cpu, INIT_STAGE_MAIN, init_cpu_fpu);
+};

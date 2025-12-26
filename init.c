@@ -1,5 +1,6 @@
 #include "sys/init.h"
 
+#include "arch/cpu.h"
 #include "arch/init.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
@@ -12,7 +13,6 @@
 #include "fs/vfs.h"
 #include "graphics/framebuffer.h"
 #include "lib/math.h"
-#include "lib/mem.h"
 #include "lib/string.h"
 #include "memory/earlymem.h"
 #include "memory/hhdm.h"
@@ -20,15 +20,22 @@
 #include "memory/pmm.h"
 #include "memory/vm.h"
 #include "sched/reaper.h"
-#include "sys/event.h"
+#include "sys/cpu.h"
+#include "sys/init.h"
 #include "sys/kernel_symbol.h"
 #include "sys/module.h"
 
 #include <tartarus.h>
 #include <uacpi/uacpi.h>
 
+tartarus_boot_info_t *g_init_boot_info;
+
+cpu_t *g_cpu_list;
+
 framebuffer_t g_framebuffer;
 size_t g_cpu_count = 0;
+
+static uintptr_t g_framebuffer_paddr;
 
 static vm_region_t g_hhdm_region, g_page_cache_region;
 
@@ -38,38 +45,43 @@ static void thread_init() {
     log(LOG_LEVEL_INFO, "UACPI", "Setup Done");
 }
 
-[[gnu::no_instrument_function]] [[noreturn]] void init(tartarus_boot_info_t *boot_info) {
-    arch_init_bsp_local(boot_info->cpus[boot_info->bsp_index].sequential_id);
-    event_init_cpu_local();
-    arch_init_bsp();
-
-    init_stage(INIT_STAGE_BOOT, false);
-
+INIT_TARGET(welcome, INIT_PROVIDES(), INIT_DEPS("log")) {
     log(LOG_LEVEL_INFO, "INIT", "Elysium " MACROS_STRINGIFY(__ARCH) " " MACROS_STRINGIFY(__VERSION) " (" __DATE__ " " __TIME__ ")");
+}
 
-    // Initialize HHDM
-    ASSERT(boot_info->hhdm_offset % ARCH_PAGE_GRANULARITY == 0 && boot_info->hhdm_offset % ARCH_PAGE_GRANULARITY == 0);
-    g_hhdm_offset = boot_info->hhdm_offset;
-    g_hhdm_size = boot_info->hhdm_size;
+INIT_TARGET_PERCORE(cpu_flags, INIT_PROVIDES("cpu_local"), INIT_DEPS()) {
+    // TODO: possibly move this to more "proper" targets
+    ARCH_CPU_CURRENT_WRITE(flags.threaded, false);
+    ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_soft, false);
+    ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_hard, false);
+    ARCH_CPU_CURRENT_WRITE(flags.deferred_work_status, (unsigned int) 0);
+}
 
-    // Count CPUs and ensure seqids make sense
+INIT_TARGET(hhdm, INIT_PROVIDES("hhdm", "memory"), INIT_DEPS("log_early")) {
+    ASSERT(g_init_boot_info->hhdm_offset % ARCH_PAGE_GRANULARITY == 0 && g_init_boot_info->hhdm_offset % ARCH_PAGE_GRANULARITY == 0);
+    g_hhdm_offset = g_init_boot_info->hhdm_offset;
+    g_hhdm_size = g_init_boot_info->hhdm_size;
+}
+
+INIT_TARGET(cpu_count, INIT_PROVIDES("cpu_count"), INIT_DEPS()) {
     uint32_t highest_seqid = 0;
-    for(tartarus_size_t i = 0; i < boot_info->cpu_count; i++) {
-        if(boot_info->cpus[i].init_state == TARTARUS_CPU_STATE_FAIL) continue;
-        if(boot_info->cpus[i].sequential_id > highest_seqid) highest_seqid = boot_info->cpus[i].sequential_id;
+    for(tartarus_size_t i = 0; i < g_init_boot_info->cpu_count; i++) {
+        if(g_init_boot_info->cpus[i].init_state == TARTARUS_CPU_STATE_FAIL) continue;
+        if(g_init_boot_info->cpus[i].sequential_id > highest_seqid) highest_seqid = g_init_boot_info->cpus[i].sequential_id;
         g_cpu_count++;
     }
     if(g_cpu_count - 1 != highest_seqid) panic("INIT", "Highest sequential id to cpu count mismatch");
 
     log(LOG_LEVEL_DEBUG, "INIT", "Counted %lu working CPUs", g_cpu_count);
     ASSERT(g_cpu_count > 0);
+}
 
-    // Initialize Early Memory
-    for(size_t i = 0; i < boot_info->mm_entry_count; i++) {
-        tartarus_mm_entry_t *entry = &boot_info->mm_entries[i];
+INIT_TARGET(early_mem, INIT_PROVIDES("earlymem"), INIT_DEPS()) {
+    for(size_t i = 0; i < g_init_boot_info->mm_entry_count; i++) {
+        tartarus_mm_entry_t *entry = &g_init_boot_info->mm_entries[i];
 
-        for(size_t j = i + 1; j < boot_info->mm_entry_count; j++) {
-            ASSERT((entry->base >= (boot_info->mm_entries[j].base + boot_info->mm_entries[j].length)) || (boot_info->mm_entries[j].base >= (entry->base + entry->length)));
+        for(size_t j = i + 1; j < g_init_boot_info->mm_entry_count; j++) {
+            ASSERT((entry->base >= (g_init_boot_info->mm_entries[j].base + g_init_boot_info->mm_entries[j].length)) || (g_init_boot_info->mm_entries[j].base >= (entry->base + entry->length)));
         }
 
         switch(entry->type) {
@@ -87,39 +99,42 @@ static void thread_init() {
 
         earlymem_region_add(entry->base, entry->length); // TODO: coalesce these regions so that we dont end up with weird max_orders in the buddy
     }
+}
 
-    // Load modules
-    log(LOG_LEVEL_DEBUG, "INIT", "Enumerating %lu modules", boot_info->module_count);
-    for(uint16_t i = 0; i < boot_info->module_count; i++) {
-        tartarus_module_t *module = &boot_info->modules[i];
+INIT_TARGET(modules, INIT_PROVIDES("boot_module"), INIT_DEPS("hhdm", "log")) {
+    log(LOG_LEVEL_DEBUG, "INIT", "Enumerating %lu modules", g_init_boot_info->module_count);
+    for(uint16_t i = 0; i < g_init_boot_info->module_count; i++) {
+        tartarus_module_t *module = &g_init_boot_info->modules[i];
         log(LOG_LEVEL_DEBUG, "INIT", "| found `%s`", module->name);
 
         if(!string_eq("kernel.ksym", module->name)) continue;
         kernel_symbols_load((void *) HHDM(module->paddr));
         log(LOG_LEVEL_DEBUG, "INIT", "| » Kernel symbols loaded");
     }
+}
 
-    // Run early init stage
-    init_stage(INIT_STAGE_EARLY, false);
-
-    // Set RSDP
-    g_acpi_rsdp = boot_info->acpi_rsdp_address;
+INIT_TARGET(rsdp, INIT_PROVIDES("rsdp"), INIT_DEPS("log")) {
+    g_acpi_rsdp = g_init_boot_info->acpi_rsdp_address;
     log(LOG_LEVEL_DEBUG, "INIT", "RSDP at %#lx", g_acpi_rsdp);
+}
 
-    // Initialize framebuffer
-    if(boot_info->framebuffer_count == 0) panic("INIT", "no framebuffer provided");
+INIT_TARGET(framebuffer, INIT_PROVIDES("framebuffer"), INIT_DEPS("log_early")) {
+    if(g_init_boot_info->framebuffer_count == 0) panic("INIT", "no framebuffer provided");
     // TODO: handle pixel format... and the entire way we deal with framebuffers in general
-    tartarus_framebuffer_t *framebuffer = &boot_info->framebuffers[0];
+    tartarus_framebuffer_t *framebuffer = &g_init_boot_info->framebuffers[0];
     g_framebuffer.address = framebuffer->vaddr;
     g_framebuffer.size = framebuffer->size;
     g_framebuffer.width = framebuffer->width;
     g_framebuffer.height = framebuffer->height;
     g_framebuffer.pitch = framebuffer->pitch;
 
-    // Map HHDM
+    g_framebuffer_paddr = framebuffer->paddr;
+}
+
+INIT_TARGET(map_hhdm, INIT_PROVIDES("map_global_as"), INIT_DEPS("hhdm", "ptm", "log")) {
     log(LOG_LEVEL_DEBUG, "INIT", "Mapping HHDM (base: %#lx, size: %#lx)", g_hhdm_offset, g_hhdm_size);
-    for(size_t i = 0; i < boot_info->mm_entry_count; i++) {
-        tartarus_mm_entry_t *entry = &boot_info->mm_entries[i];
+    for(size_t i = 0; i < g_init_boot_info->mm_entry_count; i++) {
+        tartarus_mm_entry_t *entry = &g_init_boot_info->mm_entries[i];
         switch(entry->type) {
             case TARTARUS_MM_TYPE_USABLE:
             case TARTARUS_MM_TYPE_BOOTLOADER_RECLAIMABLE:
@@ -142,12 +157,13 @@ static void thread_init() {
     g_hhdm_region.type_data.direct.physical_address = 0;
     rb_insert(&g_vm_global_address_space->regions, &g_hhdm_region.rb_node);
     log(LOG_LEVEL_DEBUG, "INIT", "Global Region: HHDM (base: %#lx, size: %#lx)", g_hhdm_region.base, g_hhdm_region.length);
+}
 
-    // Setup page cache
+INIT_TARGET(map_page_cache, INIT_PROVIDES("map_global_as"), INIT_DEPS("ptm", "earlymem", "log")) {
     uintptr_t page_cache_start = g_hhdm_offset + g_hhdm_size; // TODO: change this to some bump allocator we also use for hhdm?
     uintptr_t page_cache_end = page_cache_start;
-    for(size_t i = 0; i < boot_info->mm_entry_count; i++) {
-        tartarus_mm_entry_t *entry = &boot_info->mm_entries[i];
+    for(size_t i = 0; i < g_init_boot_info->mm_entry_count; i++) {
+        tartarus_mm_entry_t *entry = &g_init_boot_info->mm_entries[i];
         switch(entry->type) {
             case TARTARUS_MM_TYPE_USABLE:
             case TARTARUS_MM_TYPE_BOOTLOADER_RECLAIMABLE:
@@ -182,11 +198,12 @@ static void thread_init() {
 
     g_page_cache = (page_t *) page_cache_start;
     g_page_cache_size = page_cache_size;
+}
 
-    // Map the kernel
-    if(boot_info->kernel_segment_count == 0) panic("INIT", "Kernel has zero segments");
-    for(uint64_t i = 0; i < boot_info->kernel_segment_count; i++) {
-        tartarus_kernel_segment_t *segment = &boot_info->kernel_segments[i];
+INIT_TARGET(map_kernel, INIT_PROVIDES("map_global_as"), INIT_DEPS("ptm", "earlymem", "hhdm", "log")) {
+    if(g_init_boot_info->kernel_segment_count == 0) panic("INIT", "Kernel has zero segments");
+    for(uint64_t i = 0; i < g_init_boot_info->kernel_segment_count; i++) {
+        tartarus_kernel_segment_t *segment = &g_init_boot_info->kernel_segments[i];
         log(LOG_LEVEL_DEBUG,
             "INIT",
             "| Mapping Kernel Segment { %#lx -> %#lx [%c%c%c] }",
@@ -224,18 +241,21 @@ static void thread_init() {
         region->protection = VM_PROT_RW;
         rb_insert(&g_vm_global_address_space->regions, &region->rb_node);
     }
+}
 
-    // Map the framebuffer
-    arch_ptm_map(g_vm_global_address_space, (uintptr_t) g_framebuffer.address, framebuffer->paddr, MATH_CEIL(g_framebuffer.size, ARCH_PAGE_GRANULARITY), VM_PROT_RW, VM_CACHE_NONE, VM_PRIVILEGE_KERNEL, true);
+INIT_TARGET(map_fb, INIT_PROVIDES("map_global_as"), INIT_DEPS("ptm", "framebuffer")) {
+    arch_ptm_map(g_vm_global_address_space, (uintptr_t) g_framebuffer.address, g_framebuffer_paddr, MATH_CEIL(g_framebuffer.size, ARCH_PAGE_GRANULARITY), VM_PROT_RW, VM_CACHE_NONE, VM_PRIVILEGE_KERNEL, true);
+}
 
-    // Load the new address space
+INIT_TARGET_PERCORE(load_global_map, INIT_PROVIDES("global_as", "memory"), INIT_DEPS("map_global_as")) {
     log(LOG_LEVEL_DEBUG, "INIT", "Loading global address space...");
     arch_ptm_load_address_space(g_vm_global_address_space);
+}
 
-    // Initialize physical memory
+INIT_TARGET(physical_memory, INIT_PROVIDES("pmm", "vm", "memory"), INIT_DEPS("global_as", "earlymem", "log")) {
     log(LOG_LEVEL_DEBUG, "INIT", "Initializing physical memory proper");
-    for(size_t i = 0; i < boot_info->mm_entry_count; i++) {
-        tartarus_mm_entry_t *entry = &boot_info->mm_entries[i];
+    for(size_t i = 0; i < g_init_boot_info->mm_entry_count; i++) {
+        tartarus_mm_entry_t *entry = &g_init_boot_info->mm_entries[i];
 
         bool is_free = false;
         switch(entry->type) {
@@ -267,20 +287,12 @@ static void thread_init() {
         pmm_zone_t *zone = zones[i];
         log(LOG_LEVEL_DEBUG, "INIT", "» %-6s %#-18lx -> %#-18lx %lu/%lu pages", zone->name, zone->start, zone->end, zone->free_page_count, zone->total_page_count);
     }
+}
 
-    // Main init
-    init_stage(INIT_STAGE_BEFORE_MAIN, false);
-    arch_init_cpu_locals(boot_info);
-    init_stage(INIT_STAGE_MAIN, false);
-
-    // Dev init
-    init_stage(INIT_STAGE_BEFORE_DEV, false);
-    init_stage(INIT_STAGE_DEV, false);
-
-    // Initialize VFS
+INIT_TARGET(vfs, INIT_PROVIDES("fs"), INIT_DEPS()) {
     tartarus_module_t *sysroot_module = nullptr;
-    for(uint16_t i = 0; i < boot_info->module_count; i++) {
-        tartarus_module_t *module = &boot_info->modules[i];
+    for(uint16_t i = 0; i < g_init_boot_info->module_count; i++) {
+        tartarus_module_t *module = &g_init_boot_info->modules[i];
         if(!string_eq(module->name, "root.rdk")) continue;
         sysroot_module = module;
         break;
@@ -289,9 +301,18 @@ static void thread_init() {
 
     vfs_result_t res = vfs_mount(&g_rdsk_ops, nullptr, (void *) HHDM(sysroot_module->paddr));
     if(res != VFS_RESULT_OK) panic("INIT", "failed to mount rdsk (%i)", res);
+}
+
+[[gnu::no_instrument_function]] [[noreturn]] void init(tartarus_boot_info_t *boot_info) {
+    g_init_boot_info = boot_info;
+
+    arch_init_bsp();
+    ARCH_CPU_CURRENT_WRITE(sequential_id, boot_info->cpus[boot_info->bsp_index].sequential_id);
+
+    init_run(false);
 
     vfs_node_t *root_node;
-    res = vfs_root(&root_node);
+    vfs_result_t res = vfs_root(&root_node);
     ASSERT(res == VFS_RESULT_OK);
 
     log(LOG_LEVEL_DEBUG, "INIT", "| FS Root Listing");
@@ -329,9 +350,6 @@ static void thread_init() {
         if(module->uninitialize != nullptr) module->uninitialize();
     }
 #endif
-
-    // Late init
-    init_stage(INIT_STAGE_LATE, false);
 
     // SMP init
     log(LOG_LEVEL_DEBUG, "INIT", "Starting APs...");

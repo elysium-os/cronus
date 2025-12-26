@@ -16,6 +16,3 @@ void events_process(arch_interrupt_frame_t *frame);
 
 /// Queue an event.
 void event_queue(time_t delay, dw_function_t fn, void *data);
-
-/// Initialize the event system for current CPU.
-void event_init_cpu_local();

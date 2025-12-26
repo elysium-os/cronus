@@ -1,7 +1,6 @@
 #include "sys/init.h"
 
 #include "arch/cpu.h"
-#include "common/assert.h"
 #include "common/log.h"
 #include "lib/string.h"
 
@@ -13,66 +12,69 @@
 extern nullptr_t ld_init_targets_start[];
 extern nullptr_t ld_init_targets_end[];
 
-cpu_t *g_cpu_list;
-
-init_stage_t g_init_stage_current = INIT_STAGE_BOOT;
-
-static const char *stage_stringify(init_stage_t stage) {
-    switch(stage) {
-        case INIT_STAGE_BOOT:        return "boot";
-        case INIT_STAGE_EARLY:       return "early";
-        case INIT_STAGE_BEFORE_MAIN: return "before_main";
-        case INIT_STAGE_MAIN:        return "main";
-        case INIT_STAGE_BEFORE_DEV:  return "before_dev";
-        case INIT_STAGE_DEV:         return "dev";
-        case INIT_STAGE_LATE:        return "late";
+static bool target_provides(init_target_t *target, const char *name) {
+    for(size_t i = 0; i < target->provides_count; i++) {
+        if(!string_eq(target->provides[i], name)) continue;
+        return true;
     }
-    ASSERT_UNREACHABLE();
+    return false;
 }
 
-static init_target_t *find_init_target(init_stage_t stage, const char *name) {
-    for(size_t i = 0; i < TARGET_COUNT; i++) {
-        if(TARGETS[i].stage != stage || !string_eq(TARGETS[i].name, name)) continue;
-        return &TARGETS[i];
-    }
-    return nullptr;
-}
+static void run_target(init_target_t *target, bool is_ap) {
+    if(target->completed) return;
 
-static void run_init_target(init_target_t *target, bool is_ap) {
     for(size_t i = 0; i < target->dependency_count; i++) {
-        init_target_t *dep = find_init_target(target->stage, target->dependencies[i]);
-        if(dep == nullptr) {
-            log(LOG_LEVEL_WARN, "INIT", "Target `%s/%s` has an unknown dependency `%s`", stage_stringify(target->stage), target->name, target->dependencies[i]);
+        size_t provided_count = 0;
+        for(size_t j = 0; j < TARGET_COUNT; j++) {
+            init_target_t *dep = &TARGETS[j];
+            if(!target_provides(dep, target->dependencies[i])) continue;
+            run_target(dep, is_ap);
+            provided_count++;
+        }
+
+        if(provided_count == 0) {
+            log(LOG_LEVEL_WARN, "INIT", "`%s` has no providers", target->dependencies[i]);
             continue;
         }
-        run_init_target(dep, is_ap);
     }
 
-    if((is_ap && !target->per_core) || target->completed) return;
-
-    if(target->per_core) {
-        log(LOG_LEVEL_DEBUG, "INIT", "Target `%s/%s` (per-core %lu)", stage_stringify(target->stage), target->name, ARCH_CPU_CURRENT_READ(sequential_id));
-    } else {
-        log(LOG_LEVEL_DEBUG, "INIT", "Target `%s/%s`", stage_stringify(target->stage), target->name);
+    switch(target->type) {
+        case INIT_TYPE_ALL: break;
+        case INIT_TYPE_BSP_ONLY:
+            if(is_ap) return;
+            break;
+        case INIT_TYPE_APS_ONLY:
+            if(!is_ap) return;
+            break;
     }
 
     target->completed = true;
+
+    if(target->fn == nullptr) return;
+
+    if(is_ap) {
+        log(LOG_LEVEL_DEBUG, "INIT", "Target `%s` (AP %lu)", target->name, ARCH_CPU_CURRENT_READ(sequential_id));
+    } else {
+        log(LOG_LEVEL_DEBUG, "INIT", "Target `%s` (BSP)", target->name);
+    }
+
     target->fn();
 }
 
-void init_reset_ap() {
-    g_init_stage_current = INIT_STAGE_BOOT;
+void init_run(bool is_ap) {
+    // Reset targets
     for(size_t i = 0; i < TARGET_COUNT; i++) {
-        if(!TARGETS[i].per_core) continue;
-        TARGETS[i].completed = false;
+        switch(TARGETS[i].type) {
+            case INIT_TYPE_ALL: TARGETS[i].completed = false; break;
+            case INIT_TYPE_BSP_ONLY:
+                if(!is_ap) TARGETS[i].completed = false;
+                break;
+            case INIT_TYPE_APS_ONLY:
+                if(is_ap) TARGETS[i].completed = false;
+                break;
+        }
     }
-}
 
-void init_stage(init_stage_t stage, bool is_ap) {
-    ASSERT(stage >= g_init_stage_current);
-    g_init_stage_current = stage;
-    for(size_t i = 0; i < TARGET_COUNT; i++) {
-        if(TARGETS[i].stage != stage) continue;
-        run_init_target(&TARGETS[i], is_ap);
-    }
+    // Run all targets
+    for(size_t i = 0; i < TARGET_COUNT; i++) run_target(&TARGETS[i], is_ap);
 }

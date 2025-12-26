@@ -18,7 +18,7 @@ static inline uint64_t x86_64_msr_read(uint64_t msr) {
     uint32_t low;
     uint32_t high;
     asm volatile("rdmsr" : "=a"(low), "=d"(high) : "c"(msr));
-    return low + ((uint64_t) high << 32);
+    return ((uint64_t) high << 32) | low;
 }
 
 /// Write to machine specific register.

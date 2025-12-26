@@ -1,9 +1,13 @@
 #include "x86_64/cpu/lapic.h"
 
+#include "arch/cpu.h"
 #include "common/assert.h"
 #include "common/log.h"
 #include "memory/mmio.h"
+#include "sys/init.h"
+#include "x86_64/cpu/cpuid.h"
 #include "x86_64/cpu/msr.h"
+#include "x86_64/interrupt.h"
 
 #define BASE_ADDR_MASK 0xF'FFFF'FFFF'F000
 #define BASE_GLOBAL_ENABLE (1 << 11)
@@ -28,25 +32,6 @@ static void *g_common_vaddr = nullptr;
 
 [[clang::always_inline]] static uint32_t lapic_read(uint32_t reg) {
     return arch_mmio_read32((void *) ((uintptr_t) g_common_vaddr + reg));
-}
-
-void x86_64_lapic_init() {
-    g_common_paddr = x86_64_msr_read(X86_64_MSR_APIC_BASE) & BASE_ADDR_MASK;
-    log(LOG_LEVEL_DEBUG, "LAPIC", "Lapic found at %#lx", g_common_paddr);
-
-    g_common_vaddr = mmio_map(g_common_paddr, 4096);
-    ASSERT(g_common_vaddr != nullptr);
-    ASSERT(g_common_paddr != 0 && (g_common_paddr & BASE_ADDR_MASK) == g_common_paddr);
-}
-
-void x86_64_lapic_init_cpu() {
-    uint64_t lapic_base_msr = x86_64_msr_read(X86_64_MSR_APIC_BASE);
-    lapic_base_msr &= ~BASE_ADDR_MASK;
-    lapic_base_msr |= g_common_paddr;
-    lapic_base_msr |= BASE_GLOBAL_ENABLE;
-    x86_64_msr_write(X86_64_MSR_APIC_BASE, lapic_base_msr);
-
-    lapic_write(REG_SPURIOUS, 0xFF | (1 << 8));
 }
 
 void x86_64_lapic_eoi(uint8_t interrupt_vector) {
@@ -80,3 +65,29 @@ void x86_64_lapic_timer_start(uint64_t ticks) {
 uint32_t x86_64_lapic_timer_read() {
     return lapic_read(REG_TIMER_CURRENT_COUNT);
 }
+
+INIT_TARGET(lapic, INIT_PROVIDES("lapic", "interrupt", "arch"), INIT_DEPS("log", "vm")) {
+    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
+    // ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_ARAT)); // TODO: fails
+
+    g_common_paddr = x86_64_msr_read(X86_64_MSR_APIC_BASE) & BASE_ADDR_MASK;
+    log(LOG_LEVEL_DEBUG, "LAPIC", "Lapic found at %#lx", g_common_paddr);
+
+    g_common_vaddr = mmio_map(g_common_paddr, 4096);
+    ASSERT(g_common_vaddr != nullptr);
+    ASSERT(g_common_paddr != 0 && (g_common_paddr & BASE_ADDR_MASK) == g_common_paddr);
+
+    g_x86_64_interrupt_irq_eoi = x86_64_lapic_eoi;
+};
+
+INIT_TARGET_PERCORE(lapic, INIT_PROVIDES("lapic", "arch", "interrupt"), INIT_DEPS()) {
+    uint64_t lapic_base_msr = x86_64_msr_read(X86_64_MSR_APIC_BASE);
+    lapic_base_msr &= ~BASE_ADDR_MASK;
+    lapic_base_msr |= g_common_paddr;
+    lapic_base_msr |= BASE_GLOBAL_ENABLE;
+    x86_64_msr_write(X86_64_MSR_APIC_BASE, lapic_base_msr);
+
+    lapic_write(REG_SPURIOUS, 0xFF | (1 << 8));
+
+    ARCH_CPU_CURRENT_WRITE(arch.lapic_id, x86_64_lapic_id());
+};

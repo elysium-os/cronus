@@ -3,10 +3,6 @@
 #include <stdint.h>
 #include <uacpi/acpi.h>
 
-/// Initialize IOAPIC.
-/// @param apic_table MADT table
-void x86_64_ioapic_init(struct acpi_madt *apic_table);
-
 /// Map GSI to interrupt vector.
 /// @param gsi Global system interrupt (IRQ)
 /// @param lapic_id Local apic ID
