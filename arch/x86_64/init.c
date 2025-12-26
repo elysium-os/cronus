@@ -42,8 +42,8 @@
 uintptr_t g_hhdm_offset;
 size_t g_hhdm_size;
 
-page_t *g_page_cache;
-size_t g_page_cache_size;
+page_t *g_page_db;
+size_t g_page_db_size;
 
 static volatile bool g_init_ap_finished = false;
 static uint64_t g_init_ap_cpu_id = 0;

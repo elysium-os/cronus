@@ -30,7 +30,7 @@
 framebuffer_t g_framebuffer;
 size_t g_cpu_count = 0;
 
-static vm_region_t g_hhdm_region, g_page_cache_region;
+static vm_region_t g_hhdm_region, g_page_db_region;
 
 static void thread_init() {
     uacpi_status ret = uacpi_namespace_load();
@@ -68,9 +68,7 @@ static void thread_init() {
     for(size_t i = 0; i < boot_info->mm_entry_count; i++) {
         tartarus_mm_entry_t *entry = &boot_info->mm_entries[i];
 
-        for(size_t j = i + 1; j < boot_info->mm_entry_count; j++) {
-            ASSERT((entry->base >= (boot_info->mm_entries[j].base + boot_info->mm_entries[j].length)) || (boot_info->mm_entries[j].base >= (entry->base + entry->length)));
-        }
+        for(size_t j = i + 1; j < boot_info->mm_entry_count; j++) { ASSERT((entry->base >= (boot_info->mm_entries[j].base + boot_info->mm_entries[j].length)) || (boot_info->mm_entries[j].base >= (entry->base + entry->length))); }
 
         switch(entry->type) {
             case TARTARUS_MM_TYPE_USABLE: break;
@@ -144,8 +142,8 @@ static void thread_init() {
     log(LOG_LEVEL_DEBUG, "INIT", "Global Region: HHDM (base: %#lx, size: %#lx)", g_hhdm_region.base, g_hhdm_region.length);
 
     // Setup page cache
-    uintptr_t page_cache_start = g_hhdm_offset + g_hhdm_size; // TODO: change this to some bump allocator we also use for hhdm?
-    uintptr_t page_cache_end = page_cache_start;
+    uintptr_t page_db_start = g_hhdm_offset + g_hhdm_size; // TODO: change this to some bump allocator we also use for hhdm?
+    uintptr_t page_db_end = page_db_start;
     for(size_t i = 0; i < boot_info->mm_entry_count; i++) {
         tartarus_mm_entry_t *entry = &boot_info->mm_entries[i];
         switch(entry->type) {
@@ -156,32 +154,32 @@ static void thread_init() {
             default:                                      continue;
         }
 
-        uintptr_t start = page_cache_start + MATH_FLOOR((entry->base / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
-        uintptr_t end = page_cache_start + MATH_CEIL(((entry->base + entry->length) / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
+        uintptr_t start = page_db_start + MATH_FLOOR((entry->base / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
+        uintptr_t end = page_db_start + MATH_CEIL(((entry->base + entry->length) / ARCH_PAGE_GRANULARITY) * sizeof(page_t), ARCH_PAGE_GRANULARITY);
         log(LOG_LEVEL_DEBUG, "INIT", "Mapping page cache segment %#lx -> %#lx [%#lx]", start, end, end - start);
 
-        for(page_cache_end = start; page_cache_end < end; page_cache_end += ARCH_PAGE_GRANULARITY) {
-            arch_ptm_map(g_vm_global_address_space, page_cache_end, earlymem_alloc_page(), ARCH_PAGE_GRANULARITY, VM_PROT_RW, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
+        for(page_db_end = start; page_db_end < end; page_db_end += ARCH_PAGE_GRANULARITY) {
+            arch_ptm_map(g_vm_global_address_space, page_db_end, earlymem_alloc_page(), ARCH_PAGE_GRANULARITY, VM_PROT_RW, VM_CACHE_STANDARD, VM_PRIVILEGE_KERNEL, true);
         }
     }
-    size_t page_cache_size = page_cache_end - page_cache_start;
+    size_t page_db_size = page_db_end - page_db_start;
 
     // TODO: collect the physical pages in the page cache and put them into the region :)
     //  once anon regions have the rbtree to thread them on obviously
 
-    g_page_cache_region.address_space = g_vm_global_address_space;
-    g_page_cache_region.base = page_cache_start;
-    g_page_cache_region.length = page_cache_size;
-    g_page_cache_region.protection = VM_PROT_RW;
-    g_page_cache_region.cache_behavior = VM_CACHE_STANDARD;
-    g_page_cache_region.type = VM_REGION_TYPE_ANON;
-    g_page_cache_region.dynamically_backed = false;
-    g_page_cache_region.type_data.anon.back_zeroed = false;
-    rb_insert(&g_vm_global_address_space->regions, &g_page_cache_region.rb_node);
-    log(LOG_LEVEL_DEBUG, "INIT", "Global Region: Page Cache (base: %#lx, size: %#lx)", g_page_cache_region.base, g_page_cache_region.length);
+    g_page_db_region.address_space = g_vm_global_address_space;
+    g_page_db_region.base = page_db_start;
+    g_page_db_region.length = page_db_size;
+    g_page_db_region.protection = VM_PROT_RW;
+    g_page_db_region.cache_behavior = VM_CACHE_STANDARD;
+    g_page_db_region.type = VM_REGION_TYPE_ANON;
+    g_page_db_region.dynamically_backed = false;
+    g_page_db_region.type_data.anon.back_zeroed = false;
+    rb_insert(&g_vm_global_address_space->regions, &g_page_db_region.rb_node);
+    log(LOG_LEVEL_DEBUG, "INIT", "Global Region: Page Cache (base: %#lx, size: %#lx)", g_page_db_region.base, g_page_db_region.length);
 
-    g_page_cache = (page_t *) page_cache_start;
-    g_page_cache_size = page_cache_size;
+    g_page_db = (page_t *) page_db_start;
+    g_page_db_size = page_db_size;
 
     // Map the kernel
     if(boot_info->kernel_segment_count == 0) panic("INIT", "Kernel has zero segments");

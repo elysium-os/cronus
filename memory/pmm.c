@@ -75,7 +75,7 @@ void pmm_region_add(uintptr_t base, size_t size, bool is_free) {
 
             // Initialize the block
             for(size_t y = 0; y < PMM_ORDER_TO_PAGECOUNT(order); y++) {
-                page_t *page = &g_page_cache[index_offset + j + y];
+                page_t *page = &g_page_db[index_offset + j + y];
                 page->block.order = 0;
                 page->block.max_order = order;
                 page->block.free = is_free;
