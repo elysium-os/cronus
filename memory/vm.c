@@ -469,6 +469,7 @@ bool vm_fault(uintptr_t address, vm_fault_t fault) {
     current_thread->vm_fault.address = address;
     current_thread->vm_fault.dw_item.data = current_thread;
     current_thread->vm_fault.dw_item.fn = vm_fault_soft;
+    current_thread->vm_fault.dw_item.cleanup_fn = nullptr;
 
     dw_queue(&current_thread->vm_fault.dw_item);
 

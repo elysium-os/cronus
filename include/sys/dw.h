@@ -2,10 +2,14 @@
 
 #include "lib/list.h"
 
-typedef void (*dw_function_t)(void *data);
+typedef struct dw_item dw_item_t;
 
-typedef struct {
+typedef void (*dw_function_t)(void *data);
+typedef void (*dw_cleanup_fn_t)(dw_item_t *item);
+
+typedef struct dw_item {
     dw_function_t fn;
+    dw_cleanup_fn_t cleanup_fn;
     void *data;
     list_node_t list_node;
 } dw_item_t;

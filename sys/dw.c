@@ -19,10 +19,15 @@ static bool dw_enable() {
     return status == 1;
 }
 
+static void cleanup_created_dw(dw_item_t *item) {
+    slab_free(g_item_cache, item);
+}
+
 dw_item_t *dw_create(dw_function_t fn, void *data) {
     dw_item_t *item = slab_allocate(g_item_cache);
     item->fn = fn;
     item->data = data;
+    item->cleanup_fn = cleanup_created_dw;
     return item;
 }
 
@@ -44,12 +49,15 @@ repeat:
         dw_enable();
         return;
     }
+    interrupt_state_t prev_state = interrupt_state_mask();
     dw_item_t *dw_item = CONTAINER_OF(list_pop(&current_cpu->dw_items), dw_item_t, list_node);
+    interrupt_state_restore(prev_state);
     sched_preempt_dec();
 
     dw_item->fn(dw_item->data);
 
-    slab_free(g_item_cache, dw_item);
+    if(dw_item->cleanup_fn != nullptr) dw_item->cleanup_fn(dw_item);
+
     goto repeat;
 }
 
