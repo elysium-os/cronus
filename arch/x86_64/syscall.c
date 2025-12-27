@@ -18,7 +18,7 @@ syscall_return_t x86_64_syscall_fs_set(void *ptr) {
     return ret;
 }
 
-INIT_TARGET_PERCORE(syscalls, INIT_PROVIDES("arch"), INIT_DEPS()) {
+INIT_TARGET_PERCORE(syscall_msrs, INIT_PROVIDES("cpu"), INIT_DEPS()) {
     x86_64_msr_write(X86_64_MSR_EFER, x86_64_msr_read(X86_64_MSR_EFER) | MSR_EFER_SCE);
     x86_64_msr_write(X86_64_MSR_STAR, ((uint64_t) X86_64_GDT_SELECTOR_CODE64_RING0 << 32) | ((uint64_t) (X86_64_GDT_SELECTOR_DATA64_RING3 - 8) << 48));
     x86_64_msr_write(X86_64_MSR_LSTAR, (uint64_t) x86_64_syscall_entry);

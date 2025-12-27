@@ -92,7 +92,7 @@ void x86_64_tlb_shootdown(uintptr_t addr, size_t length) {
     LOG_TRACE("PTM", "shootdown finished for CPU(%lu). cpus (%lu/%lu)", X86_64_CPU_CURRENT_READ(sequential_id), g_shootdown_complete_count, g_cpu_count);
 }
 
-INIT_TARGET(tlb, INIT_PROVIDES("memory"), INIT_DEPS("interrupt", "heap", "lapic", "spinlock", "time", "cpu_count", "log")) {
+INIT_TARGET(tlb, INIT_PROVIDES("memory"), INIT_DEPS("interrupt", "heap", "cpu_count", "log")) {
     int vector = x86_64_interrupt_request(INTERRUPT_PRIORITY_CRITICAL, tlb_shootdown_handler);
     ASSERT(vector != -1);
     g_shootdown_vector = (uint8_t) vector;

@@ -4,6 +4,7 @@
 #include "arch/debug.h"
 #include "arch/interrupt.h"
 #include "common/log.h"
+#include "sys/init.h"
 
 [[noreturn]] void panic(const char *tag, const char *fmt, ...) {
     arch_interrupt_disable();
@@ -16,3 +17,5 @@
     arch_cpu_halt();
     __builtin_unreachable();
 }
+
+INIT_TARGET_BIND(panic, INIT_PROVIDES("panic"), INIT_DEPS("log"));

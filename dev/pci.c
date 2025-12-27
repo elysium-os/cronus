@@ -346,7 +346,7 @@ pci_bar_t *pci_config_read_bar(pci_device_t *device, uint8_t index) {
     return new_bar;
 }
 
-INIT_TARGET(pci_enumerate, INIT_PROVIDES("init"), INIT_DEPS("uacpi", "heap", "mmio", "log")) {
+INIT_TARGET(pci_enumerate, INIT_PROVIDES("init"), INIT_DEPS("acpi_tables", "memory", "log")) {
     struct acpi_mcfg *mcfg = nullptr;
 
     uacpi_table table;

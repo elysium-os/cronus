@@ -2,12 +2,16 @@
 
 #include "common/log.h"
 #include "memory/mmio.h"
+#include "sys/init.h"
+#include "uacpi/tables.h"
 
 #define GCIDR 0 /* General Capability and ID Register */
 #define GCR 2 /* General Configuration Register */
 #define GCR_ENABLED (1 << 0)
 #define GCR_LEGACY_ROUTING (1 << 1)
 #define MCR 30 /* Main Counter Register */
+
+bool g_hpet_initialized = false;
 
 static void *g_hpet;
 static uint32_t g_period;
@@ -24,12 +28,19 @@ time_t hpet_current_time() {
     return (hpet_read(MCR) * g_period) / (TIME_FEMTOSECONDS_IN_SECOND / TIME_NANOSECONDS_IN_SECOND);
 }
 
-void x86_64_hpet_init(struct acpi_hpet *header) {
-    g_hpet = mmio_map(header->address.address, 1024); // TODO: Assuming a lot about ACPI address
+INIT_TARGET(hpet, INIT_PROVIDES("hpet", "timer"), INIT_DEPS("acpi_tables", "log")) {
+    uacpi_table hpet;
+    uacpi_status ret = uacpi_table_find_by_signature(ACPI_HPET_SIGNATURE, &hpet);
+    if(!uacpi_likely_success(ret)) return;
+
+    g_hpet = mmio_map(((struct acpi_hpet *) hpet.hdr)->address.address, 1024); // TODO: Assuming a lot about ACPI address
     g_period = (uint32_t) (hpet_read(GCIDR) >> 32);
 
     hpet_write(GCR, hpet_read(GCR) & ~(GCR_LEGACY_ROUTING));
     hpet_write(GCR, hpet_read(GCR) | GCR_ENABLED);
 
     log(LOG_LEVEL_DEBUG, "HPET", "Initialized, frequency: %lu", TIME_FEMTOSECONDS_IN_SECOND / g_period);
+
+    uacpi_table_unref(&hpet);
+    g_hpet_initialized = true;
 }

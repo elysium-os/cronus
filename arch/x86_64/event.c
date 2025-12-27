@@ -16,7 +16,7 @@ void arch_event_timer_arm(time_t delay) {
     x86_64_lapic_timer_start(ticks);
 }
 
-INIT_TARGET(event_timer_vector, INIT_PROVIDES("event_timer_vector"), INIT_DEPS("interrupt", "log")) {
+INIT_TARGET(event_timer_vector, INIT_PROVIDES("event_timer_vector"), INIT_DEPS("interrupt", "panic", "log")) {
     g_event_interrupt_vector = arch_interrupt_request(INTERRUPT_PRIORITY_EVENT, events_process);
     if(g_event_interrupt_vector < 0) panic("EVENT", "Failed to acquire interrupt vector for event handler");
     log(LOG_LEVEL_DEBUG, "EVENT", "Event interrupt vector: %i", g_event_interrupt_vector);

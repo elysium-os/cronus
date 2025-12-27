@@ -214,7 +214,7 @@ void arch_sched_context_switch(thread_t *current, thread_t *next) {
     ASSERT_UNREACHABLE();
 }
 
-INIT_TARGET_PERCORE(idle_thread, INIT_PROVIDES("sched"), INIT_DEPS("vm", "pmm", "heap", "spinlock", "cpu_local", "hhdm")) {
+INIT_TARGET_PERCORE(idle_thread, INIT_PROVIDES("sched"), INIT_DEPS("memory", "spinlock", "cpu_local")) {
     x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));

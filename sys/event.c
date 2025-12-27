@@ -93,7 +93,7 @@ void event_cancel(event_t *event) {
     sched_preempt_dec();
 }
 
-INIT_TARGET(event_cache, INIT_PROVIDES("event"), INIT_DEPS("slab", "time", "log")) {
+INIT_TARGET(event_cache, INIT_PROVIDES("event"), INIT_DEPS("slab")) {
     g_event_cache = slab_cache_create("event", sizeof(event_t), 2);
 }
 

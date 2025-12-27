@@ -41,6 +41,7 @@ log_sink_t g_qemu_debug_sink = {
     .log = log_debug
 };
 
+// TODO: figure out what we want to do with the qemu debug log sink
 // INIT_TARGET(qemu_debug, INIT_PROVIDES("log", "log_early"), INIT_DEPS()) {
 //     x86_64_qemu_debug_putc('\n');
 //     log_sink_add(&g_qemu_debug_sink);

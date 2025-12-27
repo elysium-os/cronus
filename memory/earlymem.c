@@ -3,17 +3,29 @@
 #include "arch/page.h"
 #include "common/assert.h"
 #include "common/panic.h"
+#include "init.h"
 #include "lib/container.h"
+#include "lib/list.h"
 #include "lib/math.h"
 #include "lib/mem.h"
 #include "memory/hhdm.h"
+#include "memory/page.h"
+#include "memory/pmm.h"
+#include "sys/init.h"
 
 #define BITMAP(REGION) ((uint8_t *) ((uintptr_t) (REGION) + sizeof(earlymem_region_t)))
 #define BITMAP_SIZE(REGION) ((REGION)->length / ARCH_PAGE_GRANULARITY / 8)
 
-bool g_earlymem_active = true;
-list_t g_earlymem_regions = LIST_INIT;
+typedef struct {
+    uintptr_t base;
+    size_t length;
+    size_t hint;
+    list_node_t list_node;
+} earlymem_region_t;
 
+bool g_earlymem_active = true;
+
+static list_t g_earlymem_regions = LIST_INIT;
 static uintptr_t g_alloc_page = 0;
 static size_t g_alloc_offset = 0;
 
@@ -30,7 +42,7 @@ static bool bitmap_get(earlymem_region_t *region, size_t i) {
     return (BITMAP(region)[i / 8] & (1 << (i % 8))) != 0;
 }
 
-void earlymem_region_add(uintptr_t address, size_t length) {
+static void region_add(uintptr_t address, size_t length) {
     earlymem_region_t *region = (void *) HHDM(address);
     region->base = address;
     region->length = length;
@@ -40,7 +52,7 @@ void earlymem_region_add(uintptr_t address, size_t length) {
     list_push(&g_earlymem_regions, &region->list_node);
 }
 
-bool earlymem_region_isfree(earlymem_region_t *region, size_t offset) {
+static bool region_isfree(earlymem_region_t *region, size_t offset) {
     ASSERT(offset < region->length);
     return !bitmap_get(region, offset / ARCH_PAGE_GRANULARITY);
 }
@@ -91,4 +103,41 @@ uintptr_t earlymem_alloc(size_t size) {
     size_t offset = g_alloc_offset;
     g_alloc_offset += size;
     return g_alloc_page + offset;
+}
+
+INIT_TARGET(early_mem, INIT_PROVIDES("earlymem"), INIT_DEPS("hhdm", "assert")) {
+    for(size_t i = 0; i < g_init_boot_info->mm_entry_count; i++) {
+        tartarus_mm_entry_t *entry = &g_init_boot_info->mm_entries[i];
+
+        for(size_t j = i + 1; j < g_init_boot_info->mm_entry_count; j++) {
+            ASSERT((entry->base >= (g_init_boot_info->mm_entries[j].base + g_init_boot_info->mm_entries[j].length)) || (g_init_boot_info->mm_entries[j].base >= (entry->base + entry->length)));
+        }
+
+        switch(entry->type) {
+            case TARTARUS_MM_TYPE_USABLE: break;
+
+            case TARTARUS_MM_TYPE_BOOTLOADER_RECLAIMABLE:
+            case TARTARUS_MM_TYPE_EFI_RECLAIMABLE:
+            case TARTARUS_MM_TYPE_ACPI_RECLAIMABLE:
+            case TARTARUS_MM_TYPE_ACPI_NVS:
+            case TARTARUS_MM_TYPE_RESERVED:
+            case TARTARUS_MM_TYPE_BAD:                    continue;
+        }
+
+        ASSERT(entry->base % ARCH_PAGE_GRANULARITY == 0 && entry->length % ARCH_PAGE_GRANULARITY == 0);
+
+        region_add(entry->base, entry->length); // TODO: coalesce these regions so that we dont end up with weird max_orders in the buddy
+    }
+}
+
+INIT_TARGET(earlymem_handover, INIT_PROVIDES("pmm", "memory"), INIT_DEPS("pmm_regions")) {
+    // TODO: release reclaimable regions into pmm as well as
+    //       merging with free ones for max order to settle properly.
+    LIST_ITERATE(&g_earlymem_regions, node) {
+        earlymem_region_t *region = CONTAINER_OF(node, earlymem_region_t, list_node);
+        for(size_t offset = 0; offset < region->length; offset += ARCH_PAGE_GRANULARITY) {
+            if(!region_isfree(region, offset)) continue;
+            pmm_free(&PAGE(region->base + offset)->block);
+        }
+    }
 }

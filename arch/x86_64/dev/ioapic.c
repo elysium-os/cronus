@@ -90,7 +90,7 @@ void x86_64_ioapic_map_legacy_irq(uint8_t irq, uint8_t lapic_id, bool fallback_l
     x86_64_ioapic_map_gsi(irq, lapic_id, fallback_low_polarity, fallback_trigger_mode, vector);
 }
 
-INIT_TARGET(ioapic, INIT_PROVIDES("ioapic"), INIT_DEPS("acpi_tables")) {
+INIT_TARGET(ioapic, INIT_PROVIDES("ioapic"), INIT_DEPS("acpi_tables", "mmio", "log")) {
     uacpi_table madt;
     uacpi_status ret = uacpi_table_find_by_signature(ACPI_MADT_SIGNATURE, &madt);
     if(uacpi_likely_success(ret)) {

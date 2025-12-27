@@ -13,6 +13,7 @@
 #include "memory/page.h"
 #include "memory/pmm.h"
 #include "sched/process.h"
+#include "sys/init.h"
 
 #define ADDRESS_IN_BOUNDS(ADDRESS, START, END) ((ADDRESS) >= (START) && (ADDRESS) < (END))
 #define SEGMENT_IN_BOUNDS(BASE, LENGTH, START, END) (ADDRESS_IN_BOUNDS((BASE), (START), (END)) && ((END) - (BASE)) >= (LENGTH))
@@ -519,3 +520,5 @@ size_t vm_copy_from(void *dest, vm_address_space_t *src_as, uintptr_t src_addr, 
 rb_tree_t vm_create_regions() {
     return RB_TREE_INIT(region_node_value);
 }
+
+INIT_TARGET_BIND(vm, INIT_PROVIDES("vm", "memory"), INIT_DEPS("ptm", "hhdm", "assert", "panic"));

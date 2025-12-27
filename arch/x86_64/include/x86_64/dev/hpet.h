@@ -4,8 +4,7 @@
 
 #include <uacpi/acpi.h>
 
-/// Initialize HPET.
-void x86_64_hpet_init(struct acpi_hpet *header);
+extern bool g_hpet_initialized;
 
 /// Get the current time using the HPET MCR.
 time_t hpet_current_time();

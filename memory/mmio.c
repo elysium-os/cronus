@@ -3,6 +3,7 @@
 #include "arch/page.h"
 #include "lib/math.h"
 #include "memory/vm.h"
+#include "sys/init.h"
 
 void *mmio_map(uintptr_t address, uintptr_t length) {
     size_t offset = address % ARCH_PAGE_GRANULARITY;
@@ -23,3 +24,5 @@ void mmio_unmap(void *address, uintptr_t length) {
 
     vm_unmap(g_vm_global_address_space, address, MATH_CEIL(length, ARCH_PAGE_GRANULARITY));
 }
+
+INIT_TARGET_BIND(mmio, INIT_PROVIDES("mmio"), INIT_DEPS("vm"));

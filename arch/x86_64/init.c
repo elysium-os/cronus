@@ -43,60 +43,6 @@ static uint64_t g_init_ap_cpu_id = 0;
 
 static cpu_t g_early_bsp;
 
-static bool g_hpet_initialized = false;
-
-static time_frequency_t calibrate_lapic_timer() {
-    uint32_t nominal_freq = 0;
-    if(!x86_64_cpuid_register(0x15, X86_64_CPUID_REGISTER_ECX, &nominal_freq) && nominal_freq != 0) { return (time_frequency_t) nominal_freq; }
-
-    x86_64_lapic_timer_setup(X86_64_LAPIC_TIMER_TYPE_ONESHOT, true, 0xFF, X86_64_LAPIC_TIMER_DIVISOR_16);
-    if(!g_hpet_initialized) {
-        for(size_t sample_count = 8;; sample_count *= 2) {
-            x86_64_pit_set_reload(0xFFF0);
-            uint16_t start_count = x86_64_pit_count();
-            x86_64_lapic_timer_start(sample_count);
-            while(x86_64_lapic_timer_read() != 0) arch_cpu_relax();
-            uint64_t delta = start_count - x86_64_pit_count();
-
-            if(delta < 0x4000) continue;
-
-            x86_64_lapic_timer_stop();
-            return (sample_count / MATH_MAX(1lu, delta)) * X86_64_PIT_BASE_FREQ;
-        }
-    } else {
-        time_t timeout = (TIME_NANOSECONDS_IN_SECOND / TIME_MILLISECONDS_IN_SECOND) * 100;
-        x86_64_lapic_timer_start(UINT32_MAX);
-        time_t target = hpet_current_time() + timeout;
-        while(hpet_current_time() < target) arch_cpu_relax();
-        return ((uint64_t) UINT32_MAX - x86_64_lapic_timer_read()) * (TIME_NANOSECONDS_IN_SECOND / timeout);
-    }
-    ASSERT_UNREACHABLE();
-}
-
-// TODO: cpuid for TSC freq if available :)
-static time_frequency_t calibrate_tsc() {
-    if(!g_hpet_initialized) {
-        for(size_t sample_count = 8;; sample_count *= 2) {
-            x86_64_pit_set_reload(0xFFF0);
-            uint16_t start_count = x86_64_pit_count();
-            uint64_t tsc_target = __rdtsc() + sample_count;
-            while(__rdtsc() < tsc_target) arch_cpu_relax();
-            uint64_t delta = start_count - x86_64_pit_count();
-
-            if(delta < 0x4000) continue;
-
-            return (sample_count / MATH_MAX(1lu, delta)) * X86_64_PIT_BASE_FREQ;
-        }
-    } else {
-        time_t timeout = (TIME_NANOSECONDS_IN_SECOND / TIME_MILLISECONDS_IN_SECOND) * 100;
-        uint64_t tsc_start = __rdtsc();
-        time_t target = hpet_current_time() + timeout;
-        while(hpet_current_time() < target) arch_cpu_relax();
-        return (__rdtsc() - tsc_start) * (TIME_NANOSECONDS_IN_SECOND / timeout);
-    }
-    ASSERT_UNREACHABLE();
-}
-
 [[gnu::no_instrument_function]] [[noreturn]] static void init_ap() {
     cpu_t *cpu = &g_cpu_list[g_init_ap_cpu_id];
     cpu->self = cpu;
@@ -139,25 +85,6 @@ void arch_init_bsp() {
     log_sink_add(&g_qemu_debug_sink);
 }
 
-INIT_TARGET_PERCORE(timers, INIT_PROVIDES("timer"), INIT_DEPS("acpi_tables", "log")) {
-    uacpi_table hpet;
-    uacpi_status ret = uacpi_table_find_by_signature(ACPI_HPET_SIGNATURE, &hpet);
-    if(uacpi_likely_success(ret)) {
-        x86_64_hpet_init((struct acpi_hpet *) hpet.hdr);
-        uacpi_table_unref(&hpet);
-        g_hpet_initialized = true;
-    }
-
-    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_TSC));
-    // ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_TSC_INVARIANT)); // TODO: doesnt work on tcg
-
-    ARCH_CPU_CURRENT_WRITE(arch.lapic_timer_frequency, calibrate_lapic_timer());
-    ARCH_CPU_CURRENT_WRITE(arch.tsc_timer_frequency, calibrate_tsc());
-
-    log(LOG_LEVEL_DEBUG, "INIT", "CPU[%lu] Local Apic Timer calibrated, freq: %lu", ARCH_CPU_CURRENT_READ(sequential_id), ARCH_CPU_CURRENT_READ(arch.lapic_timer_frequency));
-    log(LOG_LEVEL_DEBUG, "INIT", "CPU[%lu] TSC calibrated, freq: %lu", ARCH_CPU_CURRENT_READ(sequential_id), ARCH_CPU_CURRENT_READ(arch.tsc_timer_frequency));
-}
-
 INIT_TARGET_PERCORE(misc_cpu_local, INIT_PROVIDES("cpu_local"), INIT_DEPS()) {
     // TODO: move into proper targets
     ARCH_CPU_CURRENT_WRITE(arch.current_thread, (x86_64_thread_t *) nullptr);
@@ -166,7 +93,7 @@ INIT_TARGET_PERCORE(misc_cpu_local, INIT_PROVIDES("cpu_local"), INIT_DEPS()) {
     ARCH_CPU_CURRENT_WRITE(arch.tsc_timer_frequency, (size_t) 0);
 }
 
-INIT_TARGET(bsp_late_cpu_local, INIT_PROVIDES("late_cpu_local"), INIT_DEPS("heap", "log", "cpu_local")) {
+INIT_TARGET(bsp_late_cpu_local, INIT_PROVIDES(), INIT_DEPS("heap", "log", "cpu_local")) {
     log(LOG_LEVEL_DEBUG, "INIT", "Setting up proper CPU locals (%lu locals)", g_cpu_count);
     g_cpu_list = heap_alloc(sizeof(cpu_t) * g_cpu_count);
     mem_clear(g_cpu_list, sizeof(cpu_t) * g_cpu_count);
@@ -179,27 +106,7 @@ INIT_TARGET(bsp_late_cpu_local, INIT_PROVIDES("late_cpu_local"), INIT_DEPS("heap
     log(LOG_LEVEL_DEBUG, "INIT", "Initialized BSP proper (local %lu)", cpu->sequential_id);
 }
 
-INIT_TARGET(cpu_info, INIT_PROVIDES(), INIT_DEPS("log")) {
-    char brand1[12];
-    x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_EBX, (uint32_t *) &brand1);
-    x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_EDX, (uint32_t *) &brand1[4]);
-    x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_ECX, (uint32_t *) &brand1[8]);
-
-    char brand2[48];
-    for(size_t i = 0; i < 3; i++) {
-        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_EAX, (uint32_t *) &brand2[i * 16]);
-        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_EBX, (uint32_t *) &brand2[i * 16 + 4]);
-        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_ECX, (uint32_t *) &brand2[i * 16 + 8]);
-        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_EDX, (uint32_t *) &brand2[i * 16 + 12]);
-    }
-    log(LOG_LEVEL_INFO, "INIT", "Running on %.*s (%.*s)", 12, brand1, 48, brand2);
-};
-
-INIT_TARGET(arch_asserts, INIT_PROVIDES("arch"), INIT_DEPS("log")) {
-    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_MSR));
-}
-
-INIT_TARGET(init_program, INIT_PROVIDES("init"), INIT_DEPS("heap", "vm", "pmm", "ptm", "sched", "vfs", "log")) {
+INIT_TARGET(init_program, INIT_PROVIDES(), INIT_DEPS("memory", "sched", "fs", "panic", "log")) {
     log(LOG_LEVEL_DEBUG, "INIT", "loading /usr/bin/init");
     vm_address_space_t *as = arch_ptm_address_space_create();
 
@@ -265,4 +172,24 @@ INIT_TARGET(init_program, INIT_PROVIDES("init"), INIT_DEPS("heap", "vm", "pmm", 
     log(LOG_LEVEL_DEBUG, "INIT", "init thread (tid: %lu) >> entry: %#lx, stack: %#lx", thread->id, entry, thread_stack);
 
     sched_thread_schedule(thread);
+}
+
+INIT_TARGET(cpu_info, INIT_PROVIDES(), INIT_DEPS("log")) {
+    char brand1[12];
+    x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_EBX, (uint32_t *) &brand1);
+    x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_EDX, (uint32_t *) &brand1[4]);
+    x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_ECX, (uint32_t *) &brand1[8]);
+
+    char brand2[48];
+    for(size_t i = 0; i < 3; i++) {
+        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_EAX, (uint32_t *) &brand2[i * 16]);
+        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_EBX, (uint32_t *) &brand2[i * 16 + 4]);
+        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_ECX, (uint32_t *) &brand2[i * 16 + 8]);
+        x86_64_cpuid_register(0x80000002 + i, X86_64_CPUID_REGISTER_EDX, (uint32_t *) &brand2[i * 16 + 12]);
+    }
+    log(LOG_LEVEL_INFO, "INIT", "Running on %.*s (%.*s)", 12, brand1, 48, brand2);
+};
+
+INIT_TARGET(msr, INIT_PROVIDES("cpu"), INIT_DEPS("assert")) {
+    ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_MSR));
 }

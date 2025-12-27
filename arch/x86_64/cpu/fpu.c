@@ -25,7 +25,7 @@ static inline void fxrstor(void *area) {
     asm volatile("fxrstor (%0)" : : "r"(area) : "memory");
 }
 
-INIT_TARGET(fpu, INIT_PROVIDES("arch"), INIT_DEPS("log")) {
+INIT_TARGET(fpu, INIT_PROVIDES("cpu"), INIT_DEPS("assert")) {
     if(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_XSAVE)) {
         uint32_t area_size = 0;
         bool success = !x86_64_cpuid_register(0xD, X86_64_CPUID_REGISTER_ECX, &area_size);
@@ -41,7 +41,7 @@ INIT_TARGET(fpu, INIT_PROVIDES("arch"), INIT_DEPS("log")) {
     }
 };
 
-INIT_TARGET_PERCORE(fpu_cpu, INIT_PROVIDES("arch"), INIT_DEPS("log")) {
+INIT_TARGET_PERCORE(fpu_cpu, INIT_PROVIDES("cpu"), INIT_DEPS("assert")) {
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_FXSR));
 
     /* Enable FPU */

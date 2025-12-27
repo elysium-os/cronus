@@ -20,7 +20,7 @@ void x86_64_tss_set_ist(x86_64_tss_t *tss, int index, uintptr_t stack_pointer) {
 }
 
 
-INIT_TARGET_PERCORE(tss, INIT_PROVIDES("arch"), INIT_DEPS("heap", "pmm", "hhdm", "cpu_local", "idt", "gdt")) {
+INIT_TARGET_PERCORE(tss, INIT_PROVIDES(), INIT_DEPS("memory", "cpu_local", "idt", "gdt")) {
     x86_64_tss_t *tss = heap_alloc(sizeof(x86_64_tss_t));
     mem_clear(tss, sizeof(x86_64_tss_t));
     tss->iomap_base = sizeof(x86_64_tss_t);

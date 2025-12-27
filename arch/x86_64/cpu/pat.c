@@ -13,7 +13,7 @@
 ///  - PA5: WP  (Write Protected)
 ///  - PA6: WC  (Write Combining)
 ///  - PA7: UC  (Uncacheable)
-INIT_TARGET(pat, INIT_PROVIDES("arch"), INIT_DEPS()) {
+INIT_TARGET_PERCORE(pat, INIT_PROVIDES("cpu"), INIT_DEPS()) {
     uint64_t pat = x86_64_msr_read(X86_64_MSR_PAT);
     pat &= ~(((uint64_t) 0b111 << 48) | ((uint64_t) 0b111 << 40));
     pat |= ((uint64_t) 0x1 << 48) | ((uint64_t) 0x5 << 40);

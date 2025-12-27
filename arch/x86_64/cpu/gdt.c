@@ -93,7 +93,7 @@ void x86_64_gdt_load_tss(x86_64_tss_t *tss) {
     asm volatile("ltr %0" : : "m"(tss_segment));
 }
 
-INIT_TARGET_PERCORE(gdt, INIT_PROVIDES("gdt", "arch"), INIT_DEPS("log")) {
+INIT_TARGET_PERCORE(gdt, INIT_PROVIDES("gdt", "cpu"), INIT_DEPS("log")) {
     gdt_descriptor_t gdtr;
     gdtr.limit = sizeof(g_gdt) - 1;
     gdtr.base = (uint64_t) &g_gdt;

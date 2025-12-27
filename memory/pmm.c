@@ -4,9 +4,11 @@
 #include "arch/page.h"
 #include "common/assert.h"
 #include "common/log.h"
+#include "init.h"
 #include "lib/mem.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"
+#include "sys/init.h"
 
 #include <stdint.h>
 
@@ -149,4 +151,34 @@ void pmm_free(pmm_block_t *block) {
     }
     list_push(&zone->lists[block->order], &block->list_node);
     spinlock_release_nodw(&zone->lock);
+}
+
+
+INIT_TARGET(pmm_regions, INIT_PROVIDES("pmm_regions", "pmm", "memory"), INIT_DEPS("global_as", "earlymem", "log")) {
+    log(LOG_LEVEL_DEBUG, "INIT", "Initializing physical memory proper");
+    for(size_t i = 0; i < g_init_boot_info->mm_entry_count; i++) {
+        tartarus_mm_entry_t *entry = &g_init_boot_info->mm_entries[i];
+
+        bool is_free = false;
+        switch(entry->type) {
+            case TARTARUS_MM_TYPE_USABLE:                 break;
+            case TARTARUS_MM_TYPE_BOOTLOADER_RECLAIMABLE: break;
+            case TARTARUS_MM_TYPE_EFI_RECLAIMABLE:        break;
+            case TARTARUS_MM_TYPE_ACPI_RECLAIMABLE:       break;
+            default:                                      continue;
+        }
+
+        log(LOG_LEVEL_DEBUG, "INIT", "| %#lx -> %#lx (free: %u)", entry->base, entry->base + entry->length, is_free);
+
+        pmm_region_add(entry->base, entry->length, is_free);
+    }
+}
+
+INIT_TARGET(physical_memory_map, INIT_PROVIDES(), INIT_DEPS("pmm", "log")) {
+    log(LOG_LEVEL_DEBUG, "INIT", "Physical Memory Map");
+    pmm_zone_t *zones[] = { &g_pmm_zone_low, &g_pmm_zone_normal };
+    for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
+        pmm_zone_t *zone = zones[i];
+        log(LOG_LEVEL_DEBUG, "INIT", "» %-6s %#-18lx -> %#-18lx %lu/%lu pages", zone->name, zone->start, zone->end, zone->free_page_count, zone->total_page_count);
+    }
 }

@@ -7,7 +7,6 @@
 #include "arch/sched.h"
 #include "common/assert.h"
 #include "common/log.h"
-#include "dev/acpi.h"
 #include "fs/rdsk.h"
 #include "fs/tmpfs.h"
 #include "fs/vfs.h"
@@ -17,7 +16,6 @@
 #include "memory/earlymem.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"
-#include "memory/pmm.h"
 #include "memory/vm.h"
 #include "sched/reaper.h"
 #include "sys/cpu.h"
@@ -28,12 +26,12 @@
 #include <tartarus.h>
 #include <uacpi/uacpi.h>
 
-tartarus_boot_info_t *g_init_boot_info;
+tartarus_boot_info_t *g_init_boot_info = nullptr;
 
-cpu_t *g_cpu_list;
+cpu_t *g_cpu_list = nullptr;
+size_t g_cpu_count = 0;
 
 framebuffer_t g_framebuffer;
-size_t g_cpu_count = 0;
 
 static uintptr_t g_framebuffer_paddr;
 
@@ -43,6 +41,68 @@ static void thread_init() {
     uacpi_status ret = uacpi_namespace_load();
     if(uacpi_unlikely_error(ret)) log(LOG_LEVEL_WARN, "UACPI", "namespace load failed (%s)", uacpi_status_to_string(ret));
     log(LOG_LEVEL_INFO, "UACPI", "Setup Done");
+}
+
+[[gnu::no_instrument_function]] [[noreturn]] void init(tartarus_boot_info_t *boot_info) {
+    g_init_boot_info = boot_info;
+
+    arch_init_bsp();
+    ARCH_CPU_CURRENT_WRITE(sequential_id, boot_info->cpus[boot_info->bsp_index].sequential_id);
+
+    init_run(false);
+
+    vfs_node_t *root_node;
+    vfs_result_t res = vfs_root(&root_node);
+    ASSERT(res == VFS_RESULT_OK);
+
+    log(LOG_LEVEL_DEBUG, "INIT", "| FS Root Listing");
+    for(size_t i = 0;;) {
+        const char *filename;
+        res = root_node->ops->readdir(root_node, &i, &filename);
+        ASSERT(res == VFS_RESULT_OK);
+        if(filename == nullptr) break;
+        log(LOG_LEVEL_DEBUG, "INIT", "| - %s", filename);
+    }
+
+    res = vfs_mount(&g_tmpfs_ops, "/tmp", nullptr);
+    if(res != VFS_RESULT_OK) panic("INIT", "failed to mount /tmp (%i)", res);
+
+    // Run module tests
+#ifdef __ENV_DEVELOPMENT
+    vfs_node_t *modules_dir = nullptr;
+    res = vfs_lookup(&VFS_ABSOLUTE_PATH("/sys/modules"), &modules_dir);
+    if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup modules directory (%i)", res);
+    if(modules_dir == nullptr) panic("INIT", "no modules directory found");
+
+    static const char *test_modules[] = { "test_pmm.cronmod", "test_vm.cronmod" };
+
+    for(size_t i = 0; i < sizeof(test_modules) / sizeof(char *); i++) {
+        vfs_node_t *test_module_file = nullptr;
+        res = vfs_lookup(&(vfs_path_t) { .root = modules_dir, .relative_path = test_modules[i] }, &test_module_file);
+        if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup `%s` module (%i)", test_modules[i], res);
+        if(test_module_file == nullptr) panic("INIT", "no `%s` module found", test_modules[i]);
+
+        module_t *module;
+        module_result_t mres = module_load(test_module_file, &module);
+        if(mres != MODULE_RESULT_OK) panic("INIT", "failed to load `%s` module `%s`", test_modules[i], module_result_stringify(mres));
+
+        if(module->initialize != nullptr) module->initialize();
+        if(module->uninitialize != nullptr) module->uninitialize();
+    }
+#endif
+
+    // SMP init
+    log(LOG_LEVEL_DEBUG, "INIT", "Starting APs...");
+    arch_init_smp(boot_info);
+
+    // Schedule init threads
+    sched_thread_schedule(reaper_create());
+    sched_thread_schedule(arch_sched_thread_create_kernel(thread_init));
+
+    // Scheduler handoff
+    log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye now!");
+    arch_sched_handoff_cpu();
+    ASSERT_UNREACHABLE();
 }
 
 INIT_TARGET(welcome, INIT_PROVIDES(), INIT_DEPS("log")) {
@@ -57,13 +117,13 @@ INIT_TARGET_PERCORE(cpu_flags, INIT_PROVIDES("cpu_local"), INIT_DEPS()) {
     ARCH_CPU_CURRENT_WRITE(flags.deferred_work_status, (unsigned int) 0);
 }
 
-INIT_TARGET(hhdm, INIT_PROVIDES("hhdm", "memory"), INIT_DEPS("log_early")) {
+INIT_TARGET(hhdm, INIT_PROVIDES("hhdm", "memory"), INIT_DEPS("assert")) {
     ASSERT(g_init_boot_info->hhdm_offset % ARCH_PAGE_GRANULARITY == 0 && g_init_boot_info->hhdm_offset % ARCH_PAGE_GRANULARITY == 0);
     g_hhdm_offset = g_init_boot_info->hhdm_offset;
     g_hhdm_size = g_init_boot_info->hhdm_size;
 }
 
-INIT_TARGET(cpu_count, INIT_PROVIDES("cpu_count"), INIT_DEPS()) {
+INIT_TARGET(cpu_count, INIT_PROVIDES("cpu_count"), INIT_DEPS("assert", "panic", "log")) {
     uint32_t highest_seqid = 0;
     for(tartarus_size_t i = 0; i < g_init_boot_info->cpu_count; i++) {
         if(g_init_boot_info->cpus[i].init_state == TARTARUS_CPU_STATE_FAIL) continue;
@@ -76,32 +136,7 @@ INIT_TARGET(cpu_count, INIT_PROVIDES("cpu_count"), INIT_DEPS()) {
     ASSERT(g_cpu_count > 0);
 }
 
-INIT_TARGET(early_mem, INIT_PROVIDES("earlymem"), INIT_DEPS()) {
-    for(size_t i = 0; i < g_init_boot_info->mm_entry_count; i++) {
-        tartarus_mm_entry_t *entry = &g_init_boot_info->mm_entries[i];
-
-        for(size_t j = i + 1; j < g_init_boot_info->mm_entry_count; j++) {
-            ASSERT((entry->base >= (g_init_boot_info->mm_entries[j].base + g_init_boot_info->mm_entries[j].length)) || (g_init_boot_info->mm_entries[j].base >= (entry->base + entry->length)));
-        }
-
-        switch(entry->type) {
-            case TARTARUS_MM_TYPE_USABLE: break;
-
-            case TARTARUS_MM_TYPE_BOOTLOADER_RECLAIMABLE:
-            case TARTARUS_MM_TYPE_EFI_RECLAIMABLE:
-            case TARTARUS_MM_TYPE_ACPI_RECLAIMABLE:
-            case TARTARUS_MM_TYPE_ACPI_NVS:
-            case TARTARUS_MM_TYPE_RESERVED:
-            case TARTARUS_MM_TYPE_BAD:                    continue;
-        }
-
-        ASSERT(entry->base % ARCH_PAGE_GRANULARITY == 0 && entry->length % ARCH_PAGE_GRANULARITY == 0);
-
-        earlymem_region_add(entry->base, entry->length); // TODO: coalesce these regions so that we dont end up with weird max_orders in the buddy
-    }
-}
-
-INIT_TARGET(modules, INIT_PROVIDES("boot_module"), INIT_DEPS("hhdm", "log")) {
+INIT_TARGET(modules, INIT_PROVIDES("boot_module"), INIT_DEPS("hhdm", "panic", "log")) {
     log(LOG_LEVEL_DEBUG, "INIT", "Enumerating %lu modules", g_init_boot_info->module_count);
     for(uint16_t i = 0; i < g_init_boot_info->module_count; i++) {
         tartarus_module_t *module = &g_init_boot_info->modules[i];
@@ -113,13 +148,9 @@ INIT_TARGET(modules, INIT_PROVIDES("boot_module"), INIT_DEPS("hhdm", "log")) {
     }
 }
 
-INIT_TARGET(rsdp, INIT_PROVIDES("rsdp"), INIT_DEPS("log")) {
-    g_acpi_rsdp = g_init_boot_info->acpi_rsdp_address;
-    log(LOG_LEVEL_DEBUG, "INIT", "RSDP at %#lx", g_acpi_rsdp);
-}
+INIT_TARGET(framebuffer, INIT_PROVIDES("framebuffer"), INIT_DEPS()) {
+    // TODO: handle having no framebuffers
 
-INIT_TARGET(framebuffer, INIT_PROVIDES("framebuffer"), INIT_DEPS("log_early")) {
-    if(g_init_boot_info->framebuffer_count == 0) panic("INIT", "no framebuffer provided");
     // TODO: handle pixel format... and the entire way we deal with framebuffers in general
     tartarus_framebuffer_t *framebuffer = &g_init_boot_info->framebuffers[0];
     g_framebuffer.address = framebuffer->vaddr;
@@ -252,44 +283,7 @@ INIT_TARGET_PERCORE(load_global_map, INIT_PROVIDES("global_as", "memory"), INIT_
     arch_ptm_load_address_space(g_vm_global_address_space);
 }
 
-INIT_TARGET(physical_memory, INIT_PROVIDES("pmm", "vm", "memory"), INIT_DEPS("global_as", "earlymem", "log")) {
-    log(LOG_LEVEL_DEBUG, "INIT", "Initializing physical memory proper");
-    for(size_t i = 0; i < g_init_boot_info->mm_entry_count; i++) {
-        tartarus_mm_entry_t *entry = &g_init_boot_info->mm_entries[i];
-
-        bool is_free = false;
-        switch(entry->type) {
-            case TARTARUS_MM_TYPE_USABLE:                 break;
-            case TARTARUS_MM_TYPE_BOOTLOADER_RECLAIMABLE: break;
-            case TARTARUS_MM_TYPE_EFI_RECLAIMABLE:        break;
-            case TARTARUS_MM_TYPE_ACPI_RECLAIMABLE:       break;
-            default:                                      continue;
-        }
-
-        log(LOG_LEVEL_DEBUG, "INIT", "| %#lx -> %#lx (free: %u)", entry->base, entry->base + entry->length, is_free);
-
-        pmm_region_add(entry->base, entry->length, is_free);
-    }
-
-    // TODO: release reclaimable regions into pmm as well as
-    //       merging with free ones for max order to settle properly.
-    LIST_ITERATE(&g_earlymem_regions, node) {
-        earlymem_region_t *region = CONTAINER_OF(node, earlymem_region_t, list_node);
-        for(size_t offset = 0; offset < region->length; offset += ARCH_PAGE_GRANULARITY) {
-            if(!earlymem_region_isfree(region, offset)) continue;
-            pmm_free(&PAGE(region->base + offset)->block);
-        }
-    }
-
-    log(LOG_LEVEL_DEBUG, "INIT", "Physical Memory Map");
-    pmm_zone_t *zones[] = { &g_pmm_zone_low, &g_pmm_zone_normal };
-    for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
-        pmm_zone_t *zone = zones[i];
-        log(LOG_LEVEL_DEBUG, "INIT", "» %-6s %#-18lx -> %#-18lx %lu/%lu pages", zone->name, zone->start, zone->end, zone->free_page_count, zone->total_page_count);
-    }
-}
-
-INIT_TARGET(vfs, INIT_PROVIDES("fs"), INIT_DEPS()) {
+INIT_TARGET(sysroot, INIT_PROVIDES("fs"), INIT_DEPS("memory")) {
     tartarus_module_t *sysroot_module = nullptr;
     for(uint16_t i = 0; i < g_init_boot_info->module_count; i++) {
         tartarus_module_t *module = &g_init_boot_info->modules[i];
@@ -303,64 +297,4 @@ INIT_TARGET(vfs, INIT_PROVIDES("fs"), INIT_DEPS()) {
     if(res != VFS_RESULT_OK) panic("INIT", "failed to mount rdsk (%i)", res);
 }
 
-[[gnu::no_instrument_function]] [[noreturn]] void init(tartarus_boot_info_t *boot_info) {
-    g_init_boot_info = boot_info;
-
-    arch_init_bsp();
-    ARCH_CPU_CURRENT_WRITE(sequential_id, boot_info->cpus[boot_info->bsp_index].sequential_id);
-
-    init_run(false);
-
-    vfs_node_t *root_node;
-    vfs_result_t res = vfs_root(&root_node);
-    ASSERT(res == VFS_RESULT_OK);
-
-    log(LOG_LEVEL_DEBUG, "INIT", "| FS Root Listing");
-    for(size_t i = 0;;) {
-        const char *filename;
-        res = root_node->ops->readdir(root_node, &i, &filename);
-        ASSERT(res == VFS_RESULT_OK);
-        if(filename == nullptr) break;
-        log(LOG_LEVEL_DEBUG, "INIT", "| - %s", filename);
-    }
-
-    res = vfs_mount(&g_tmpfs_ops, "/tmp", nullptr);
-    if(res != VFS_RESULT_OK) panic("INIT", "failed to mount /tmp (%i)", res);
-
-    // Run module tests
-#ifdef __ENV_DEVELOPMENT
-    vfs_node_t *modules_dir = nullptr;
-    res = vfs_lookup(&VFS_ABSOLUTE_PATH("/sys/modules"), &modules_dir);
-    if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup modules directory (%i)", res);
-    if(modules_dir == nullptr) panic("INIT", "no modules directory found");
-
-    static const char *test_modules[] = { "test_pmm.cronmod", "test_vm.cronmod" };
-
-    for(size_t i = 0; i < sizeof(test_modules) / sizeof(char *); i++) {
-        vfs_node_t *test_module_file = nullptr;
-        res = vfs_lookup(&(vfs_path_t) { .root = modules_dir, .relative_path = test_modules[i] }, &test_module_file);
-        if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup `%s` module (%i)", test_modules[i], res);
-        if(test_module_file == nullptr) panic("INIT", "no `%s` module found", test_modules[i]);
-
-        module_t *module;
-        module_result_t mres = module_load(test_module_file, &module);
-        if(mres != MODULE_RESULT_OK) panic("INIT", "failed to load `%s` module `%s`", test_modules[i], module_result_stringify(mres));
-
-        if(module->initialize != nullptr) module->initialize();
-        if(module->uninitialize != nullptr) module->uninitialize();
-    }
-#endif
-
-    // SMP init
-    log(LOG_LEVEL_DEBUG, "INIT", "Starting APs...");
-    arch_init_smp(boot_info);
-
-    // Schedule init threads
-    sched_thread_schedule(reaper_create());
-    sched_thread_schedule(arch_sched_thread_create_kernel(thread_init));
-
-    // Scheduler handoff
-    log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye now!");
-    arch_sched_handoff_cpu();
-    ASSERT_UNREACHABLE();
-}
+INIT_TARGET_BIND(assert, INIT_PROVIDES("assert"), INIT_DEPS("panic"));
