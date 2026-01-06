@@ -1,6 +1,8 @@
 #pragma once
 
+// TODO: this is cursed
 struct arch_interrupt_frame;
+// NOLINTNEXTLINE
 enum interrupt_priority;
 
 /// Request a free interrupt vector and register a handler.

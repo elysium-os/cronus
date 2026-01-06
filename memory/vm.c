@@ -315,7 +315,7 @@ static void *map_common(vm_address_space_t *address_space, void *hint, size_t le
 
     if(!region->dynamically_backed) region_map(region, region->base, region->length);
 
-    region = region_insert(address_space, region);
+    region_insert(address_space, region);
 
     spinlock_release_nodw(&address_space->lock);
 

@@ -5,6 +5,7 @@
 #define RB_TREE_INIT(VALUE_FN) ((rb_tree_t) { .value = (VALUE_FN), .root = nullptr, .count = 0 })
 
 typedef size_t rb_value_t;
+static_assert((rb_value_t) -1 > 0, "rb_value_t must be unsigned");
 typedef struct rb_node rb_node_t;
 
 typedef enum {

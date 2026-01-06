@@ -77,6 +77,9 @@ typedef enum {
 
 static x86_64_ptm_address_space_t g_global_address_space;
 
+// TODO: 1gb pages (needs the cpuid check)
+static bool g_x86_64_cpu_pdpe1gb_support = true;
+
 static uintptr_t alloc_page() {
     if(EXPECT_UNLIKELY(g_earlymem_active)) {
         uintptr_t address = earlymem_alloc_page();
@@ -198,8 +201,6 @@ void arch_ptm_map(vm_address_space_t *address_space, uintptr_t vaddr, uintptr_t 
         page_size_t cursize = PAGE_SIZE_4K;
         if(paddr % PAGE_SIZE_2M == 0 && vaddr % PAGE_SIZE_2M == 0 && length - i >= PAGE_SIZE_2M) cursize = PAGE_SIZE_2M;
 
-        // TODO: 1gb pages (needs the cpuid check)
-        bool g_x86_64_cpu_pdpe1gb_support = true;
         if(g_x86_64_cpu_pdpe1gb_support && paddr % PAGE_SIZE_1G == 0 && vaddr % PAGE_SIZE_1G == 0 && length - i >= PAGE_SIZE_1G) cursize = PAGE_SIZE_1G;
 
         map_page((uint64_t *) HHDM(X86_64_PTM_AS(address_space)->pt_top), vaddr + i, paddr + i, cursize, prot, cache, privilege, global);

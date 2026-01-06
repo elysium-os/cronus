@@ -72,8 +72,8 @@ static time_frequency_t calibrate_lapic_timer() {
     } else {
         time_t timeout = (TIME_NANOSECONDS_IN_SECOND / TIME_MILLISECONDS_IN_SECOND) * 100;
         x86_64_lapic_timer_start(UINT32_MAX);
-        time_t target = hpet_current_time() + timeout;
-        while(hpet_current_time() < target) arch_cpu_relax();
+        time_t target = x86_64_hpet_current_time() + timeout;
+        while(x86_64_hpet_current_time() < target) arch_cpu_relax();
         return ((uint64_t) UINT32_MAX - x86_64_lapic_timer_read()) * (TIME_NANOSECONDS_IN_SECOND / timeout);
     }
     ASSERT_UNREACHABLE();
@@ -96,8 +96,8 @@ static time_frequency_t calibrate_tsc() {
     } else {
         time_t timeout = (TIME_NANOSECONDS_IN_SECOND / TIME_MILLISECONDS_IN_SECOND) * 100;
         uint64_t tsc_start = __rdtsc();
-        time_t target = hpet_current_time() + timeout;
-        while(hpet_current_time() < target) arch_cpu_relax();
+        time_t target = x86_64_hpet_current_time() + timeout;
+        while(x86_64_hpet_current_time() < target) arch_cpu_relax();
         return (__rdtsc() - tsc_start) * (TIME_NANOSECONDS_IN_SECOND / timeout);
     }
     ASSERT_UNREACHABLE();

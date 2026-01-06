@@ -20,7 +20,7 @@ static void hpet_write(uint64_t reg, uint64_t value) {
     return arch_mmio_write64(g_hpet + (reg * sizeof(uint64_t)), value);
 }
 
-time_t hpet_current_time() {
+time_t x86_64_hpet_current_time() {
     return (hpet_read(MCR) * g_period) / (TIME_FEMTOSECONDS_IN_SECOND / TIME_NANOSECONDS_IN_SECOND);
 }
 

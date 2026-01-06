@@ -1,5 +1,43 @@
-Checks:
-    - "-*"
-    - "modernize-use-nullptr"
-    - "elysium-atomic-checks"
+HeaderFileExtensions: ["h"]
+FormatStyle: None
 WarningsAsErrors: "*"
+
+Checks:
+  - "-*"
+  - "modernize-use-nullptr"
+  - "readability-identifier-naming"
+  - "readability-simplify-boolean-expr"
+  - "readability-redundant-control-flow"
+  - "clang-diagnostic-*"
+  - "elysium-atomic-checks"
+  - "elysium-global-prefix"
+  - "elysium-header-namespace"
+
+CheckOptions:
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.MemberCase
+    value: lower_case
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key: readability-identifier-naming.StructCase
+    value: lower_case
+  - key: readability-identifier-naming.UnionCase
+    value: lower_case
+  - key: readability-identifier-naming.EnumCase
+    value: lower_case
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.TypedefCase
+    value: lower_case
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.FunctionIgnoredRegexp
+    value: '^(__cyg_profile_func_(enter|exit))|__ubsan.*$'
+
+  - key: elysium-header-namespace.SpecialDirectoryPrefixes
+    value: include/arch:arch_;include/x86_64:x86_64_
+  - key: elysium-header-namespace.SpecialGlobalPrefixes
+    value: internal_

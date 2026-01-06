@@ -8,4 +8,4 @@
 void x86_64_hpet_init(struct acpi_hpet *header);
 
 /// Get the current time using the HPET MCR.
-time_t hpet_current_time();
+time_t x86_64_hpet_current_time();

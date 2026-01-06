@@ -18,7 +18,7 @@
 #define PUTCHAR(OUTFUNC, CH, COUNT) ({ (COUNT)++; OUTFUNC((CH)); })
 
 enum {
-    LNONE, Lh, Lhh, Ll, Lll, Lj, Lz, Lt, LL
+    L_NONE, L_H, L_HH, L_L, L_LL, L_J, L_Z, L_T, LL
 };
 
 enum {
@@ -110,7 +110,7 @@ int format(format_writer_t writer, const char *format, va_list list) {
             flags = 0;
             precision = -1;
             width = 0;
-            length_prefix = LNONE;
+            length_prefix = L_NONE;
             fmt++;
             fallback = fmt;
             if(*fmt == '%') {
@@ -187,11 +187,11 @@ int format(format_writer_t writer, const char *format, va_list list) {
 
     lbl_length:
     switch(*fmt) {
-        case 'h': length_prefix = Lh; goto lbl_length_ext;
-        case 'l': length_prefix = Ll; goto lbl_length_ext;
-        case 'j': length_prefix = Lj; break;
-        case 'z': length_prefix = Lz; break;
-        case 't': length_prefix = Lt; break;
+        case 'h': length_prefix = L_H; goto lbl_length_ext;
+        case 'l': length_prefix = L_L; goto lbl_length_ext;
+        case 'j': length_prefix = L_J; break;
+        case 'z': length_prefix = L_Z; break;
+        case 't': length_prefix = L_T; break;
         case 'L': length_prefix = LL; break;
         default: goto lbl_modifiers;
     }
@@ -201,8 +201,8 @@ int format(format_writer_t writer, const char *format, va_list list) {
     lbl_length_ext:
     fmt++;
     switch(*fmt) {
-        case 'h': length_prefix = Lhh; break;
-        case 'l': length_prefix = Lll; break;
+        case 'h': length_prefix = L_HH; break;
+        case 'l': length_prefix = L_LL; break;
         default: goto lbl_modifiers;
     }
     fmt++;
@@ -211,7 +211,7 @@ int format(format_writer_t writer, const char *format, va_list list) {
     uint8_t index = *fmt;
     if(index < 'a') index += ('a' - 'A');
     uint8_t size = g_lookup[length_prefix][HASH(index)];
-    if(!size) size = g_lookup[LNONE][HASH(index)];
+    if(!size) size = g_lookup[L_NONE][HASH(index)];
     if(!size) goto lbl_invalid;
 
     switch(size) {
