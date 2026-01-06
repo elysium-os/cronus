@@ -51,12 +51,6 @@ static const char *get_message(uint8_t int_no) {
     ASSERT_UNREACHABLE();
 }
 
-static void init_exceptions() {
-    for(int i = 0; i < 32; i++) {
-        switch(i) {
-            default: x86_64_interrupt_set(i, x86_64_exception_unhandled); break;
-        }
-    }
+INIT_TARGET(exceptions, INIT_STAGE_EARLY, INIT_SCOPE_BSP, INIT_DEPS()) {
+    for(int i = 0; i < 32; i++) { x86_64_interrupt_set(i, x86_64_exception_unhandled); }
 }
-
-INIT_TARGET(exceptions, INIT_STAGE_EARLY, init_exceptions);

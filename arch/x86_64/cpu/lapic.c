@@ -3,6 +3,7 @@
 #include "common/assert.h"
 #include "common/log.h"
 #include "memory/mmio.h"
+#include "sys/init.h"
 #include "x86_64/cpu/msr.h"
 
 #define BASE_ADDR_MASK 0xF'FFFF'FFFF'F000
@@ -39,16 +40,6 @@ void x86_64_lapic_init() {
     ASSERT(g_common_paddr != 0 && (g_common_paddr & BASE_ADDR_MASK) == g_common_paddr);
 }
 
-void x86_64_lapic_init_cpu() {
-    uint64_t lapic_base_msr = x86_64_msr_read(X86_64_MSR_APIC_BASE);
-    lapic_base_msr &= ~BASE_ADDR_MASK;
-    lapic_base_msr |= g_common_paddr;
-    lapic_base_msr |= BASE_GLOBAL_ENABLE;
-    x86_64_msr_write(X86_64_MSR_APIC_BASE, lapic_base_msr);
-
-    lapic_write(REG_SPURIOUS, 0xFF | (1 << 8));
-}
-
 void x86_64_lapic_eoi(uint8_t interrupt_vector) {
     if(lapic_read(REG_IN_SERVICE_BASE + interrupt_vector / 32 * 0x10) & (1 << (interrupt_vector % 32))) lapic_write(REG_EOI, 0);
 }
@@ -79,4 +70,15 @@ void x86_64_lapic_timer_start(uint64_t ticks) {
 
 uint32_t x86_64_lapic_timer_read() {
     return lapic_read(REG_TIMER_CURRENT_COUNT);
+}
+
+
+INIT_TARGET(lapic, INIT_STAGE_BEFORE_MAIN, INIT_SCOPE_ALL, INIT_DEPS("external_interrupts")) {
+    uint64_t lapic_base_msr = x86_64_msr_read(X86_64_MSR_APIC_BASE);
+    lapic_base_msr &= ~BASE_ADDR_MASK;
+    lapic_base_msr |= g_common_paddr;
+    lapic_base_msr |= BASE_GLOBAL_ENABLE;
+    x86_64_msr_write(X86_64_MSR_APIC_BASE, lapic_base_msr);
+
+    lapic_write(REG_SPURIOUS, 0xFF | (1 << 8));
 }

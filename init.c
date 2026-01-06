@@ -41,9 +41,8 @@ static void thread_init() {
 [[gnu::no_instrument_function]] [[noreturn]] void init(tartarus_boot_info_t *boot_info) {
     arch_init_bsp_local(boot_info->cpus[boot_info->bsp_index].sequential_id);
     event_init_cpu_local();
-    arch_init_bsp();
 
-    init_stage(INIT_STAGE_BOOT, false);
+    init_run_stage(INIT_STAGE_BOOT, false);
 
     log(LOG_LEVEL_INFO, "INIT", "Elysium " MACROS_STRINGIFY(__ARCH) " " MACROS_STRINGIFY(__VERSION) " (" __DATE__ " " __TIME__ ")");
 
@@ -98,7 +97,7 @@ static void thread_init() {
     }
 
     // Run early init stage
-    init_stage(INIT_STAGE_EARLY, false);
+    init_run_stage(INIT_STAGE_EARLY, false);
 
     // Set RSDP
     g_acpi_rsdp = boot_info->acpi_rsdp_address;
@@ -267,13 +266,13 @@ static void thread_init() {
     }
 
     // Main init
-    init_stage(INIT_STAGE_BEFORE_MAIN, false);
+    init_run_stage(INIT_STAGE_BEFORE_MAIN, false);
     arch_init_cpu_locals(boot_info);
-    init_stage(INIT_STAGE_MAIN, false);
+    init_run_stage(INIT_STAGE_MAIN, false);
 
     // Dev init
-    init_stage(INIT_STAGE_BEFORE_DEV, false);
-    init_stage(INIT_STAGE_DEV, false);
+    init_run_stage(INIT_STAGE_BEFORE_DEV, false);
+    init_run_stage(INIT_STAGE_DEV, false);
 
     // Initialize VFS
     tartarus_module_t *sysroot_module = nullptr;
@@ -329,7 +328,7 @@ static void thread_init() {
 #endif
 
     // Late init
-    init_stage(INIT_STAGE_LATE, false);
+    init_run_stage(INIT_STAGE_LATE, false);
 
     // SMP init
     log(LOG_LEVEL_DEBUG, "INIT", "Starting APs...");

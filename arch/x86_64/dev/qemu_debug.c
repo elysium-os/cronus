@@ -41,11 +41,9 @@ static log_sink_t g_qemu_debug_sink = {
     .log = log_debug
 };
 
-static void qemu_debug_init() {
+INIT_TARGET(qemu_debug, INIT_STAGE_BOOT, INIT_SCOPE_BSP, INIT_DEPS()) {
     x86_64_qemu_debug_putc('\n');
     log_sink_add(&g_qemu_debug_sink);
 }
-
-INIT_TARGET(qemu_debug, INIT_STAGE_BOOT, qemu_debug_init);
 
 #endif

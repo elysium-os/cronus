@@ -26,7 +26,6 @@
 #include "x86_64/cpu/gdt.h"
 #include "x86_64/cpu/lapic.h"
 #include "x86_64/cpu/msr.h"
-#include "x86_64/cpu/pat.h"
 #include "x86_64/dev/hpet.h"
 #include "x86_64/dev/ioapic.h"
 #include "x86_64/dev/pic8259.h"
@@ -54,9 +53,7 @@ static bool g_hpet_initialized = false;
 
 static time_frequency_t calibrate_lapic_timer() {
     uint32_t nominal_freq = 0;
-    if(!x86_64_cpuid_register(0x15, X86_64_CPUID_REGISTER_ECX, &nominal_freq) && nominal_freq != 0) {
-        return (time_frequency_t) nominal_freq;
-    }
+    if(!x86_64_cpuid_register(0x15, X86_64_CPUID_REGISTER_ECX, &nominal_freq) && nominal_freq != 0) { return (time_frequency_t) nominal_freq; }
 
     x86_64_lapic_timer_setup(X86_64_LAPIC_TIMER_TYPE_ONESHOT, true, 0xFF, X86_64_LAPIC_TIMER_DIVISOR_16);
     if(!g_hpet_initialized) {
@@ -131,16 +128,6 @@ static void initialize_cpu_local(cpu_t *cpu, size_t seqid) {
     cpu->flags.deferred_work_status = 0;
 }
 
-static void initialize_cpu() {
-    x86_64_gdt_init();
-    x86_64_interrupt_load_idt();
-    pat_init();
-
-    uint64_t cr4 = x86_64_cr4_read();
-    cr4 |= 1 << 7; /* CR4.PGE */
-    x86_64_cr4_write(cr4);
-}
-
 [[gnu::no_instrument_function]] [[noreturn]] static void init_ap() {
     cpu_t *cpu = &g_cpu_list[g_init_ap_cpu_id];
     x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
@@ -148,20 +135,19 @@ static void initialize_cpu() {
 
     log(LOG_LEVEL_INFO, "INIT", "Initializing AP %lu", g_init_ap_cpu_id);
 
-    init_stage(INIT_STAGE_BOOT, true);
-    initialize_cpu();
-    init_stage(INIT_STAGE_EARLY, true);
+    init_run_stage(INIT_STAGE_BOOT, true);
+    init_run_stage(INIT_STAGE_EARLY, true);
 
     arch_ptm_load_address_space(g_vm_global_address_space);
 
-    init_stage(INIT_STAGE_BEFORE_MAIN, true);
+    init_run_stage(INIT_STAGE_BEFORE_MAIN, true);
     cpu->arch.lapic_id = x86_64_lapic_id();
-    init_stage(INIT_STAGE_MAIN, true);
+    init_run_stage(INIT_STAGE_MAIN, true);
 
-    init_stage(INIT_STAGE_BEFORE_DEV, true);
-    init_stage(INIT_STAGE_DEV, true);
+    init_run_stage(INIT_STAGE_BEFORE_DEV, true);
+    init_run_stage(INIT_STAGE_DEV, true);
 
-    init_stage(INIT_STAGE_LATE, true);
+    init_run_stage(INIT_STAGE_LATE, true);
 
     log(LOG_LEVEL_DEBUG, "INIT", "AP %lu (Lapic ID: %i) init exit", g_init_ap_cpu_id, x86_64_lapic_id());
     __atomic_add_fetch(&g_init_ap_finished, true, __ATOMIC_SEQ_CST);
@@ -173,10 +159,6 @@ static void initialize_cpu() {
 void arch_init_bsp_local(size_t seqid) {
     initialize_cpu_local(&g_early_bsp, seqid);
     x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
-}
-
-void arch_init_bsp() {
-    initialize_cpu();
 }
 
 void arch_init_cpu_locals(tartarus_boot_info_t *boot_info) {
@@ -219,7 +201,7 @@ void arch_init_smp(tartarus_boot_info_t *boot_info) {
     log(LOG_LEVEL_DEBUG, "INIT", "BSP seqid is %lu", ARCH_CPU_CURRENT_READ(sequential_id));
 }
 
-static void cpuinfo() {
+INIT_TARGET(cpuinfo, INIT_STAGE_EARLY, INIT_SCOPE_BSP, INIT_DEPS()) {
     char brand1[12];
     x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_EBX, (uint32_t *) &brand1);
     x86_64_cpuid_register(0, X86_64_CPUID_REGISTER_EDX, (uint32_t *) &brand1[4]);
@@ -235,15 +217,11 @@ static void cpuinfo() {
     log(LOG_LEVEL_INFO, "INIT", "Running on %.*s (%.*s)", 12, brand1, 48, brand2);
 }
 
-INIT_TARGET(cpuinfo, INIT_STAGE_EARLY, cpuinfo);
-
-static void arch_asserts() {
+INIT_TARGET(arch_asserts, INIT_STAGE_EARLY, INIT_SCOPE_BSP, INIT_DEPS()) {
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_MSR));
 }
 
-INIT_TARGET(arch_asserts, INIT_STAGE_EARLY, arch_asserts);
-
-static void setup_tss() {
+INIT_TARGET(tss, INIT_STAGE_BEFORE_MAIN, INIT_SCOPE_ALL, INIT_DEPS()) {
     x86_64_tss_t *tss = heap_alloc(sizeof(x86_64_tss_t));
     mem_clear(tss, sizeof(x86_64_tss_t));
     tss->iomap_base = sizeof(x86_64_tss_t);
@@ -258,9 +236,7 @@ static void setup_tss() {
     x86_64_gdt_load_tss(tss);
 }
 
-INIT_TARGET_PERCORE(tss, INIT_STAGE_BEFORE_MAIN, setup_tss);
-
-static void external_interrupts() {
+INIT_TARGET(external_interrupts, INIT_STAGE_BEFORE_MAIN, INIT_SCOPE_BSP, INIT_DEPS()) {
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_APIC));
     // ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_ARAT)); // TODO: fails
 
@@ -270,11 +246,7 @@ static void external_interrupts() {
     g_x86_64_interrupt_irq_eoi = x86_64_lapic_eoi;
 }
 
-INIT_TARGET(external_interrupts, INIT_STAGE_BEFORE_MAIN, external_interrupts);
-INIT_TARGET_PERCORE(lapic, INIT_STAGE_BEFORE_MAIN, x86_64_lapic_init_cpu, "external_interrupts");
-
-
-static void initialize_ioapic() {
+INIT_TARGET(ioapic, INIT_STAGE_BEFORE_DEV, INIT_SCOPE_BSP, INIT_DEPS("acpi_tables")) {
     uacpi_table madt;
     uacpi_status ret = uacpi_table_find_by_signature(ACPI_MADT_SIGNATURE, &madt);
     if(uacpi_likely_success(ret)) {
@@ -283,9 +255,7 @@ static void initialize_ioapic() {
     }
 }
 
-INIT_TARGET(ioapic, INIT_STAGE_BEFORE_DEV, initialize_ioapic, "acpi_tables")
-
-static void initialize_timers() {
+INIT_TARGET(timers, INIT_STAGE_BEFORE_DEV, INIT_SCOPE_ALL, INIT_DEPS("acpi_tables")) {
     uacpi_table hpet;
     uacpi_status ret = uacpi_table_find_by_signature(ACPI_HPET_SIGNATURE, &hpet);
     if(uacpi_likely_success(ret)) {
@@ -304,9 +274,7 @@ static void initialize_timers() {
     log(LOG_LEVEL_DEBUG, "INIT", "CPU[%lu] TSC calibrated, freq: %lu", ARCH_CPU_CURRENT_READ(sequential_id), ARCH_CPU_CURRENT_READ(arch.tsc_timer_frequency));
 }
 
-INIT_TARGET_PERCORE(timers, INIT_STAGE_BEFORE_DEV, initialize_timers, "acpi_tables");
-
-static void setup_init_program() {
+INIT_TARGET(init_program, INIT_STAGE_LATE, INIT_SCOPE_BSP, INIT_DEPS()) {
     log(LOG_LEVEL_DEBUG, "INIT", "loading /usr/bin/init");
     vm_address_space_t *as = arch_ptm_address_space_create();
 
@@ -373,5 +341,3 @@ static void setup_init_program() {
 
     sched_thread_schedule(thread);
 }
-
-INIT_TARGET(init_program, INIT_STAGE_LATE, setup_init_program);

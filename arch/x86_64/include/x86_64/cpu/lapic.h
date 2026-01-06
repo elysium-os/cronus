@@ -26,9 +26,6 @@ typedef enum : uint32_t {
 /// Initialize the local apic.
 void x86_64_lapic_init();
 
-/// Initialize and enable the local apic for the current core.
-void x86_64_lapic_init_cpu();
-
 /// Get the local apic id of the current core.
 uint32_t x86_64_lapic_id();
 

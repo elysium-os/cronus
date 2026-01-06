@@ -71,8 +71,6 @@ void dw_status_enable() {
     if(dw_enable()) dw_process();
 }
 
-static void dw_init() {
+INIT_TARGET(deferred_work, INIT_STAGE_MAIN, INIT_SCOPE_BSP, INIT_DEPS()) {
     g_item_cache = slab_cache_create("deferred_work", sizeof(dw_item_t), 2);
 }
-
-INIT_TARGET(deferred_work, INIT_STAGE_MAIN, dw_init);

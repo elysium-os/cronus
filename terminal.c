@@ -69,9 +69,7 @@ static log_sink_t g_terminal_sink = {
     .log = log_fb
 };
 
-static void init_terminal() {
+INIT_TARGET(terminal, INIT_STAGE_EARLY, INIT_SCOPE_BSP, INIT_DEPS()) {
     draw_rect(&g_framebuffer, 0, 0, g_framebuffer.width, g_framebuffer.height, draw_color(14, 14, 15));
     log_sink_add(&g_terminal_sink);
 }
-
-INIT_TARGET(terminal, INIT_STAGE_EARLY, init_terminal);

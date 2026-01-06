@@ -1,22 +1,28 @@
 #pragma once
 
+#include "lib/macros.h"
+
 #include <stddef.h>
 
-#define INIT_TARGET_FULL(NAME, STAGE, FN, PERCORE, ...)                                                        \
-    static const char *g_init_target_##NAME##_deps[] = { __VA_ARGS__ };                                        \
-    [[gnu::used, gnu::section(".init_targets")]] static init_target_t g_init_target_##NAME = (init_target_t) { \
-        .name = #NAME,                                                                                         \
-        .stage = (STAGE),                                                                                      \
-        .dependencies = g_init_target_##NAME##_deps,                                                           \
-        .dependency_count = sizeof(g_init_target_##NAME##_deps) / sizeof(const char *),                        \
-        .fn = (FN),                                                                                            \
-        .per_core = (PERCORE),                                                                                 \
-        .completed = false,                                                                                    \
-    };
+#define INIT_UTIL_NAME MACROS_CONCAT(init_target_ln, __LINE__)
+#define INIT_UTIL_VAR MACROS_CONCAT(g_, INIT_UTIL_NAME)
+#define INIT_UTIL_VAR_DEPS MACROS_CONCAT(INIT_UTIL_VAR, _deps)
 
+#define INIT_DEPS(...) ((const char *[]) { __VA_ARGS__ })
 
-#define INIT_TARGET(NAME, STAGE, FN, ...) INIT_TARGET_FULL(NAME, STAGE, FN, false, __VA_ARGS__)
-#define INIT_TARGET_PERCORE(NAME, STAGE, FN, ...) INIT_TARGET_FULL(NAME, STAGE, FN, true, __VA_ARGS__)
+#define INIT_TARGET(NAME, STAGE, SCOPE, DEPS)                                                           \
+    static void INIT_UTIL_NAME();                                                                       \
+    static const char *INIT_UTIL_VAR_DEPS[] = DEPS;                                                     \
+    [[gnu::used, gnu::section(".init_targets")]] static init_target_t INIT_UTIL_VAR = (init_target_t) { \
+        .name = #NAME,                                                                                  \
+        .stage = (STAGE),                                                                               \
+        .scope = (SCOPE),                                                                               \
+        .fn = (INIT_UTIL_NAME),                                                                         \
+        .dependencies = INIT_UTIL_VAR_DEPS,                                                             \
+        .dependency_count = sizeof(INIT_UTIL_VAR_DEPS) / sizeof(const char *),                          \
+        .completed = false,                                                                             \
+    };                                                                                                  \
+    static void INIT_UTIL_NAME()
 
 typedef enum {
     /**
@@ -28,7 +34,7 @@ typedef enum {
      * Early init stage.
      *
      * Guarantees:
-     * - Earlymem is initialized.
+     * - Earlymem is initialized
      */
     INIT_STAGE_EARLY,
 
@@ -41,13 +47,20 @@ typedef enum {
     INIT_STAGE_LATE,
 } init_stage_t;
 
+typedef enum {
+    INIT_SCOPE_BSP,
+    INIT_SCOPE_APS,
+    INIT_SCOPE_ALL
+} init_scope_t;
+
 typedef struct [[gnu::packed]] {
     const char *name;
     init_stage_t stage;
+    init_scope_t scope;
+    void (*fn)();
     const char **dependencies;
     size_t dependency_count;
-    void (*fn)();
-    bool per_core;
+
     bool completed;
 } init_target_t;
 
@@ -57,4 +70,4 @@ extern init_stage_t g_init_stage_current;
 void init_reset_ap();
 
 /// Run all the init targets for a stage.
-void init_stage(init_stage_t stage, bool is_ap);
+void init_run_stage(init_stage_t stage, bool is_ap);

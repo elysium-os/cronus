@@ -33,7 +33,12 @@ enum {
     PTRDIFF, UPTRDIFF
 };
 
-static const uint8_t lookup[][26] = {
+typedef union {
+    uintmax_t integer;
+    void *pointer;
+} arg_t;
+
+static const uint8_t g_lookup[][26] = {
     { // NONE
         [HASH('c')] = INT, [HASH('s')] = PTR, [HASH('d')] = INT, [HASH('i')] = INT,
         [HASH('o')] = UINT, [HASH('x')] = UINT, [HASH('u')] = UINT,
@@ -81,12 +86,7 @@ static const uint8_t lookup[][26] = {
     }
 };
 
-typedef union {
-    uintmax_t integer;
-    void *pointer;
-} arg_t;
-
-static const char *prefixes = "\0000x\0000X\0+\0 ";
+static const char *g_prefixes = "\0000x\0000X\0+\0 ";
 
 int format(format_writer_t writer, const char *format, va_list list) {
     char *fmt = (char *) format;
@@ -210,8 +210,8 @@ int format(format_writer_t writer, const char *format, va_list list) {
     lbl_modifiers:
     uint8_t index = *fmt;
     if(index < 'a') index += ('a' - 'A');
-    uint8_t size = lookup[length_prefix][HASH(index)];
-    if(!size) size = lookup[LNONE][HASH(index)];
+    uint8_t size = g_lookup[length_prefix][HASH(index)];
+    if(!size) size = g_lookup[LNONE][HASH(index)];
     if(!size) goto lbl_invalid;
 
     switch(size) {
@@ -309,12 +309,12 @@ int format(format_writer_t writer, const char *format, va_list list) {
     if(precision_pad == 0 && (flags & FLAG_LEADING_ZERO) && (value.integer != 0 || !(flags & FLAG_NO_PREFIX_ON_ZERO))) precision_pad = 1;
     length += precision_pad;
     if(negative) length++;
-    else if(!(flags & FLAG_NO_PREFIX_ON_ZERO) || value.integer != 0) for(int i = prefix_offset; prefixes[i]; i++) length++;
+    else if(!(flags & FLAG_NO_PREFIX_ON_ZERO) || value.integer != 0) for(int i = prefix_offset; g_prefixes[i]; i++) length++;
 
     if(!(flags & (FLAG_LEFT | FLAG_ZERO))) for(int i = length; i < width; i++) PUTCHAR(writer, ' ', count);
     if(!length) goto lbl_normal;
     if(negative) PUTCHAR(writer, '-', count);
-    else if(!(flags & FLAG_NO_PREFIX_ON_ZERO) || value.integer != 0) while(prefixes[prefix_offset]) PUTCHAR(writer, prefixes[prefix_offset++], count);
+    else if(!(flags & FLAG_NO_PREFIX_ON_ZERO) || value.integer != 0) while(g_prefixes[prefix_offset]) PUTCHAR(writer, g_prefixes[prefix_offset++], count);
     if((flags & (FLAG_ZERO | FLAG_LEFT)) == FLAG_ZERO) for(int i = length; i < width; i++) PUTCHAR(writer, '0', count);
     for(int i = 0; i < precision_pad; i++) PUTCHAR(writer, '0', count);
     while(pw != 0 && (precision || value.integer)) {

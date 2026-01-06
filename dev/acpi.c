@@ -7,9 +7,7 @@
 
 uintptr_t g_acpi_rsdp = 0;
 
-static void init_acpi_tables() {
+INIT_TARGET(acpi_tables, INIT_STAGE_BEFORE_DEV, INIT_SCOPE_BSP, INIT_DEPS()) {
     uacpi_status ret = uacpi_initialize(0);
     if(uacpi_unlikely_error(ret)) panic("INIT", "UACPI initialization failed (%s)", uacpi_status_to_string(ret));
 }
-
-INIT_TARGET(acpi_tables, INIT_STAGE_BEFORE_DEV, init_acpi_tables);

@@ -16,17 +16,14 @@ void arch_event_timer_arm(time_t delay) {
     x86_64_lapic_timer_start(ticks);
 }
 
-static void init_event_timer_vector() {
+
+INIT_TARGET(event_timer_vector, INIT_STAGE_BEFORE_DEV, INIT_SCOPE_BSP, INIT_DEPS()) {
     g_event_interrupt_vector = arch_interrupt_request(INTERRUPT_PRIORITY_EVENT, events_process);
     if(g_event_interrupt_vector < 0) panic("EVENT", "Failed to acquire interrupt vector for event handler");
     log(LOG_LEVEL_DEBUG, "EVENT", "Event interrupt vector: %i", g_event_interrupt_vector);
 }
 
-INIT_TARGET(event_timer_vector, INIT_STAGE_BEFORE_DEV, init_event_timer_vector);
-
-static void init_event_timer() {
+INIT_TARGET(event_timer, INIT_STAGE_BEFORE_DEV, INIT_SCOPE_ALL, INIT_DEPS("event_timer_vector", "timers")) {
     log(LOG_LEVEL_DEBUG, "EVENT", "Event timer setup on vector %i, oneshot, divisor 16", g_event_interrupt_vector);
     x86_64_lapic_timer_setup(X86_64_LAPIC_TIMER_TYPE_ONESHOT, false, g_event_interrupt_vector, X86_64_LAPIC_TIMER_DIVISOR_16);
 }
-
-INIT_TARGET_PERCORE(event_timer, INIT_STAGE_BEFORE_DEV, init_event_timer, "event_timer_vector", "timers");

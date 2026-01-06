@@ -25,13 +25,9 @@ SECTIONS
         *(.rodata .rodata.*)
     } :rodata
 
-    ld_cpu_local_init_start = .;
-
-    .cpu_local_init : {
-        *(.cpu_local_init)
+    .hooks : {
+        KEEP(*(hooks_*))
     } :rodata
-
-    ld_cpu_local_init_end = .;
 
     . += CONSTANT(MAXPAGESIZE);
 

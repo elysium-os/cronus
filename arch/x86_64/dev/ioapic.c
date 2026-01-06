@@ -7,14 +7,14 @@
 #include <uacpi/acpi.h>
 
 #define VER 0x1
-#define VER_MAX_REDIRECTION_ENTRY(val) (((val) >> 16) & 0xFF)
+#define VER_MAX_REDIRECTION_ENTRY(VALUE) (((VALUE) >> 16) & 0xFF)
 
-#define IOREDx(x) (0x10 + (x) * 2)
-#define IOREDx_DELMOD(val) (((val) & 0x7) << 8)
-#define IOREDx_DESTMOD (1 << 11)
-#define IOREDx_INTPOL (1 << 13)
-#define IOREDx_TRIGGERMODE (1 << 15)
-#define IOREDx_MASK (1 << 16)
+#define IOREDX(X) (0x10 + (X) * 2)
+#define IOREDX_DELMOD(VALUE) (((VALUE) & 0x7) << 8)
+#define IOREDX_DESTMOD (1 << 11)
+#define IOREDX_INTPOL (1 << 13)
+#define IOREDX_TRIGGERMODE (1 << 15)
+#define IOREDX_MASK (1 << 16)
 
 #define LEGACY_POLARITY (0b11)
 #define LEGACY_TRIGGER (0b11 << 2)
@@ -83,11 +83,11 @@ void x86_64_ioapic_init(struct acpi_madt *apic_table) {
 }
 
 void x86_64_ioapic_map_gsi(uint8_t gsi, uint8_t lapic_id, bool low_polarity, bool trigger_mode, uint8_t vector) {
-    uint32_t iored_low = IOREDx(gsi);
+    uint32_t iored_low = IOREDX(gsi);
 
     uint32_t low_entry = vector;
-    if(low_polarity) low_entry |= IOREDx_INTPOL;
-    if(!trigger_mode) low_entry |= IOREDx_TRIGGERMODE;
+    if(low_polarity) low_entry |= IOREDX_INTPOL;
+    if(!trigger_mode) low_entry |= IOREDX_TRIGGERMODE;
     ioapic_write(iored_low, low_entry);
 
     uint32_t high_data = ioapic_read(iored_low + 1);

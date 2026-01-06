@@ -100,8 +100,6 @@ void event_init_cpu_local() {
     sched_preempt_dec();
 }
 
-static void event_cache_init() {
+INIT_TARGET(event_cache, INIT_STAGE_MAIN, INIT_SCOPE_BSP, INIT_DEPS()) {
     g_event_cache = slab_cache_create("event", sizeof(event_t), 2);
 }
-
-INIT_TARGET(event_cache, INIT_STAGE_MAIN, event_cache_init);

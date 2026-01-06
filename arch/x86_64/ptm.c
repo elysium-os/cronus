@@ -349,7 +349,7 @@ void x86_64_ptm_page_fault_handler(arch_interrupt_frame_t *frame) {
     x86_64_exception_unhandled(frame);
 }
 
-static void ptm_init() {
+INIT_TARGET(ptm, INIT_STAGE_EARLY, INIT_SCOPE_BSP, INIT_DEPS()) {
     g_global_address_space.common.lock = SPINLOCK_INIT;
     g_global_address_space.common.regions = vm_create_regions();
     g_global_address_space.common.start = KERNELSPACE_START;
@@ -367,5 +367,3 @@ static void ptm_init() {
 
     x86_64_interrupt_set(0xE, x86_64_ptm_page_fault_handler);
 }
-
-INIT_TARGET(ptm, INIT_STAGE_EARLY, ptm_init);

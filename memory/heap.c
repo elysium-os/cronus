@@ -72,10 +72,8 @@ void heap_free(void *address, size_t size) {
     slab_free(find_cache(size), address);
 }
 
-static void heap_initialize() {
+INIT_TARGET(heap, INIT_STAGE_BEFORE_MAIN, INIT_SCOPE_BSP, INIT_DEPS("slab")) {
     for(size_t i = 0; i < SLAB_8X_COUNT; i++) g_8x_slabs[i] = slab_cache_create(g_slab_8x_names[i], g_slab_8x_sizes[i], 2);
     for(size_t i = 0; i < SLAB_128X_COUNT; i++) g_128x_slabs[i] = slab_cache_create(g_slab_128x_names[i], g_slab_128x_sizes[i], 3);
     for(size_t i = 0; i < SLAB_OTHER_COUNT; i++) g_other_slabs[i] = slab_cache_create(g_slab_other_names[i], g_slab_other_sizes[i], 5);
 }
-
-INIT_TARGET(heap, INIT_STAGE_BEFORE_MAIN, heap_initialize, "slab");

@@ -193,7 +193,7 @@ free:
     slab_direct_free(cache, obj);
 }
 
-static void slab_init() {
+INIT_TARGET(slab, INIT_STAGE_BEFORE_MAIN, INIT_SCOPE_BSP, INIT_DEPS()) {
     g_alloc_cache = (slab_cache_t) {
         .name = "slab-cache",
         .object_size = sizeof(slab_cache_t) + g_cpu_count * sizeof(slab_cache_cpu_t),
@@ -221,5 +221,3 @@ static void slab_init() {
     list_push(&g_slab_caches, &g_alloc_cache.list_node);
     list_push(&g_slab_caches, &g_alloc_magazine.list_node);
 }
-
-INIT_TARGET(slab, INIT_STAGE_BEFORE_MAIN, slab_init);

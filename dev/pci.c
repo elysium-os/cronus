@@ -273,9 +273,7 @@ static void enumerate_bus(uint16_t segment, uint8_t bus) {
     for(uint8_t slot = 0; slot < 32; slot++) {
         pci_device_t *device = g_create_device(segment, bus, slot, 0);
         if(readw(device, offsetof(pci_device_header_t, vendor_id)) == VENDOR_INVALID) continue;
-        for(uint8_t func = 0; func < ((readb(device, offsetof(pci_device_header_t, header_type)) & HEADER_TYPE_MULTIFUNC) ? 8 : 1); func++) {
-            enumerate_function(segment, bus, slot, func);
-        }
+        for(uint8_t func = 0; func < ((readb(device, offsetof(pci_device_header_t, header_type)) & HEADER_TYPE_MULTIFUNC) ? 8 : 1); func++) { enumerate_function(segment, bus, slot, func); }
         g_free_device(device);
     }
 }
@@ -348,7 +346,7 @@ pci_bar_t *pci_config_read_bar(pci_device_t *device, uint8_t index) {
     return new_bar;
 }
 
-static void pci_enumerate() {
+INIT_TARGET(pci_enumerate, INIT_STAGE_DEV, INIT_SCOPE_BSP, INIT_DEPS()) {
     struct acpi_mcfg *mcfg = nullptr;
 
     uacpi_table table;
@@ -388,5 +386,3 @@ static void pci_enumerate() {
 
     if(uacpi_likely_success(ret)) uacpi_table_unref(&table);
 }
-
-INIT_TARGET(pci_enumerate, INIT_STAGE_DEV, pci_enumerate);
