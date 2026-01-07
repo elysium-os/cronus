@@ -7,7 +7,7 @@
 #include "lib/container.h"
 #include "memory/slab.h"
 #include "sys/dw.h"
-#include "sys/init.h"
+#include "sys/hook.h"
 #include "sys/interrupt.h"
 
 static_assert(sizeof(rb_value_t) >= sizeof(time_t));
@@ -100,6 +100,6 @@ void event_init_cpu_local() {
     sched_preempt_dec();
 }
 
-INIT_TARGET(event_cache, INIT_STAGE_MAIN, INIT_SCOPE_BSP, INIT_DEPS()) {
+HOOK(init_slab_cache) {
     g_event_cache = slab_cache_create("event", sizeof(event_t), 2);
 }

@@ -5,6 +5,7 @@
 #include "common/assert.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"
+#include "sys/hook.h"
 #include "sys/init.h"
 
 #define MAGAZINE_SIZE 32
@@ -220,4 +221,6 @@ INIT_TARGET(slab, INIT_STAGE_BEFORE_MAIN, INIT_SCOPE_BSP, INIT_DEPS()) {
     };
     list_push(&g_slab_caches, &g_alloc_cache.list_node);
     list_push(&g_slab_caches, &g_alloc_magazine.list_node);
+
+    HOOK_RUN(init_slab_cache);
 }

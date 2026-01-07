@@ -5,7 +5,7 @@
 #include "lib/barrier.h"
 #include "lib/container.h"
 #include "memory/slab.h"
-#include "sys/init.h"
+#include "sys/hook.h"
 
 #include <stdint.h>
 
@@ -71,6 +71,6 @@ void dw_status_enable() {
     if(dw_enable()) dw_process();
 }
 
-INIT_TARGET(deferred_work, INIT_STAGE_MAIN, INIT_SCOPE_BSP, INIT_DEPS()) {
+HOOK(init_slab_cache) {
     g_item_cache = slab_cache_create("deferred_work", sizeof(dw_item_t), 2);
 }
