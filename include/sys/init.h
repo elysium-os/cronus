@@ -10,18 +10,18 @@
 
 #define INIT_DEPS(...) ((const char *[]) { __VA_ARGS__ })
 
-#define INIT_TARGET(NAME, STAGE, SCOPE, DEPS)                                                           \
-    static void INIT_UTIL_NAME();                                                                       \
-    static const char *INIT_UTIL_VAR_DEPS[] = DEPS;                                                     \
-    [[gnu::used, gnu::section(".init_targets")]] static init_target_t INIT_UTIL_VAR = (init_target_t) { \
-        .name = #NAME,                                                                                  \
-        .stage = (STAGE),                                                                               \
-        .scope = (SCOPE),                                                                               \
-        .fn = (INIT_UTIL_NAME),                                                                         \
-        .dependencies = INIT_UTIL_VAR_DEPS,                                                             \
-        .dependency_count = sizeof(INIT_UTIL_VAR_DEPS) / sizeof(const char *),                          \
-        .completed = false,                                                                             \
-    };                                                                                                  \
+#define INIT_TARGET(NAME, STAGE, SCOPE, DEPS)                                                          \
+    static void INIT_UTIL_NAME();                                                                      \
+    static const char *INIT_UTIL_VAR_DEPS[] = DEPS;                                                    \
+    [[gnu::used, gnu::section("init_targets")]] static init_target_t INIT_UTIL_VAR = (init_target_t) { \
+        .name = #NAME,                                                                                 \
+        .stage = (STAGE),                                                                              \
+        .scope = (SCOPE),                                                                              \
+        .fn = (INIT_UTIL_NAME),                                                                        \
+        .dependencies = INIT_UTIL_VAR_DEPS,                                                            \
+        .dependency_count = sizeof(INIT_UTIL_VAR_DEPS) / sizeof(const char *),                         \
+        .completed = false,                                                                            \
+    };                                                                                                 \
     static void INIT_UTIL_NAME()
 
 typedef enum {
