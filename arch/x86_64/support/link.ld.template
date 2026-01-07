@@ -25,6 +25,8 @@ SECTIONS
         *(.rodata .rodata.*)
     } :rodata
 
+    @prefixed_sections("hook_", "rodata")@
+
     . += CONSTANT(MAXPAGESIZE);
 
     .data : {
