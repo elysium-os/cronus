@@ -1,5 +1,5 @@
-OUTPUT_ARCH(i386:x86-64)
-OUTPUT_FORMAT(elf64-x86-64)
+OUTPUT_ARCH(@required_opt("arch")@)
+OUTPUT_FORMAT(@required_opt("format")@)
 ENTRY(init)
 
 PHDRS
@@ -11,7 +11,7 @@ PHDRS
 
 SECTIONS
 {
-    . = 0xFFFFFFFF80000000;
+    . = @required_opt("kernel_start")@;
 
     ld_kernel_start = .;
 
@@ -23,10 +23,6 @@ SECTIONS
 
     .rodata : {
         *(.rodata .rodata.*)
-    } :rodata
-
-    .hooks : {
-        KEEP(*(hooks_*))
     } :rodata
 
     . += CONSTANT(MAXPAGESIZE);
@@ -42,8 +38,8 @@ SECTIONS
 
     ld_init_targets_start = .;
 
-    .init_targets : {
-        *(.init_targets .init_targets.*)
+    init_targets : {
+        *(init_targets)
     } :data
 
     ld_init_targets_end = .;

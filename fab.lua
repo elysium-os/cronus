@@ -157,6 +157,13 @@ if opt_arch == "x86_64" then
 
     local asmgen_includes = asmgen_rule:build("x86_64_asm_defs.rsp", {}, {}, { asmgen })
 
+    -- LD GEN
+    local ldgen_rule = fab.rule({
+        name = "ld-gen",
+        description = "Generating ld script fragment for prefixed sections",
+        command = { fab.get_executable(path(fab.project_root(), "arch/x86_64/support/ld-gen.py")), "--template", "@TEMPLATE@", "--dest", "@OUT@", "@ARGS@", "@IN@" }
+    })
+
     -- Flags
     table.extend(c_flags, {
         "--target=x86_64-none-elf",
@@ -194,10 +201,19 @@ if opt_arch == "x86_64" then
         })
         table.extend(objects, cc:generate(uacpi_sources, cflags_uacpi, include_dirs))
 
-        local kernel = linker:link("kernel.elf", objects, {
-            "-T" .. fab.path_rel("arch/x86_64/support/link.ld"),
-            "-znoexecstack"
+        local ld_script = ldgen_rule:build("x86_64-link.ld", objects, {
+            template = fab.path_rel("arch/x86_64/support/link.ld.template"),
+            args = table.join({
+                "--opt", "arch=i386:x86-64",
+                "--opt", "format=elf64-x86-64",
+                "--opt", "kernel_start=0xFFFFFFFF80000000"
+            }, " ")
         })
+
+        local kernel = linker:link("kernel.elf", objects, {
+            "-T" .. ld_script.path,
+            "-znoexecstack"
+        }, { ld_script })
 
         kernel:install("kernel.elf")
     end
