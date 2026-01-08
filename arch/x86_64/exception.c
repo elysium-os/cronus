@@ -5,6 +5,7 @@
 #include "common/log.h"
 #include "sys/init.h"
 #include "x86_64/cpu/cr.h"
+#include "x86_64/cpu/msr.h"
 #include "x86_64/debug.h"
 #include "x86_64/interrupt.h"
 
@@ -47,6 +48,12 @@ static const char *get_message(uint8_t int_no) {
         frame->rcx,
         frame->rbx,
         frame->rax);
+
+    uint64_t fs = x86_64_msr_read(X86_64_MSR_FS_BASE);
+    uint64_t gs = x86_64_msr_read(X86_64_MSR_GS_BASE);
+    uint64_t kernel_gs = x86_64_msr_read(X86_64_MSR_KERNEL_GS_BASE);
+    log(LOG_LEVEL_FATAL, "EXCEPTION", "MSRs:\nFS: %#lx\nGS: %#lx\nKERNEL_GS: %#lx", fs, gs, kernel_gs);
+
     arch_cpu_halt();
     ASSERT_UNREACHABLE();
 }
