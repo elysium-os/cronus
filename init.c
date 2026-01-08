@@ -1,6 +1,6 @@
 #include "sys/init.h"
 
-#include "arch/init.h"
+#include "arch/cpu.h"
 #include "arch/page.h"
 #include "arch/ptm.h"
 #include "arch/sched.h"
@@ -11,26 +11,42 @@
 #include "fs/tmpfs.h"
 #include "fs/vfs.h"
 #include "graphics/framebuffer.h"
+#include "lib/atomic.h"
+#include "lib/barrier.h"
 #include "lib/math.h"
 #include "lib/mem.h"
 #include "lib/string.h"
 #include "memory/earlymem.h"
+#include "memory/heap.h"
 #include "memory/hhdm.h"
 #include "memory/page.h"
 #include "memory/pmm.h"
 #include "memory/vm.h"
 #include "sched/reaper.h"
-#include "sys/event.h"
+#include "sys/cpu.h"
+#include "sys/hook.h"
 #include "sys/kernel_symbol.h"
 #include "sys/module.h"
 
+#include <stddef.h>
 #include <tartarus.h>
 #include <uacpi/uacpi.h>
 
 framebuffer_t g_framebuffer;
 size_t g_cpu_count = 0;
 
+uintptr_t g_hhdm_offset;
+size_t g_hhdm_size;
+
+page_t *g_page_db;
+size_t g_page_db_size;
+
 static vm_region_t g_hhdm_region, g_page_db_region;
+
+ATOMIC static bool g_init_ap_finished = false;
+ATOMIC static uint64_t g_init_ap_cpu_id = 0;
+
+static cpu_t g_early_bsp;
 
 static void thread_init() {
     uacpi_status ret = uacpi_namespace_load();
@@ -38,9 +54,38 @@ static void thread_init() {
     log(LOG_LEVEL_INFO, "UACPI", "Setup Done");
 }
 
+[[gnu::no_instrument_function]] [[noreturn]] static void init_ap() {
+    size_t id = ATOMIC_LOAD(&g_init_ap_cpu_id, ATOMIC_SEQ_CST);
+    arch_cpu_local_load(&g_cpu_list[id]);
+    HOOK_RUN(init_cpu_local);
+
+    log(LOG_LEVEL_INFO, "INIT", "Initializing AP %lu", id);
+
+    init_run_stage(INIT_STAGE_BOOT, true);
+    init_run_stage(INIT_STAGE_EARLY, true);
+
+    arch_ptm_load_address_space(g_vm_global_address_space);
+
+    init_run_stage(INIT_STAGE_BEFORE_MAIN, true);
+    init_run_stage(INIT_STAGE_MAIN, true);
+
+    init_run_stage(INIT_STAGE_BEFORE_DEV, true);
+    init_run_stage(INIT_STAGE_DEV, true);
+
+    init_run_stage(INIT_STAGE_LATE, true);
+
+    log(LOG_LEVEL_DEBUG, "INIT", "AP %lu init exit", id);
+    ATOMIC_FETCH_ADD(&g_init_ap_finished, true, ATOMIC_SEQ_CST);
+
+    arch_sched_handoff_cpu();
+    ASSERT_UNREACHABLE();
+}
+
 [[gnu::no_instrument_function]] [[noreturn]] void init(tartarus_boot_info_t *boot_info) {
-    arch_init_bsp_local(boot_info->cpus[boot_info->bsp_index].sequential_id);
-    event_init_cpu_local();
+    g_early_bsp.self = &g_early_bsp;
+    g_early_bsp.sequential_id = boot_info->cpus[boot_info->bsp_index].sequential_id;
+    arch_cpu_local_load(&g_early_bsp);
+    HOOK_RUN(init_cpu_local);
 
     init_run_stage(INIT_STAGE_BOOT, false);
 
@@ -234,18 +279,17 @@ static void thread_init() {
     for(size_t i = 0; i < boot_info->mm_entry_count; i++) {
         tartarus_mm_entry_t *entry = &boot_info->mm_entries[i];
 
-        bool is_free = false;
         switch(entry->type) {
-            case TARTARUS_MM_TYPE_USABLE:                 break;
-            case TARTARUS_MM_TYPE_BOOTLOADER_RECLAIMABLE: break;
-            case TARTARUS_MM_TYPE_EFI_RECLAIMABLE:        break;
+            case TARTARUS_MM_TYPE_USABLE:
+            case TARTARUS_MM_TYPE_BOOTLOADER_RECLAIMABLE:
+            case TARTARUS_MM_TYPE_EFI_RECLAIMABLE:
             case TARTARUS_MM_TYPE_ACPI_RECLAIMABLE:       break;
             default:                                      continue;
         }
 
-        log(LOG_LEVEL_DEBUG, "INIT", "| %#lx -> %#lx (free: %u)", entry->base, entry->base + entry->length, is_free);
+        log(LOG_LEVEL_DEBUG, "INIT", "| %#lx -> %#lx", entry->base, entry->base + entry->length);
 
-        pmm_region_add(entry->base, entry->length, is_free);
+        pmm_region_add(entry->base, entry->length);
     }
 
     // TODO: release reclaimable regions into pmm as well as
@@ -253,6 +297,7 @@ static void thread_init() {
     LIST_ITERATE(&g_earlymem_regions, node) {
         earlymem_region_t *region = CONTAINER_OF(node, earlymem_region_t, list_node);
         for(size_t offset = 0; offset < region->length; offset += ARCH_PAGE_GRANULARITY) {
+            // TODO: we can hand out the metadata pages of the earlymem bitmap as free
             if(!earlymem_region_isfree(region, offset)) continue;
             pmm_free(&PAGE(region->base + offset)->block);
         }
@@ -267,7 +312,6 @@ static void thread_init() {
 
     // Main init
     init_run_stage(INIT_STAGE_BEFORE_MAIN, false);
-    arch_init_cpu_locals(boot_info);
     init_run_stage(INIT_STAGE_MAIN, false);
 
     // Dev init
@@ -330,16 +374,49 @@ static void thread_init() {
     // Late init
     init_run_stage(INIT_STAGE_LATE, false);
 
-    // SMP init
-    log(LOG_LEVEL_DEBUG, "INIT", "Starting APs...");
-    arch_init_smp(boot_info);
-
     // Schedule init threads
     sched_thread_schedule(reaper_create());
+
+    // CPU local proper
+    log(LOG_LEVEL_DEBUG, "INIT", "Setting up proper CPU locals (%lu locals)", g_cpu_count);
+    g_cpu_list = heap_alloc(sizeof(cpu_t) * g_cpu_count);
+
+    for(size_t i = 0; i < boot_info->cpu_count; i++) {
+        if(boot_info->cpus[i].init_state == TARTARUS_CPU_STATE_FAIL) continue;
+
+        cpu_t *cpu = &g_cpu_list[i];
+        if(i == boot_info->bsp_index) {
+            mem_copy(cpu, &g_early_bsp, sizeof(cpu_t));
+            arch_cpu_local_load(cpu);
+
+            ASSERT(cpu->sequential_id == i);
+        }
+        cpu->sequential_id = i;
+        cpu->self = cpu;
+    }
+
+    // SMP init
+    log(LOG_LEVEL_DEBUG, "INIT", "Starting APs...");
+    for(size_t i = 0; i < boot_info->cpu_count; i++) {
+        if(i == boot_info->bsp_index) continue;
+        if(boot_info->cpus[i].init_state == TARTARUS_CPU_STATE_FAIL) continue;
+
+        init_reset_ap();
+
+        ATOMIC_STORE(&g_init_ap_cpu_id, boot_info->cpus[i].sequential_id, ATOMIC_SEQ_CST);
+        ATOMIC_STORE(&g_init_ap_finished, false, ATOMIC_SEQ_CST);
+
+        ATOMIC_STORE(boot_info->cpus[i].wake_on_write, (uintptr_t) init_ap, ATOMIC_SEQ_CST);
+        while(!ATOMIC_LOAD(&g_init_ap_finished, ATOMIC_SEQ_CST)) arch_cpu_relax();
+    }
+
+    log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%lu/%lu cpus initialized)", g_cpu_count, g_cpu_count);
+    log(LOG_LEVEL_DEBUG, "INIT", "BSP seqid is %lu", ARCH_CPU_CURRENT_READ(sequential_id));
+
     sched_thread_schedule(arch_sched_thread_create_kernel(thread_init));
 
     // Scheduler handoff
-    log(LOG_LEVEL_INFO, "INIT", "Reached scheduler handoff. Bye now!");
+    log(LOG_LEVEL_INFO, "INIT", "BSP reached scheduler handoff. Bye now!");
     arch_sched_handoff_cpu();
     ASSERT_UNREACHABLE();
 }

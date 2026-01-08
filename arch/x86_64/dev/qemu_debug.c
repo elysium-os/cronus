@@ -1,3 +1,4 @@
+#include "arch/cpu.h"
 #include "common/log.h"
 #include "lib/format.h"
 #include "sys/init.h"
@@ -30,7 +31,7 @@ static void log_debug(log_level_t level, const char *tag, const char *fmt, va_li
         default:              color = "\e[0m"; break;
     }
 
-    debug_format("%s%10s%s ", color, tag, "\e[0m");
+    debug_format("\e[90m[%lu] %s%10s\e[0m ", ARCH_CPU_CURRENT_READ(sequential_id), color, tag);
     format(x86_64_qemu_debug_putc, fmt, args);
     x86_64_qemu_debug_putc('\n');
 }

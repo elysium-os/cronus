@@ -70,7 +70,7 @@ if opt_build_type == "debug" then
         "-O0",
         "-g",
         "-fsanitize=undefined",
-        "-finstrument-functions",
+        -- "-finstrument-functions",
         "-fno-lto",
         "-fno-omit-frame-pointer",
     })

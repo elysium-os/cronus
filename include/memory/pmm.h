@@ -41,7 +41,7 @@ extern pmm_zone_t g_pmm_zone_low;
 /// Adds a block of memory to be managed by the PMM.
 /// @param base Region base address
 /// @param size Region size in bytes
-void pmm_region_add(uintptr_t base, size_t size, bool is_free);
+void pmm_region_add(uintptr_t base, size_t size);
 
 /// Allocates a block of size order^2 pages.
 pmm_block_t *pmm_alloc(pmm_order_t order, pmm_flags_t flags);

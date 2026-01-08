@@ -9,7 +9,8 @@
 #include "memory/hhdm.h"
 
 #define BITMAP(REGION) ((uint8_t *) ((uintptr_t) (REGION) + sizeof(earlymem_region_t)))
-#define BITMAP_SIZE(REGION) ((REGION)->length / ARCH_PAGE_GRANULARITY / 8)
+#define BITMAP_BITS(REGION) ((REGION)->length / ARCH_PAGE_GRANULARITY)
+#define BITMAP_SIZE(REGION) MATH_DIV_CEIL(BITMAP_BITS(REGION), 8)
 
 bool g_earlymem_active = true;
 list_t g_earlymem_regions = LIST_INIT;
@@ -36,7 +37,11 @@ void earlymem_region_add(uintptr_t address, size_t length) {
     region->length = length;
     region->hint = 0;
     mem_set(BITMAP(region), 0, BITMAP_SIZE(region));
-    for(size_t i = 0; i < MATH_DIV_CEIL(BITMAP_SIZE(region), ARCH_PAGE_GRANULARITY); i++) bitmap_set(region, i, true);
+
+    // TODO: figure out how well this actually handles tiny regions (what about a region with just one page :O)
+    size_t metadata_bytes = sizeof(earlymem_region_t) + BITMAP_SIZE(region);
+    size_t metadata_pages = MATH_DIV_CEIL(metadata_bytes, ARCH_PAGE_GRANULARITY);
+    for(size_t i = 0; i < metadata_pages; i++) bitmap_set(region, i, true);
     list_push(&g_earlymem_regions, &region->list_node);
 }
 

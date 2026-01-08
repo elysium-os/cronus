@@ -77,9 +77,9 @@ void x86_64_tlb_shootdown(uintptr_t addr, size_t length) {
             last = time;
             for(size_t i = 0; i < g_cpu_count; i++) {
                 cpu_t *cpu = &g_cpu_list[i];
-                if(cpu == ARCH_CPU_CURRENT_READ(self)) continue;
+                if(ARCH_CPU_CURRENT_READ(sequential_id) == i) continue;
 
-                if(__atomic_load_n(&g_shootdown_status[cpu->sequential_id], __ATOMIC_ACQUIRE)) continue;
+                if(__atomic_load_n(&g_shootdown_status[i], __ATOMIC_ACQUIRE)) continue;
 
                 x86_64_lapic_ipi(cpu->arch.lapic_id, g_shootdown_vector | X86_64_LAPIC_IPI_ASSERT);
             }

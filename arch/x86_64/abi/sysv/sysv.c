@@ -14,11 +14,11 @@ uintptr_t x86_64_sysv_stack_setup(vm_address_space_t *address_space, size_t stac
     {                                                                    \
         stack -= sizeof(uint64_t);                                       \
         uint64_t tmp = (VALUE);                                          \
-        size_t copyto_count = vm_copy_to(address_space, stack, &tmp, 4); \
-        ASSERT(copyto_count == 4);                                       \
+        size_t copyto_count = vm_copy_to(address_space, stack, &tmp, 8); \
+        ASSERT(copyto_count == 8);                                       \
     }
 
-    void *stack_ptr = vm_map_anon(address_space, nullptr, stack_size, (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_FLAG_DYNAMICALLY_BACKED);
+    void *stack_ptr = vm_map_anon(address_space, (void *) 0x10000000, stack_size, (vm_protection_t) { .read = true, .write = true }, VM_CACHE_STANDARD, VM_FLAG_DYNAMICALLY_BACKED);
     ASSERT(stack_ptr != nullptr);
     uintptr_t stack = (uintptr_t) stack_ptr + stack_size - 1;
     stack &= ~0xF;

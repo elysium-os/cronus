@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../../../include/arch/cpu.h"
 #include "common/assert.h"
 #include "sys/cpu.h"
 

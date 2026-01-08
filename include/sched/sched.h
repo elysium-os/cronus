@@ -7,14 +7,10 @@
 typedef struct sched {
     spinlock_t lock;
     list_t thread_queue;
-
-    struct {
-        uint32_t preempt_counter;
-        bool yield_immediately;
-    } status;
-
     struct thread *idle_thread;
 } sched_t;
+
+extern sched_t *g_sched;
 
 /// Schedule a thread.
 void sched_thread_schedule(struct thread *thread);

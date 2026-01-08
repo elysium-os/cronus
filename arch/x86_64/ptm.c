@@ -13,6 +13,7 @@
 #include "memory/hhdm.h"
 #include "memory/page.h"
 #include "memory/pmm.h"
+#include "memory/vm.h"
 #include "sys/init.h"
 #include "x86_64/cpu/cr.h"
 #include "x86_64/exception.h"
@@ -346,7 +347,7 @@ void x86_64_ptm_page_fault_handler(arch_interrupt_frame_t *frame) {
     vm_fault_t fault = VM_FAULT_UNKNOWN;
     if((frame->err_code & PAGEFAULT_FLAG_PRESENT) == 0) fault = VM_FAULT_NOT_PRESENT;
 
-    if(ARCH_CPU_CURRENT_READ(flags.threaded) && vm_fault(x86_64_cr2_read(), fault)) return;
+    if(ARCH_CPU_CURRENT_READ(flags.threaded) && (frame->rip < g_vm_global_address_space->start || frame->rip >= g_vm_global_address_space->end) && vm_fault(x86_64_cr2_read(), fault)) return;
     x86_64_exception_unhandled(frame);
 }
 

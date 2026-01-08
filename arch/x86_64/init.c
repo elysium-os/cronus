@@ -17,6 +17,7 @@
 #include "memory/vm.h"
 #include "sched/sched.h"
 #include "sys/event.h"
+#include "sys/hook.h"
 #include "sys/init.h"
 #include "sys/time.h"
 #include "x86_64/abi/sysv/auxv.h"
@@ -37,17 +38,6 @@
 #include <tartarus.h>
 #include <uacpi/tables.h>
 #include <uacpi/uacpi.h>
-
-uintptr_t g_hhdm_offset;
-size_t g_hhdm_size;
-
-page_t *g_page_db;
-size_t g_page_db_size;
-
-static volatile bool g_init_ap_finished = false;
-static uint64_t g_init_ap_cpu_id = 0;
-
-static cpu_t g_early_bsp;
 
 static bool g_hpet_initialized = false;
 
@@ -101,104 +91,6 @@ static time_frequency_t calibrate_tsc() {
         return (__rdtsc() - tsc_start) * (TIME_NANOSECONDS_IN_SECOND / timeout);
     }
     ASSERT_UNREACHABLE();
-}
-
-
-static void initialize_cpu_local(cpu_t *cpu, size_t seqid) {
-    cpu->self = cpu;
-
-    cpu->arch.current_thread = nullptr;
-    cpu->arch.lapic_timer_frequency = 0;
-    cpu->arch.tsc_timer_frequency = 0;
-    cpu->arch.tss = nullptr;
-
-    cpu->arch.lapic_id = 0;
-    cpu->sequential_id = seqid;
-
-    cpu->dw_items = LIST_INIT;
-    cpu->sched = (sched_t) {
-        .lock = SPINLOCK_INIT,
-        .thread_queue = LIST_INIT,
-        .status = { .preempt_counter = 0, .yield_immediately = false },
-    };
-
-    cpu->flags.threaded = false;
-    cpu->flags.in_interrupt_hard = false;
-    cpu->flags.in_interrupt_soft = false;
-    cpu->flags.deferred_work_status = 0;
-}
-
-[[gnu::no_instrument_function]] [[noreturn]] static void init_ap() {
-    cpu_t *cpu = &g_cpu_list[g_init_ap_cpu_id];
-    x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
-    event_init_cpu_local();
-
-    log(LOG_LEVEL_INFO, "INIT", "Initializing AP %lu", g_init_ap_cpu_id);
-
-    init_run_stage(INIT_STAGE_BOOT, true);
-    init_run_stage(INIT_STAGE_EARLY, true);
-
-    arch_ptm_load_address_space(g_vm_global_address_space);
-
-    init_run_stage(INIT_STAGE_BEFORE_MAIN, true);
-    cpu->arch.lapic_id = x86_64_lapic_id();
-    init_run_stage(INIT_STAGE_MAIN, true);
-
-    init_run_stage(INIT_STAGE_BEFORE_DEV, true);
-    init_run_stage(INIT_STAGE_DEV, true);
-
-    init_run_stage(INIT_STAGE_LATE, true);
-
-    log(LOG_LEVEL_DEBUG, "INIT", "AP %lu (Lapic ID: %i) init exit", g_init_ap_cpu_id, x86_64_lapic_id());
-    __atomic_add_fetch(&g_init_ap_finished, true, __ATOMIC_SEQ_CST);
-
-    arch_sched_handoff_cpu();
-    ASSERT_UNREACHABLE();
-}
-
-void arch_init_bsp_local(size_t seqid) {
-    initialize_cpu_local(&g_early_bsp, seqid);
-    x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) &g_early_bsp);
-}
-
-void arch_init_cpu_locals(tartarus_boot_info_t *boot_info) {
-    log(LOG_LEVEL_DEBUG, "INIT", "Setting up proper CPU locals (%lu locals)", g_cpu_count);
-    g_cpu_list = heap_alloc(sizeof(cpu_t) * g_cpu_count);
-    mem_clear(g_cpu_list, sizeof(cpu_t) * g_cpu_count);
-
-    for(size_t i = 0; i < boot_info->cpu_count; i++) {
-        if(boot_info->cpus[i].init_state == TARTARUS_CPU_STATE_FAIL) continue;
-
-        if(i != boot_info->bsp_index) {
-            initialize_cpu_local(&g_cpu_list[boot_info->cpus[i].sequential_id], boot_info->cpus[i].sequential_id);
-        } else {
-            log(LOG_LEVEL_DEBUG, "INIT", "Initialized BSP proper (local %lu)", boot_info->cpus[i].sequential_id);
-            cpu_t *cpu = &g_cpu_list[boot_info->cpus[i].sequential_id];
-            mem_copy(cpu, &g_early_bsp, sizeof(cpu_t));
-            cpu->self = cpu;
-            cpu->arch.lapic_id = x86_64_lapic_id();
-            x86_64_msr_write(X86_64_MSR_GS_BASE, (uint64_t) cpu);
-        }
-    }
-}
-
-void arch_init_smp(tartarus_boot_info_t *boot_info) {
-    for(size_t i = 0; i < boot_info->cpu_count; i++) {
-        if(boot_info->cpus[i].init_state == TARTARUS_CPU_STATE_FAIL) continue;
-
-        if(i == boot_info->bsp_index) continue;
-
-        init_reset_ap();
-
-        g_init_ap_cpu_id = boot_info->cpus[i].sequential_id;
-        g_init_ap_finished = false;
-
-        __atomic_store_n(boot_info->cpus[i].wake_on_write, (uintptr_t) init_ap, __ATOMIC_RELEASE);
-        while(!g_init_ap_finished);
-    }
-
-    log(LOG_LEVEL_DEBUG, "INIT", "SMP init done (%lu/%lu cpus initialized)", g_cpu_count, g_cpu_count);
-    log(LOG_LEVEL_DEBUG, "INIT", "BSP seqid is %lu", ARCH_CPU_CURRENT_READ(sequential_id));
 }
 
 INIT_TARGET(cpuinfo, INIT_STAGE_EARLY, INIT_SCOPE_BSP, INIT_DEPS()) {
@@ -340,4 +232,21 @@ INIT_TARGET(init_program, INIT_STAGE_LATE, INIT_SCOPE_BSP, INIT_DEPS()) {
     log(LOG_LEVEL_DEBUG, "INIT", "init thread (tid: %lu) >> entry: %#lx, stack: %#lx", thread->id, entry, thread_stack);
 
     sched_thread_schedule(thread);
+}
+
+HOOK(init_cpu_local) {
+    ARCH_CPU_CURRENT_PTR()->flags.yield_immediately = false;
+    ARCH_CPU_CURRENT_PTR()->flags.threaded = false;
+    ARCH_CPU_CURRENT_PTR()->flags.in_interrupt_hard = false;
+    ARCH_CPU_CURRENT_PTR()->flags.in_interrupt_soft = false;
+    ARCH_CPU_CURRENT_PTR()->flags.deferred_work_status = 0;
+    ARCH_CPU_CURRENT_PTR()->flags.preempt_counter = 0;
+}
+
+HOOK(init_cpu_local) { // TODO: these are purely defaults, should be moved at the very least, probably not really needed
+    ARCH_CPU_CURRENT_PTR()->arch.current_thread = nullptr;
+    ARCH_CPU_CURRENT_PTR()->arch.lapic_timer_frequency = 0;
+    ARCH_CPU_CURRENT_PTR()->arch.tsc_timer_frequency = 0;
+    ARCH_CPU_CURRENT_PTR()->arch.tss = nullptr;
+    ARCH_CPU_CURRENT_PTR()->arch.lapic_id = 0;
 }

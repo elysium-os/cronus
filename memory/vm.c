@@ -1,3 +1,4 @@
+#define TRACE
 #include "memory/vm.h"
 
 #include "arch/mem.h"

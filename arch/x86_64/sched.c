@@ -27,6 +27,7 @@
 #include "x86_64/thread.h"
 
 #include <stddef.h>
+#include <stdint.h>
 
 #define INTERVAL 100000
 #define KERNEL_STACK_SIZE_PG 16
@@ -69,7 +70,7 @@ static long g_next_tid = BOOTSTRAP_TID + 1;
     arch_interrupt_enable();
     arch_sched_preempt();
 
-    ASSERT(ARCH_CPU_CURRENT_READ(sched.status.preempt_counter) == 0 && ARCH_CPU_CURRENT_READ(flags.deferred_work_status) == 0);
+    ASSERT(ARCH_CPU_CURRENT_READ(flags.preempt_counter) == 0 && ARCH_CPU_CURRENT_READ(flags.deferred_work_status) == 0);
 }
 
 [[gnu::no_instrument_function]] static void kernel_thread_exit() {
@@ -77,7 +78,7 @@ static long g_next_tid = BOOTSTRAP_TID + 1;
 }
 
 static void sched_entry([[maybe_unused]] void *data) {
-    ARCH_CPU_CURRENT_WRITE(sched.status.yield_immediately, true);
+    ARCH_CPU_CURRENT_WRITE(flags.yield_immediately, true);
 }
 
 [[noreturn]] static void sched_idle() {
@@ -116,9 +117,10 @@ static void sched_entry([[maybe_unused]] void *data) {
 
 static sched_t *pick_next_scheduler() {
     // TODO: this is NOT a good way of doing this
-    static size_t current_cpu_id = 0;
-    size_t cpu_id = __atomic_fetch_add(&current_cpu_id, 1, __ATOMIC_RELAXED);
-    return &g_cpu_list[cpu_id % g_cpu_count].sched;
+    // static size_t current_cpu_id = 0;
+    // size_t cpu_id = __atomic_fetch_add(&current_cpu_id, 1, __ATOMIC_RELAXED);
+    // return &g_sched[cpu_id % g_cpu_count];
+    return &g_sched[0];
 }
 
 static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *scheduler, x86_64_thread_stack_t kernel_stack, uintptr_t rsp) {
@@ -205,16 +207,17 @@ void arch_sched_context_switch(thread_t *current, thread_t *next) {
     x86_64_thread_t *bootstrap_thread = heap_alloc(sizeof(x86_64_thread_t));
     mem_clear(bootstrap_thread, sizeof(x86_64_thread_t));
     bootstrap_thread->common.state = THREAD_STATE_DESTROY;
-    bootstrap_thread->common.scheduler = &ARCH_CPU_CURRENT_PTR()->sched;
+    bootstrap_thread->common.scheduler = &g_sched[ARCH_CPU_CURRENT_READ(sequential_id)];
     bootstrap_thread->common.id = BOOTSTRAP_TID;
 
     ARCH_CPU_CURRENT_WRITE(flags.threaded, true);
 
-    sched_switch(bootstrap_thread, X86_64_THREAD(ARCH_CPU_CURRENT_READ(sched.idle_thread)));
+    // TODO: just yield here? though we must ensure bootstrap thread is more "complete" for that
+    sched_switch(bootstrap_thread, X86_64_THREAD(g_sched[ARCH_CPU_CURRENT_READ(sequential_id)].idle_thread));
     ASSERT_UNREACHABLE();
 }
 
-INIT_TARGET(idle_thread, INIT_STAGE_LATE, INIT_SCOPE_ALL, INIT_DEPS()) {
+INIT_TARGET(idle_thread, INIT_STAGE_LATE, INIT_SCOPE_ALL, INIT_DEPS("init_program")) {
     x86_64_thread_stack_t kernel_stack = { .base = HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(KERNEL_STACK_SIZE_PG, PMM_FLAG_ZERO))) + KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY), .size = KERNEL_STACK_SIZE_PG * ARCH_PAGE_GRANULARITY };
 
     init_stack_kernel_t *init_stack = (init_stack_kernel_t *) (kernel_stack.base - sizeof(init_stack_kernel_t));
@@ -222,7 +225,7 @@ INIT_TARGET(idle_thread, INIT_STAGE_LATE, INIT_SCOPE_ALL, INIT_DEPS()) {
     init_stack->thread_init = common_thread_init;
     init_stack->thread_exit_kernel = kernel_thread_exit;
 
-    x86_64_thread_t *idle_thread = create_thread(nullptr, IDLE_TID, &ARCH_CPU_CURRENT_PTR()->sched, kernel_stack, (uintptr_t) init_stack);
-
-    ARCH_CPU_CURRENT_WRITE(sched.idle_thread, &idle_thread->common);
+    sched_t *sched = &g_sched[ARCH_CPU_CURRENT_READ(sequential_id)];
+    x86_64_thread_t *idle_thread = create_thread(nullptr, IDLE_TID, sched, kernel_stack, (uintptr_t) init_stack);
+    sched->idle_thread = &idle_thread->common;
 }

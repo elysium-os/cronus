@@ -10,19 +10,19 @@ void (*g_x86_64_fpu_save)(void *area) = nullptr;
 void (*g_x86_64_fpu_restore)(void *area) = nullptr;
 
 static inline void xsave(void *area) {
-    asm volatile("xsave (%0)" : : "r"(area), "a"(0xFFFF'FFFF), "d"(0xFFFF'FFFF) : "memory");
+    asm volatile("xsaveq (%0)" : : "r"(area), "a"(0xFFFF'FFFF), "d"(0xFFFF'FFFF) : "memory");
 }
 
 static inline void xrstor(void *area) {
-    asm volatile("xrstor (%0)" : : "r"(area), "a"(0xFFFF'FFFF), "d"(0xFFFF'FFFF) : "memory");
+    asm volatile("xrstorq (%0)" : : "r"(area), "a"(0xFFFF'FFFF), "d"(0xFFFF'FFFF) : "memory");
 }
 
 static inline void fxsave(void *area) {
-    asm volatile("fxsave (%0)" : : "r"(area) : "memory");
+    asm volatile("fxsaveq (%0)" : : "r"(area) : "memory");
 }
 
 static inline void fxrstor(void *area) {
-    asm volatile("fxrstor (%0)" : : "r"(area) : "memory");
+    asm volatile("fxrstorq (%0)" : : "r"(area) : "memory");
 }
 
 INIT_TARGET(fpu, INIT_STAGE_MAIN, INIT_SCOPE_BSP, INIT_DEPS()) {
@@ -41,7 +41,7 @@ INIT_TARGET(fpu, INIT_STAGE_MAIN, INIT_SCOPE_BSP, INIT_DEPS()) {
     }
 }
 
-INIT_TARGET(fpu_cpu, INIT_STAGE_MAIN, INIT_SCOPE_ALL, INIT_DEPS()) {
+INIT_TARGET(fpu_cpu, INIT_STAGE_MAIN, INIT_SCOPE_ALL, INIT_DEPS("fpu")) {
     ASSERT(x86_64_cpuid_feature(X86_64_CPUID_FEATURE_FXSR));
 
     /* Enable FPU */

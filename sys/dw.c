@@ -1,9 +1,12 @@
+#define TRACE
 #include "sys/dw.h"
 
 #include "arch/cpu.h"
 #include "common/assert.h"
+#include "common/log.h"
 #include "lib/barrier.h"
 #include "lib/container.h"
+#include "lib/list.h"
 #include "memory/slab.h"
 #include "sys/hook.h"
 
@@ -73,4 +76,8 @@ void dw_status_enable() {
 
 HOOK(init_slab_cache) {
     g_item_cache = slab_cache_create("deferred_work", sizeof(dw_item_t), 2);
+}
+
+HOOK(init_cpu_local) {
+    ARCH_CPU_CURRENT_PTR()->dw_items = LIST_INIT;
 }

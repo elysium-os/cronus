@@ -1,11 +1,16 @@
-#include "x86_64/interrupt.h"
+#include "arch/interrupt.h"
 
 #include "arch/cpu.h"
-#include "arch/interrupt.h"
+#include "arch/page.h"
+#include "arch/sched.h"
 #include "common/assert.h"
+#include "common/log.h"
+#include "sched/thread.h"
 #include "sys/dw.h"
 #include "sys/init.h"
 #include "x86_64/cpu/gdt.h"
+#include "x86_64/interrupt.h"
+#include "x86_64/thread.h"
 
 #define FLAGS_NORMAL 0x8E
 #define FLAGS_TRAP 0x8F
@@ -42,15 +47,21 @@ static int find_vector(interrupt_priority_t priority) {
 }
 
 [[gnu::no_instrument_function]] void x86_64_interrupt_handler(arch_interrupt_frame_t *frame) {
-    bool is_threaded = ARCH_CPU_CURRENT_READ(flags.threaded);
     bool is_outmost_handler = false;
 
-    if(is_threaded) {
+    // x86_64_thread_t *t = X86_64_THREAD(arch_sched_thread_current());
+    // unsigned long sp;
+    // __asm__ volatile("mov %%rsp, %0" : "=r"(sp));
+    // ASSERT(sp <= t->kernel_stack.base + t->kernel_stack.size / 3);
+
+    if(ARCH_CPU_CURRENT_READ(flags.threaded)) {
         is_outmost_handler = !ARCH_CPU_CURRENT_THREAD()->in_interrupt_handler;
         if(is_outmost_handler) ARCH_CPU_CURRENT_THREAD()->in_interrupt_handler = true;
 
+        // if(is_outmost_handler) {
         sched_preempt_inc();
         dw_status_disable();
+        // }
     }
 
     // Handle HardINT
@@ -59,18 +70,22 @@ static int find_vector(interrupt_priority_t priority) {
     if(frame->int_no >= 32) g_x86_64_interrupt_irq_eoi(frame->int_no);
     ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_hard, false);
 
-    if(is_threaded) {
+    if(ARCH_CPU_CURRENT_READ(flags.threaded)) {
+        // if(is_outmost_handler) {
         // At this point the HardINT is handled, so we can enable interrupts
-        ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_soft, true);
+        if(is_outmost_handler) ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_soft, true);
         arch_interrupt_enable();
         dw_status_enable();
         arch_interrupt_disable();
-        ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_soft, false);
+        if(is_outmost_handler) ARCH_CPU_CURRENT_WRITE(flags.in_interrupt_soft, false);
 
+        // Note that if we dec to zero and are pending a yield,
+        // this will yield
         sched_preempt_dec();
+        // }
 
         // Ensure preemption and dw is enabled if we return to userspace
-        ASSERT(!X86_64_INTERRUPT_IS_FROM_USER(frame) || (ARCH_CPU_CURRENT_READ(sched.status.preempt_counter) == 0 && ARCH_CPU_CURRENT_READ(flags.deferred_work_status) == 0));
+        ASSERT(!X86_64_INTERRUPT_IS_FROM_USER(frame) || (ARCH_CPU_CURRENT_READ(flags.preempt_counter) == 0 && ARCH_CPU_CURRENT_READ(flags.deferred_work_status) == 0));
         if(is_outmost_handler) ARCH_CPU_CURRENT_THREAD()->in_interrupt_handler = false;
     }
 }

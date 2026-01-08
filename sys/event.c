@@ -2,6 +2,7 @@
 
 #include "arch/cpu.h"
 #include "arch/event.h"
+#include "arch/interrupt.h"
 #include "arch/time.h"
 #include "common/assert.h"
 #include "lib/container.h"
@@ -19,7 +20,8 @@ static rb_value_t rbnode_value(rb_node_t *node) {
 }
 
 void events_process(arch_interrupt_frame_t *) {
-    sched_preempt_inc();
+    ASSERT(!arch_interrupt_state());
+
     cpu_t *current_cpu = ARCH_CPU_CURRENT_PTR();
 
     while(true) {
@@ -35,15 +37,8 @@ void events_process(arch_interrupt_frame_t *) {
 
         rb_remove(&current_cpu->events, node);
         dw_queue(event->dw_item);
-
-        if(ARCH_CPU_CURRENT_READ(flags.in_interrupt_hard)) {
-            rb_insert(&current_cpu->free_events, &event->rb_node);
-        } else {
-            slab_free(g_event_cache, event);
-        }
+        rb_insert(&current_cpu->free_events, &event->rb_node);
     }
-
-    sched_preempt_dec();
 }
 
 void event_queue(time_t delay, dw_function_t fn, void *data) {
@@ -80,8 +75,9 @@ void event_queue(time_t delay, dw_function_t fn, void *data) {
     interrupt_state_restore(interrupt_state);
 }
 
+// TODO: this is largely untested as it is not used anywhere at the moment
 void event_cancel(event_t *event) {
-    sched_preempt_inc();
+    interrupt_state_t interrupt_state = interrupt_state_mask();
     rb_tree_t *events = &ARCH_CPU_CURRENT_PTR()->events;
 
     rb_remove(events, &event->rb_node);
@@ -90,16 +86,14 @@ void event_cancel(event_t *event) {
     rb_node_t *first_node = rb_search(events, 0, RB_SEARCH_TYPE_NEAREST);
     if(first_node != nullptr) arch_event_timer_arm(CONTAINER_OF(first_node, event_t, rb_node)->deadline - arch_time_monotonic());
 
-    sched_preempt_dec();
-}
-
-void event_init_cpu_local() {
-    sched_preempt_inc();
-    ARCH_CPU_CURRENT_PTR()->events = RB_TREE_INIT(rbnode_value);
-    ARCH_CPU_CURRENT_PTR()->free_events = RB_TREE_INIT(rbnode_value);
-    sched_preempt_dec();
+    interrupt_state_restore(interrupt_state);
 }
 
 HOOK(init_slab_cache) {
     g_event_cache = slab_cache_create("event", sizeof(event_t), 2);
+}
+
+HOOK(init_cpu_local) {
+    ARCH_CPU_CURRENT_PTR()->events = RB_TREE_INIT(rbnode_value);
+    ARCH_CPU_CURRENT_PTR()->free_events = RB_TREE_INIT(rbnode_value);
 }

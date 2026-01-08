@@ -1,8 +1,14 @@
+#include "arch/cpu.h"
+
 #include "sys/init.h"
 #include "x86_64/cpu/cr.h"
 #include "x86_64/cpu/msr.h"
 
 #include <stdint.h>
+
+void arch_cpu_local_load(void *ptr) {
+    x86_64_msr_write(X86_64_MSR_GS_BASE, (uintptr_t) ptr);
+}
 
 /// Initialize the Page Attribute Table (PAT) for the current CPU.
 /// The PAT is configured in cronus as following:

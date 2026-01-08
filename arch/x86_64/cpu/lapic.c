@@ -72,7 +72,6 @@ uint32_t x86_64_lapic_timer_read() {
     return lapic_read(REG_TIMER_CURRENT_COUNT);
 }
 
-
 INIT_TARGET(lapic, INIT_STAGE_BEFORE_MAIN, INIT_SCOPE_ALL, INIT_DEPS("external_interrupts")) {
     uint64_t lapic_base_msr = x86_64_msr_read(X86_64_MSR_APIC_BASE);
     lapic_base_msr &= ~BASE_ADDR_MASK;

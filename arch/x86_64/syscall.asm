@@ -55,7 +55,7 @@ x86_64_syscall_entry:
 
     mov rbx, rdx ; Cannot use rdx for return value
 
-    .invalid_syscall:
+.invalid_syscall:
 
     xor r12, r12
     mov r12, ds
