@@ -51,7 +51,7 @@ void spinlock_release_noint(spinlock_t *lock, interrupt_state_t interrupt_state)
 }
 
 void spinlock_acquire_raw(spinlock_t *lock) {
-#ifdef __ENV_DEVELOPMENT
+#ifdef __ENV_DEBUG
     uint64_t dead = 0;
 #endif
     while(true) {
@@ -59,7 +59,7 @@ void spinlock_acquire_raw(spinlock_t *lock) {
 
         while(__atomic_load_n(lock, __ATOMIC_RELAXED)) {
             arch_cpu_relax();
-#ifdef __ENV_DEVELOPMENT
+#ifdef __ENV_DEBUG
             ASSERT(dead++ != DEADLOCK_AT);
 #endif
         }

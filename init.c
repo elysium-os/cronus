@@ -258,12 +258,12 @@ static void thread_init() {
         }
     }
 
-    log(LOG_LEVEL_DEBUG, "INIT", "Physical Memory Map");
-    pmm_zone_t *zones[] = { &g_pmm_zone_low, &g_pmm_zone_normal };
-    for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
-        pmm_zone_t *zone = zones[i];
-        log(LOG_LEVEL_DEBUG, "INIT", "» %-6s %#-18lx -> %#-18lx %lu/%lu pages", zone->name, zone->start, zone->end, zone->free_page_count, zone->total_page_count);
-    }
+    // log(LOG_LEVEL_DEBUG, "INIT", "Physical Memory Map");
+    // pmm_zone_t *zones[] = { &g_pmm_zone_low, &g_pmm_zone_normal };
+    // for(size_t i = 0; i < sizeof(zones) / sizeof(pmm_zone_t *); i++) {
+    //     pmm_zone_t *zone = zones[i];
+    //     log(LOG_LEVEL_DEBUG, "INIT", "» %-6s %#-18lx -> %#-18lx %lu/%lu pages", zone->name, zone->start, zone->end, zone->free_page_count, zone->total_page_count);
+    // }
 
     // Main init
     init_run_stage(INIT_STAGE_BEFORE_MAIN, false);
@@ -304,28 +304,28 @@ static void thread_init() {
     if(res != VFS_RESULT_OK) panic("INIT", "failed to mount /tmp (%i)", res);
 
     // Run module tests
-#ifdef __ENV_DEVELOPMENT
-    vfs_node_t *modules_dir = nullptr;
-    res = vfs_lookup(&VFS_ABSOLUTE_PATH("/sys/modules"), &modules_dir);
-    if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup modules directory (%i)", res);
-    if(modules_dir == nullptr) panic("INIT", "no modules directory found");
+    // #ifdef __ENV_DEBUG
+    //     vfs_node_t *modules_dir = nullptr;
+    //     res = vfs_lookup(&VFS_ABSOLUTE_PATH("/sys/modules"), &modules_dir);
+    //     if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup modules directory (%i)", res);
+    //     if(modules_dir == nullptr) panic("INIT", "no modules directory found");
 
-    static const char *test_modules[] = { "test_pmm.cronmod", "test_vm.cronmod" };
+    //     static const char *test_modules[] = { "test_pmm.cronmod", "test_vm.cronmod" };
 
-    for(size_t i = 0; i < sizeof(test_modules) / sizeof(char *); i++) {
-        vfs_node_t *test_module_file = nullptr;
-        res = vfs_lookup(&(vfs_path_t) { .root = modules_dir, .relative_path = test_modules[i] }, &test_module_file);
-        if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup `%s` module (%i)", test_modules[i], res);
-        if(test_module_file == nullptr) panic("INIT", "no `%s` module found", test_modules[i]);
+    //     for(size_t i = 0; i < sizeof(test_modules) / sizeof(char *); i++) {
+    //         vfs_node_t *test_module_file = nullptr;
+    //         res = vfs_lookup(&(vfs_path_t) { .root = modules_dir, .relative_path = test_modules[i] }, &test_module_file);
+    //         if(res != VFS_RESULT_OK) panic("INIT", "failed to lookup `%s` module (%i)", test_modules[i], res);
+    //         if(test_module_file == nullptr) panic("INIT", "no `%s` module found", test_modules[i]);
 
-        module_t *module;
-        module_result_t mres = module_load(test_module_file, &module);
-        if(mres != MODULE_RESULT_OK) panic("INIT", "failed to load `%s` module `%s`", test_modules[i], module_result_stringify(mres));
+    //         module_t *module;
+    //         module_result_t mres = module_load(test_module_file, &module);
+    //         if(mres != MODULE_RESULT_OK) panic("INIT", "failed to load `%s` module `%s`", test_modules[i], module_result_stringify(mres));
 
-        if(module->initialize != nullptr) module->initialize();
-        if(module->uninitialize != nullptr) module->uninitialize();
-    }
-#endif
+    //         if(module->initialize != nullptr) module->initialize();
+    //         if(module->uninitialize != nullptr) module->uninitialize();
+    //     }
+    // #endif
 
     // Late init
     init_run_stage(INIT_STAGE_LATE, false);

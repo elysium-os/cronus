@@ -25,7 +25,7 @@ typedef struct {
 
     bool in_interrupt_handler;
 
-#ifdef __ENV_DEVELOPMENT
+#ifdef __ENV_DEBUG
     struct {
         bool active;
         bool in_profiler;

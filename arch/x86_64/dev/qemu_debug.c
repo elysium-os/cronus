@@ -5,7 +5,7 @@
 
 #include <stdarg.h>
 
-#ifdef __ENV_DEVELOPMENT
+#ifdef __ENV_DEBUG
 
 static void x86_64_qemu_debug_putc(char ch) {
     x86_64_port_outb(0xE9, ch);

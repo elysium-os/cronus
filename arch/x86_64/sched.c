@@ -135,7 +135,7 @@ static x86_64_thread_t *create_thread(process_t *proc, size_t id, sched_t *sched
     thread->state.fpu_area = (void *) HHDM(PAGE_PADDR(PAGE_FROM_BLOCK(pmm_alloc_pages(MATH_DIV_CEIL(g_x86_64_fpu_area_size, ARCH_PAGE_GRANULARITY), PMM_FLAG_ZERO)))); // TODO: wasting a page here...
     thread->in_interrupt_handler = false;
 
-#ifdef __ENV_DEVELOPMENT
+#ifdef __ENV_DEBUG
     thread->profiler.records = x86_64_profiler_records();
 #endif
 

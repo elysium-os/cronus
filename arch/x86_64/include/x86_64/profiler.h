@@ -4,7 +4,7 @@
 
 #include <stdint.h>
 
-#ifdef __ENV_DEVELOPMENT
+#ifdef __ENV_DEBUG
 
 #define X86_64_PROFILER_FRAMES 128
 

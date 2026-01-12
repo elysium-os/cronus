@@ -7,7 +7,7 @@
 #include "memory/heap.h"
 #include "sys/kernel_symbol.h"
 
-#ifdef __ENV_DEVELOPMENT
+#ifdef __ENV_DEBUG
 
 static bool g_profiler_enabled = false; // TODO: remove when is_threaded exists
 
